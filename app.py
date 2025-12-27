@@ -82,21 +82,31 @@ DATA_DIR.mkdir(exist_ok=True)
 # Utilitários de planilha
 # ----------------------
 
-def conectar_google_sheets():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
+def conectar_google_sheets_test():
+    try:
+        client = conectar_google_sheets()
+        # Testa cada aba
+        for aba in ["registros", "treino", "sono"]:
+            client.open("Registro_Atleta_Bernardo").worksheet(aba)
+        st.success("Conexão com Google Sheets OK em todas as abas!")
+        return client
+    except Exception as e:
+        st.error(f"Erro na conexão com Google Sheets: {e}")
+        return None
 
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
+client = conectar_google_sheets_test()
 
+
+scopes = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+
+try:
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scopes)
     client = gspread.authorize(creds)
-    return client
-
-client = conectar_google_sheets()
+    # Teste de conexão com a aba 'registros'
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
+    st.success("Conexão com Google Sheets OK!")
+except Exception as e:
+    st.error(f"Erro na conexão: {e}")
 
 
 
