@@ -8,6 +8,7 @@ import io
 import numpy as np
 import matplotlib.patches as mpatches
 import altair as alt
+import os
 from pathlib import Path
 from google.oauth2.service_account import Credentials
 import gspread
@@ -2870,4 +2871,5 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
 
