@@ -1,9 +1,7 @@
 # app.py - Versão Streamlit do sistema do Murilo
 import streamlit as st
 import pandas as pd
-import os
 from datetime import datetime, timedelta
-from openpyxl import Workbook, load_workbook
 import matplotlib.pyplot as plt
 from PIL import Image
 import io
@@ -11,6 +9,8 @@ import numpy as np
 import matplotlib.patches as mpatches
 import altair as alt
 from pathlib import Path
+from google.oauth2.service_account import Credentials
+import gspread
 
 BASE_DIR = Path(__file__).parent
 
@@ -20,10 +20,11 @@ st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_si
 # ----------------------
 # Configurações de arquivos
 # ----------------------
-REGISTROS_PATH = BASE_DIR / "Data" / "registros.xlsx"
-TREINO_PATH = BASE_DIR / "treino.xlsx"
-SONO_PATH = BASE_DIR / "controle_sono.xlsx"
-IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
+EXPECTED_REGISTROS_COLUMNS = [
+    "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
+    "Minutos Jogados", "Gols Marcados", "Assistências", "Resultado", "Local",
+    "Condição do Campo", "Treino", "Date", "Hora"
+
 
 # --- NOVOS CAMINHOS PARA LOGOS (Crie os arquivos nesta pasta) ---
 LOGO_PATH_1 = BASE_DIR / "logos" / "paulista.png"
@@ -76,6 +77,25 @@ DATA_DIR.mkdir(exist_ok=True)
 # ----------------------
 # Utilitários de planilha
 # ----------------------
+
+def conectar_google_sheets():
+    scopes = [
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=scopes
+    )
+
+    client = gspread.authorize(creds)
+    return client
+
+client = conectar_google_sheets()
+
+
+
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
     try:
@@ -91,68 +111,41 @@ def parse_duration_to_hours(dur_str):
 
 
 def load_registros():
-    """Carrega registros de jogos da planilha para um DataFrame (ou cria o arquivo se não existir)."""
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
+    dados = sheet.get_all_records()
 
-    # ----------------------------------------------------------------------------------------------------------------------
-    # AQUI ESTÃO AS COLUNAS ESPERADAS - ADICIONADO "Condição do Campo"
-    expected_columns = ["Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
-                        "Minutos Jogados", "Gols Marcados", "Assistências", "Resultado", "Local",
-                        "Condição do Campo", "Treino", "Date", "Hora"]
-    # ----------------------------------------------------------------------------------------------------------------------
+    df = pd.DataFrame(dados)
 
-    if not os.path.exists(REGISTROS_PATH):
-        # Cria planilha base com cabeçalhos
-        wb = Workbook()
-        ws = wb.active
-        ws.append(expected_columns)  # Usa a lista de colunas esperadas
-        wb.save(REGISTROS_PATH)
-        return pd.DataFrame(columns=expected_columns)
+    for col in EXPECTED_REGISTROS_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
 
-    try:
-        df = pd.read_excel(REGISTROS_PATH, engine="openpyxl")
-
-        # Normalizar colunas esperadas:
-        for c in expected_columns:
-            if c not in df.columns:
-                # Se a planilha antiga não tiver a coluna, adiciona ela vazia
-                df[c] = ""
-
-        return df[expected_columns]  # Retorna apenas as colunas na ordem correta
-    except Exception as e:
-        st.error(f"Erro ao carregar {REGISTROS_PATH}: {e}")
-        return pd.DataFrame(columns=expected_columns)
+    return df[EXPECTED_REGISTROS_COLUMNS]
 
 def save_registros(df):
-    """Salva DataFrame de registros no arquivo."""
-    try:
-        df.to_excel(REGISTROS_PATH, index=False, engine="openpyxl")
-        st.success("Planilha de registros atualizada com sucesso.")
-    except Exception as e:
-        st.error(f"Erro ao salvar registros: {e}")
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
+    sheet.clear()
+    sheet.update([df.columns.tolist()] + df.values.tolist())
+    print("SALVO COM SUCESSO NO GOOGLE SHEETS")
+
+EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
 
 def load_treinos_df():
-    if not os.path.exists(TREINO_PATH):
-        wb = Workbook()
-        ws = wb.active
-        ws.append(["Treino","Date","Tipo"])
-        wb.save(TREINO_PATH)
-        return pd.DataFrame(columns=["Treino","Date","Tipo"])
-    try:
-        df = pd.read_excel(TREINO_PATH, engine="openpyxl")
-        for c in ["Treino","Date","Tipo"]:
-            if c not in df.columns:
-                df[c] = ""
-        return df[["Treino","Date","Tipo"]]
-    except Exception as e:
-        st.error(f"Erro ao carregar {TREINO_PATH}: {e}")
-        return pd.DataFrame(columns=["Treino","Date","Tipo"])
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
+    dados = sheet.get_all_records()
+
+    df = pd.DataFrame(dados)
+
+    for col in EXPECTED_TREINOS_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+
+    return df[EXPECTED_TREINOS_COLUMNS]
 
 def save_treinos_df(df):
-    try:
-        df.to_excel(TREINO_PATH, index=False, engine="openpyxl")
-        st.success("Planilha de treinos atualizada.")
-    except Exception as e:
-        st.error(f"Erro ao salvar treinos: {e}")
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
+    sheet.clear()
+    sheet.update([df.columns.tolist()] + df.values.tolist())
 
 # 1. Definição das Constantes de Cochilo
 COL_DURACAO_COCHILO = 'Duração do Cochilo'
@@ -165,47 +158,26 @@ ALL_COLUMNS = [
     "Hora Dormir",
     "Hora Acordar",
     "Duração do Sono (h:min)",
-    COL_DURACAO_COCHILO, # Com a vírgula
-    COL_HOUVE_COCHILO
+    "Duração do Cochilo",
+    "Houve Cochilo"
 ]
 
-
 def load_sono_df():
-    # 1. CRIAÇÃO (Se não existir, cria o arquivo com as 6 colunas)
-    if not os.path.exists(SONO_PATH):
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Controle de Sono"
-        # CORREÇÃO AQUI: Cria o arquivo com as 6 colunas
-        ws.append(ALL_COLUMNS)
-        wb.save(SONO_PATH)
-        return pd.DataFrame(columns=ALL_COLUMNS)  # Retorna um DF vazio com 6 colunas
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
+    dados = sheet.get_all_records()
 
-    try:
-        # 2. LEITURA
-        df = pd.read_excel(SONO_PATH, engine="openpyxl", header=0)
+    df = pd.DataFrame(dados)
 
-        # 3. GARANTIA DE FORMATO DE DADOS (Mantido)
-        df['Data'] = pd.to_datetime(df['Data'], errors='coerce', dayfirst=True).dt.strftime('%d/%m/%Y')
+    for col in ALL_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
 
-        # 4. GARANTIA DE COLUNAS: Garante que TODAS as 6 colunas existam
-        for c in ALL_COLUMNS:
-            if c not in df.columns:
-                df[c] = ""  # Adiciona a coluna vazia se ela não existe
-
-        # CORREÇÃO AQUI: RETORNA AS 6 COLUNAS!
-        return df[ALL_COLUMNS]
-
-    except Exception as e:
-        st.error(f"Erro ao carregar {SONO_PATH}: {e}")
-        return pd.DataFrame(columns=ALL_COLUMNS)  # Retorna um DF vazio com 6 colunas para evitar crash
+    return df[ALL_COLUMNS]
 
 def save_sono_df(df):
-    try:
-        df.to_excel(SONO_PATH, index=False, engine="openpyxl")
-        st.success("Planilha de sono atualizada.")
-    except Exception as e:
-        st.error(f"Erro ao salvar sono: {e}")
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
+    sheet.clear()
+    sheet.update([df.columns.tolist()] + df.values.tolist())
 
 # ----------------------
 
