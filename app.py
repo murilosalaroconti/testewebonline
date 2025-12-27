@@ -14,6 +14,7 @@ from google.oauth2.service_account import Credentials
 import gspread
 
 BASE_DIR = Path(__file__).parent
+IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
@@ -26,6 +27,7 @@ EXPECTED_REGISTROS_COLUMNS = [
     "Minutos Jogados", "Gols Marcados", "Assistências", "Resultado", "Local",
     "Condição do Campo", "Treino", "Date", "Hora"
 ]
+
 
 
 # --- NOVOS CAMINHOS PARA LOGOS (Crie os arquivos nesta pasta) ---
@@ -2871,5 +2873,3 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
-
-
