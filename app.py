@@ -24,6 +24,7 @@ EXPECTED_REGISTROS_COLUMNS = [
     "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
     "Minutos Jogados", "Gols Marcados", "Assistências", "Resultado", "Local",
     "Condição do Campo", "Treino", "Date", "Hora"
+]
 
 
 # --- NOVOS CAMINHOS PARA LOGOS (Crie os arquivos nesta pasta) ---
@@ -2869,3 +2870,4 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
