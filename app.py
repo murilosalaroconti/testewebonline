@@ -111,6 +111,11 @@ def conectar_google_sheets_test():
 # ----------------------
 client = conectar_google_sheets_test()
 
+# Botão para atualizar dados
+# ------------------------------
+if st.button("Atualizar planilha"):
+    st.cache_data.clear()  # limpa o cache de todas as funções com @st.cache_data
+    st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
 
 
 def parse_duration_to_hours(dur_str):
