@@ -416,8 +416,8 @@ with st.sidebar:
     with col_dados:
         st.markdown("##### 🏋️ Dados Físicos")
         # Agrupamos em markdown simples para garantir que caiba no espaço
-        st.markdown(f"**Peso:** 33 kg")
-        st.markdown(f"**Altura:** 1.32 m")
+        st.markdown(f"**Peso:** 30,6 kg")
+        st.markdown(f"**Altura:** 1.35 m")
         st.markdown(f"**Idade:** 9 anos")
 
     with col_campo:
@@ -2885,3 +2885,4 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
