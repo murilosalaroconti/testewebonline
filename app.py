@@ -127,16 +127,14 @@ def parse_duration_to_hours(dur_str):
 # FIM DA FUNÇÃO QUE PRECISA SER DEFINIDA PRIMEIRO.
 
 
+@st.cache_data(ttl=300)  # TTL = 300 segundos = 5 minutos
 def load_registros():
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
     dados = sheet.get_all_records()
-
     df = pd.DataFrame(dados)
-
     for col in EXPECTED_REGISTROS_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-
     return df[EXPECTED_REGISTROS_COLUMNS]
 
 def save_registros(df):
@@ -147,16 +145,14 @@ def save_registros(df):
 
 EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
 
+@st.cache_data(ttl=300)
 def load_treinos_df():
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
     dados = sheet.get_all_records()
-
     df = pd.DataFrame(dados)
-
     for col in EXPECTED_TREINOS_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-
     return df[EXPECTED_TREINOS_COLUMNS]
 
 def save_treinos_df(df):
@@ -179,16 +175,14 @@ ALL_COLUMNS = [
     "Houve Cochilo"
 ]
 
+@st.cache_data(ttl=300)
 def load_sono_df():
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
     dados = sheet.get_all_records()
-
     df = pd.DataFrame(dados)
-
     for col in ALL_COLUMNS:
         if col not in df.columns:
             df[col] = ""
-
     return df[ALL_COLUMNS]
 
 def save_sono_df(df):
