@@ -2542,7 +2542,7 @@ with tab[5]:
             st.markdown(f'''
                 <div class="card-jogos">
                     🏟️ JOGOS<p>{total_jogos}</p>
-                    <label>Minutos Jogados Total</label>
+                    <label>Total de Jogos</label>
                 </div>''', unsafe_allow_html=True)
         # Coluna 2: Gols Total
         with col2:
@@ -2563,7 +2563,7 @@ with tab[5]:
             st.markdown(f'''
                 <div class="card-minutos">
                     ⏱️ MINUTAGEM<p>{total_minutos}</p>
-                    <label>Total em Campo</label>
+                    <label>Total Minutos</label>
                 </div>''', unsafe_allow_html=True)
 
         # Coluna 5: Total de Treinos
@@ -2885,4 +2885,5 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
 
