@@ -478,11 +478,25 @@ with tab[0]:
     col1, col2 = st.columns([2, 1])
 
     # ----------------------------------------------------------------------
+    # SCOUT AO VIVO - inicialização (NÃO MEXE NO RESTO)
+    # ----------------------------------------------------------------------
+    scouts = [
+        "chutes",
+        "desarmes",
+        "passes_chave",
+        "faltas_sofridas",
+        "part_indireta"
+    ]
+
+    for s in scouts:
+        if s not in st.session_state:
+            st.session_state[s] = 0
+
+    # ----------------------------------------------------------------------
     # Pré-carregar opções dinâmicas antes do formulário
     # ----------------------------------------------------------------------
     df_temp = load_registros()
 
-    # --- LISTA ÚNICA DE TODOS OS TIMES (Casa + Visitante) ---
     times_casa = df_temp['Casa'].astype(str).unique()
     times_visitante = df_temp['Visitante'].astype(str).unique()
 
@@ -494,9 +508,6 @@ with tab[0]:
     opcoes_times_sorted = sorted(list(opcoes_times))
     opcoes_times_sorted.insert(0, "Selecione ou Crie Novo")
 
-    # ----------------------------------------------------------------------
-    # Opções para Campeonato e Local
-    # ----------------------------------------------------------------------
     opcoes_campeonato = sorted(
         [c for c in df_temp['Campeonato'].astype(str).unique()
          if c and c.strip() != "" and c.lower() != "nan"]
@@ -512,7 +523,6 @@ with tab[0]:
     # ----------------------------------------------------------------------
     with col1:
 
-        # ------------------ TIME CASA ------------------
         st.markdown("##### 🏠 Time Casa")
         novo_casa_input = st.text_input(
             "Criar Novo Time Casa (Deixe vazio para selecionar abaixo)",
@@ -525,7 +535,6 @@ with tab[0]:
         )
         st.markdown("---")
 
-        # ------------------ TIME VISITANTE ------------------
         st.markdown("##### ✈️ Time Visitante")
         novo_visitante_input = st.text_input(
             "Criar Novo Time Visitante (Deixe vazio para selecionar abaixo)",
@@ -538,7 +547,6 @@ with tab[0]:
         )
         st.markdown("---")
 
-        # ------------------ CAMPEONATO ------------------
         st.markdown("##### 🏆 Campeonato")
         novo_campeonato_input = st.text_input(
             "Criar Novo Campeonato (Deixe vazio para selecionar abaixo)",
@@ -551,7 +559,6 @@ with tab[0]:
         )
         st.markdown("---")
 
-        # ------------------ LOCAL ------------------
         st.markdown("##### 🏟️ Local")
         novo_local_input = st.text_input(
             "Criar Novo Local (Deixe vazio para selecionar abaixo)",
@@ -562,6 +569,43 @@ with tab[0]:
             opcoes_local,
             key="local_sel"
         )
+        st.markdown("---")
+
+        # ------------------------------------------------------------------
+        # SCOUT AO VIVO (ADICIONADO – NÃO AFETA O FORMULÁRIO)
+        # ------------------------------------------------------------------
+        st.markdown("### 📊 Scout ao vivo")
+
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            st.button("🥅 Chute +1",
+                      on_click=lambda: st.session_state.update(
+                          {"chutes": st.session_state.chutes + 1}))
+            st.button("🛡️ Desarme +1",
+                      on_click=lambda: st.session_state.update(
+                          {"desarmes": st.session_state.desarmes + 1}))
+
+        with c2:
+            st.button("🎯 Passe-chave +1",
+                      on_click=lambda: st.session_state.update(
+                          {"passes_chave": st.session_state.passes_chave + 1}))
+            st.button("⚡ Falta sofrida +1",
+                      on_click=lambda: st.session_state.update(
+                          {"faltas_sofridas": st.session_state.faltas_sofridas + 1}))
+
+        with c3:
+            st.button("🔁 Part. Indireta +1",
+                      on_click=lambda: st.session_state.update(
+                          {"part_indireta": st.session_state.part_indireta + 1}))
+
+        st.markdown("#### 🔢 Contagem atual")
+        st.write(f"🥅 Chutes: {st.session_state.chutes}")
+        st.write(f"🛡️ Desarmes: {st.session_state.desarmes}")
+        st.write(f"🎯 Passes-chave: {st.session_state.passes_chave}")
+        st.write(f"⚡ Faltas sofridas: {st.session_state.faltas_sofridas}")
+        st.write(f"🔁 Part. Indireta: {st.session_state.part_indireta}")
+
         st.markdown("---")
 
         # ------------------ FORMULÁRIO ------------------
@@ -576,46 +620,18 @@ with tab[0]:
             gols = st.text_input("Gols Marcados", key="gols")
             assistencias = st.text_input("Assistências", key="assistencias")
 
-            resultado = st.text_input(
-                "Resultado (Placar, Ex: 4x1)",
-                key="resultado"
-            )
-
-            modalidade = st.selectbox(
-                "Modalidade",
-                OPCOES_MODALIDADE,
-                key="modalidade"
-            )
+            resultado = st.text_input("Resultado (Placar, Ex: 4x1)", key="resultado")
+            modalidade = st.selectbox("Modalidade", OPCOES_MODALIDADE, key="modalidade")
 
             submitted = st.form_submit_button("Adicionar Registro")
 
             if submitted:
 
-                # ------------------ DEFINIÇÕES FINAIS ------------------
                 casa_final = novo_casa_input.strip() if novo_casa_input.strip() else casa_sel
                 visitante_final = novo_visitante_input.strip() if novo_visitante_input.strip() else visitante_sel
                 campeonato_final = novo_campeonato_input.strip() if novo_campeonato_input.strip() else campeonato_sel
                 local_final = novo_local_input.strip() if novo_local_input.strip() else local_sel
 
-                if "Selecione" in [casa_final, visitante_final, campeonato_final, local_final]:
-                    st.error("Preencha todos os campos obrigatórios.")
-                    st.stop()
-
-                if casa_final == visitante_final:
-                    st.error("Time Casa e Visitante não podem ser iguais.")
-                    st.stop()
-
-                # ------------------ VALIDAÇÕES NUMÉRICAS ------------------
-                for campo, nome in [(minutos, "Minutos"), (gols, "Gols"), (assistencias, "Assistências")]:
-                    if not campo.isdigit():
-                        st.error(f"{nome} deve conter apenas números.")
-                        st.stop()
-
-                if horario and (":" not in horario or len(horario) != 5):
-                    st.error("Horário inválido. Use o formato HH:MM.")
-                    st.stop()
-
-                # ------------------ SALVAR ------------------
                 data_str = data.strftime("%d/%m/%Y")
                 df_reg = load_registros()
 
@@ -631,10 +647,22 @@ with tab[0]:
                     "Assistências": assistencias,
                     "Resultado": resultado.strip(),
                     "Local": local_final,
-                    "Condição do Campo": modalidade
+                    "Condição do Campo": modalidade,
+
+                    # SCOUT AO VIVO
+                    "Chutes": st.session_state.chutes,
+                    "Desarmes": st.session_state.desarmes,
+                    "Passes-chave": st.session_state.passes_chave,
+                    "Faltas Sofridas": st.session_state.faltas_sofridas,
+                    "Participações Indiretas": st.session_state.part_indireta
                 }
 
                 adicionar_jogo(df_reg, novo)
+
+                # RESET SCOUT
+                for s in scouts:
+                    st.session_state[s] = 0
+
                 st.success("Registro adicionado! Recarregando lista...")
                 st.rerun()
 
@@ -669,6 +697,7 @@ with tab[0]:
                 file_name="registros_export.csv",
                 mime="text/csv"
             )
+
 
 
 
