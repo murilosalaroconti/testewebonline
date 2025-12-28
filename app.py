@@ -24,10 +24,11 @@ st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_si
 # ----------------------
 EXPECTED_REGISTROS_COLUMNS = [
     "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
-    "Minutos Jogados", "Gols Marcados", "Assistências", "Resultado", "Local",
-    "Condição do Campo", "Treino", "Date", "Hora"
+    "Minutos Jogados", "Gols Marcados", "Assistências",
+    "Chutes", "Desarmes", "Passes-chave", "Faltas Sofridas", "Participações Indiretas",
+    "Resultado", "Local", "Condição do Campo",
+    "Treino", "Date", "Hora"
 ]
-
 
 
 # --- NOVOS CAMINHOS PARA LOGOS (Crie os arquivos nesta pasta) ---
@@ -699,11 +700,6 @@ with tab[0]:
             )
 
 
-
-
-
-
-   
 
 # Aba Treinos
 # --------------------------
