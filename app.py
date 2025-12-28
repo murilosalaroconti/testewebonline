@@ -24,8 +24,11 @@ st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_si
 # ----------------------
 EXPECTED_REGISTROS_COLUMNS = [
     "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
-    "Minutos Jogados", "Gols Marcados", "Assistências", "Resultado", "Local",
-    "Condição do Campo", "Treino", "Date", "Hora"
+    "Minutos Jogados", "Gols Marcados", "Assistências",
+    "Participação Indireta",
+    "Chutes", "Desarmes", "Passe-chave", "Faltas Sofridas",
+    "Resultado", "Local", "Condição do Campo",
+    "Treino", "Date", "Hora"
 ]
 
 
@@ -525,20 +528,47 @@ with tab[0]:
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            if st.button("🥅 Chute +1"):
-                st.session_state.chutes += 1
-            if st.button("🛡️ Desarme +1"):
-                st.session_state.desarmes += 1
+            st.button(
+                "🥅 Chute +1",
+                key="btn_chute",
+                on_click=lambda: st.session_state.update(
+                    {"chutes": st.session_state.chutes + 1}
+                )
+            )
+
+            st.button(
+                "🛡️ Desarme +1",
+                key="btn_desarme",
+                on_click=lambda: st.session_state.update(
+                    {"desarmes": st.session_state.desarmes + 1}
+                )
+            )
 
         with c2:
-            if st.button("🎯 Passe-chave +1"):
-                st.session_state.passes_chave += 1
-            if st.button("⚡ Falta sofrida +1"):
-                st.session_state.faltas_sofridas += 1
+            st.button(
+                "🎯 Passe-chave +1",
+                key="btn_passe",
+                on_click=lambda: st.session_state.update(
+                    {"passes_chave": st.session_state.passes_chave + 1}
+                )
+            )
+
+            st.button(
+                "⚡ Falta sofrida +1",
+                key="btn_falta",
+                on_click=lambda: st.session_state.update(
+                    {"faltas_sofridas": st.session_state.faltas_sofridas + 1}
+                )
+            )
 
         with c3:
-            if st.button("🔁 Part. Indireta +1"):
-                st.session_state.part_indireta += 1
+            st.button(
+                "🔁 Part. Indireta +1",
+                key="btn_part",
+                on_click=lambda: st.session_state.update(
+                    {"part_indireta": st.session_state.part_indireta + 1}
+                )
+            )
 
         st.info(
             f"""
