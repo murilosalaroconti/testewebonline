@@ -416,8 +416,8 @@ with st.sidebar:
     with col_dados:
         st.markdown("##### 🏋️ Dados Físicos")
         # Agrupamos em markdown simples para garantir que caiba no espaço
-        st.markdown(f"**Peso:** 30,6 kg")
-        st.markdown(f"**Altura:** 1.35 m")
+        st.markdown(f"**Peso:** 33 kg")
+        st.markdown(f"**Altura:** 1.32 m")
         st.markdown(f"**Idade:** 9 anos")
 
     with col_campo:
@@ -648,246 +648,11 @@ with tab[0]:
             towrite.seek(0)
             st.download_button("Download CSV", towrite, file_name="registros_export.csv", mime="text/csv")
 
-    st.markdown("---")
-    st.markdown("### Gerar gráfico de gols:")
 
 
-    # --- INÍCIO DOS FILTROS DA GERAÇÃO DE GRÁFICO ---
-    df_temp = load_registros()
-    df_temp = df_temp[df_temp["Treino"].isna() | (df_temp["Treino"] == "")]
 
-    # ... (Lógica de Filtros de Ano, Mês e Visitante) ...
-    years = sorted([y for y in df_temp['Data'].apply(lambda x: safe_extract_date_part(x, 'year')).dropna().unique() if
-                    y is not None], reverse=True)
-    months_map = {1: 'Janeiro', 2: 'Fevereiro', 3: 'Março', 4: 'Abril', 5: 'Maio', 6: 'Junho', 7: 'Julho', 8: 'Agosto',
-                  9: 'Setembro', 10: 'Outubro', 11: 'Novembro', 12: 'Dezembro'}
-    months_available = sorted(
-        [m for m in df_temp['Data'].apply(lambda x: safe_extract_date_part(x, 'month')).dropna().unique() if
-         m is not None])
-    month_options = ["Todos"] + [f"{m:02d} - {months_map.get(m)}" for m in months_available]
-
-    # --- ADICIONADO: OPÇÕES PARA O FILTRO DE CAMPEONATO ---
-    campeonatos = sorted([c for c in df_temp['Campeonato'].astype(str).unique() if c and c.strip() != "" and c != "nan"])
-    # ------------------------------------------------------
-
-    # --- ADICIONADO: OPÇÕES PARA O FILTRO DE CONDIÇÃO DO CAMPO ---
-    condicoes = sorted([c for c in df_temp['Condição do Campo'].astype(str).unique() if c and c.strip() != "" and c != "nan"])
-    # -------------------------------------------------------------
-
-    # OBS: Usamos a coluna 'Casa' como a lista de 'Visitantes' para o filtro, como você tinha feito.
-    visitantes = sorted([v for v in df_temp['Casa'].astype(str).unique() if v and v.strip() != "" and v != "nan"])
-
-    # ALTERADO: De 3 para 5 colunas para acomodar os novos filtros
-    col_filter1, col_filter2, col_filter3, col_filter4, col_filter5 = st.columns(5)
-
-    with col_filter1:
-        ano_filter = st.selectbox("Filtrar por Ano:", ["Todos"] + years, key="jogos_ano")
-    with col_filter2:
-        mes_filter = st.selectbox("Filtrar por Mês:", month_options, key="jogos_mes")
-    with col_filter3:
-        visitante_filter = st.selectbox("Filtrar por Time (Visitante):", ["Todos"] + visitantes, key="jogos_casa")
-    with col_filter4:
-        # --- NOVO FILTRO DE CAMPEONATO ---
-        campeonato_filter = st.selectbox("Filtrar por Campeonato:", ["Todos"] + campeonatos, key="jogos_campeonato")
-        # ---------------------------------
-    with col_filter5:
-        # --- NOVO FILTRO DE CONDIÇÃO DO CAMPO ---
-        condicao_filter = st.selectbox("Condição do Campo:", ["Todos"] + condicoes, key="jogos_condicao")
-        # ----------------------------------------
-    # --- FIM DOS FILTROS DA GERAÇÃO DE GRÁFICO ---
-
-    if st.button("Gerar Gráfico (Jogos)"):
-        # ... (Sua lógica de Filtragem e Geração do Gráfico) ...
-        df = load_registros()
-        df_jogos = df[df["Treino"].isna() | (df["Treino"] == "")]
-
-        # --- APLICAÇÃO DOS FILTROS ---
-        df_jogos_filtrado = df_jogos.copy()
-        df_jogos_filtrado["Ano"] = df_jogos_filtrado['Data'].apply(lambda x: safe_extract_date_part(x, 'year'))
-        df_jogos_filtrado["Mes"] = df_jogos_filtrado['Data'].apply(lambda x: safe_extract_date_part(x, 'month'))
-
-        if ano_filter != "Todos":
-            df_jogos_filtrado = df_jogos_filtrado[df_jogos_filtrado["Ano"] == ano_filter]
-        if mes_filter != "Todos":
-            mes_num = int(mes_filter.split(' ')[0])
-            df_jogos_filtrado = df_jogos_filtrado[df_jogos_filtrado["Mes"] == mes_num]
-        if visitante_filter != "Todos":
-            df_jogos_filtrado = df_jogos_filtrado[df_jogos_filtrado["Casa"].astype(str) == visitante_filter]
-        if campeonato_filter != "Todos":
-            # --- NOVO FILTRO DE CAMPEONATO APLICADO ---
-            df_jogos_filtrado = df_jogos_filtrado[df_jogos_filtrado["Campeonato"].astype(str) == campeonato_filter]
-            # -----------------------------------------
-        if condicao_filter != "Todos":
-            # --- NOVO FILTRO DE CONDIÇÃO DO CAMPO APLICADO ---
-            df_jogos_filtrado = df_jogos_filtrado[df_jogos_filtrado["Condição do Campo"].astype(str) == condicao_filter]
-            # -----------------------------------------------
-        # --- FIM APLICAÇÃO DOS FILTROS ---
-
-        if df_jogos_filtrado.empty:
-            st.info("Não há registros de jogos para gerar o gráfico com os filtros selecionados.")
-
-        else:
-            # --- INÍCIO DA CORREÇÃO: Conversão de Data e Ordenação ---
-            import pandas as pd  # Garante que o pandas esteja importado
-
-            # 1. Converte a 'Data' para um objeto datetime (DD/MM/AAAA)
-            try:
-                # O parâmetro dayfirst=True é crucial para datas brasileiras (dia/mês/ano)
-                df_jogos_filtrado['Data_DT'] = pd.to_datetime(df_jogos_filtrado['Data'], format='%d/%m/%Y',
-                                                              dayfirst=True)
-            except Exception as e:
-                st.error(
-                    f"Erro ao converter coluna 'Data'. Verifique o formato DD/MM/AAAA. Erro: {e}. O gráfico não será gerado.")
-                st.stop()
-
-            # 2. Ordena os dados pelo campo de data/hora ANTES do agrupamento
-            df_jogos_filtrado = df_jogos_filtrado.sort_values(by='Data_DT', ascending=True)
-
-            # --- FIM DA CORREÇÃO ---
-
-            df_jogos_filtrado = df_jogos_filtrado.fillna("")
-
-
-            def to_int_safe(x):
-                try:
-                    return int(x)
-                except:
-                    return 0
-
-
-            df_jogos_filtrado["Gols Marcados"] = df_jogos_filtrado["Gols Marcados"].apply(to_int_safe)
-
-            # O agrupamento agora respeitará a ordem da Data_DT que já foi feita
-            # A variável 'group' é definida AQUI
-            group = df_jogos_filtrado.groupby(["Data_DT", "Visitante", "Campeonato", "Local"], dropna=False)[
-                "Gols Marcados"].sum().reset_index()
-
-            # --- Segundo check de 'group.empty' não é mais necessário aqui. ---
-            # O primeiro 'if' já garantiu que df_jogos_filtrado não está vazio.
-            # Se 'group' estiver vazio após o agrupamento (caso extremamente raro), ele deve ser tratado:
-            if group.empty:
-                st.info(
-                    "Não há dados suficientes para o gráfico após o agrupamento. (Todos os 'Gols Marcados' podem ser zero ou nulo após filtragem/agrupamento)")
-            else:
-                # Plot
-                fig, ax = plt.subplots(figsize=(12, 6))
-
-                # --- MAPA DE CORES ---
-                from matplotlib.patches import Patch
-
-                colors_map = {
-                    "Federação Paulista": "red", "Liga da Juventude": "pink", "União de Clubes": "green",
-                    "Liga Kids Guarulhos": "purple", "Copa Cuebla": "orange", "Paulista CUP": "blue",
-                    "Copa São Paulo": "yellow", "Copa J9": "black", "Torneio Internacional": "brown",
-                    "Terrão Cup": "cyan",
-                    # Adicione aqui outros campeonatos
-                    "Amistoso": "gray",
-                    "Copa Galo": "darkgreen",
-                    "Festival": "lightgray",
-                    "Mercosul": "turquoise",
-                    "Liga Paulista": "lightcoral"
-                }
-
-                colors = [colors_map.get(c, "gray") for c in group["Campeonato"]]
-                x = range(len(group))
-                ax.bar(x, group["Gols Marcados"].values, color=colors, width=0.6, edgecolor='black', linewidth=1.0,
-                       zorder=3)
-                ax.set_xticks(x)
-                ax.set_xticklabels(group["Visitante"].values, rotation=60, ha='right', fontsize=8)
-
-                titulo_filtro = ""
-                if ano_filter != "Todos": titulo_filtro += f"Ano: {ano_filter}, "
-                if mes_filter != "Todos": titulo_filtro += f"Mês: {mes_filter.split(' - ')[1]}, "
-                if visitante_filter != "Todos": titulo_filtro += f"Time: {visitante_filter}, "
-                if campeonato_filter != "Todos": titulo_filtro += f"Campeonato: {campeonato_filter}, " # NOVO FILTRO
-                if condicao_filter != "Todos": titulo_filtro += f"Condição: {condicao_filter}, " # NOVO FILTRO
-
-                titulo = f"Estatísticas de Gols Marcados ({titulo_filtro.strip(', ') if titulo_filtro else 'Todos os Jogos'})"
-
-                ax.set_title(titulo, fontsize=14, fontweight='bold', color='darkred')
-                ax.set_ylabel("Gols Marcados")
-                for i, v in enumerate(group["Gols Marcados"].values):
-                    ax.text(i, v / 2 if v > 0 else 0.02, str(v), ha='center', va='center', color='white',
-                            fontweight='bold')
-
-                # --- CÓDIGO DA LEGENDA ---
-                campeonatos_presentes = group["Campeonato"].unique()
-                legend_handles = []
-                legend_labels = []
-
-                for camp in sorted(campeonatos_presentes):
-                    if camp in colors_map:
-                        legend_handles.append(Patch(facecolor=colors_map[camp], edgecolor='black'))
-                        legend_labels.append(camp)
-                    else:
-                        legend_handles.append(Patch(facecolor="gray", edgecolor='black'))
-                        legend_labels.append(f"{camp} (Cor Padrão)")
-
-                ax.legend(handles=legend_handles, labels=legend_labels,
-                          title="Campeonatos",
-                          bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0.,
-                          fontsize=9)
-
-                campeonatos_presentes = group["Campeonato"].unique()
-                legend_handles = []
-                legend_labels = []
-
-                for camp in sorted(campeonatos_presentes):
-                    if camp in colors_map:
-                        legend_handles.append(Patch(facecolor=colors_map[camp], edgecolor='black'))
-                        legend_labels.append(camp)
-                    else:
-                        legend_handles.append(Patch(facecolor="gray", edgecolor='black'))
-                        legend_labels.append(f"{camp} (Cor Padrão)")
-
-                # 1. AJUSTE DE POSIÇÃO DA LEGENDA (Moved para baixo: de (1.02, 1) para (1.02, 0.95))
-                # Você pode ajustar o '0.95' para um valor menor (ex: 0.8) se quiser descer mais.
-                ax.legend(handles=legend_handles, labels=legend_labels,
-                          title="Campeonatos",
-                          bbox_to_anchor=(1.02, 0.95), loc='upper left', borderaxespad=0.,
-                          fontsize=9)
-
-
-                # ----------------------------------------------------------------------------------
-                # 2. ADIÇÃO DE ASSISTÊNCIAS E REPOSICIONAMENTO DAS ESTATÍSTICAS
-                # ----------------------------------------------------------------------------------
-
-                # Para calcular o total de assistências, precisamos da coluna 'Assistências' original
-                # (antes do agrupamento, no df_jogos_filtrado) e converter para inteiro.
-
-                def to_int_safe(x):
-                    try:
-                        return int(x)
-                    except:
-                        return 0
-
-
-                # Garante que a coluna Assistências seja tratada como número para a soma
-                df_jogos_filtrado["Assistências"] = df_jogos_filtrado["Assistências"].apply(to_int_safe)
-
-                total_jogos = len(group)
-                total_gols = int(group["Gols Marcados"].sum())
-                # NOVO: SOMA O TOTAL DE ASSISTÊNCIAS
-                total_assistencias = int(df_jogos_filtrado["Assistências"].sum())
-                media_gols = total_gols / total_jogos if total_jogos > 0 else 0
-
-                # NOVO TEXTO DE ESTATÍSTICAS (Incluindo Assistências)
-                # O "\n" cria a quebra de linha
-                stat_text = (
-                    f"Total de Jogos: {total_jogos}\n"
-                    f"Total de Gols: {total_gols}\n"
-                    f"Total de Assistências: {total_assistencias}\n"  # Nova linha
-                    f"Média de Gols: {media_gols:.2f}"
-                )
-
-                # 3. AJUSTE DA POSIÇÃO DO TEXTO ESTATÍSTICO (Moved para baixo: de (1.01, 0) para (1.02, -0.05))
-                # O y='-0.05' move o texto um pouco para baixo da área de plotagem.
-                ax.text(1.02, 0, stat_text, transform=ax.transAxes, fontsize=9, verticalalignment='bottom',
-                        horizontalalignment='left', bbox=dict(facecolor='white', edgecolor='none'))
-
-
-                plt.tight_layout()
-                st.pyplot(fig)
+    plt.tight_layout()
+    st.pyplot(fig)
 
 # Aba Treinos
 # --------------------------
@@ -2542,7 +2307,7 @@ with tab[5]:
             st.markdown(f'''
                 <div class="card-jogos">
                     🏟️ JOGOS<p>{total_jogos}</p>
-                    <label>Total de Jogos</label>
+                    <label>Minutos Jogados Total</label>
                 </div>''', unsafe_allow_html=True)
         # Coluna 2: Gols Total
         with col2:
@@ -2563,7 +2328,7 @@ with tab[5]:
             st.markdown(f'''
                 <div class="card-minutos">
                     ⏱️ MINUTAGEM<p>{total_minutos}</p>
-                    <label>Total Minutos</label>
+                    <label>Total em Campo</label>
                 </div>''', unsafe_allow_html=True)
 
         # Coluna 5: Total de Treinos
@@ -2885,5 +2650,3 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
-
-
