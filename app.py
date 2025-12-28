@@ -554,24 +554,40 @@ with tab[0]:
 
         # ---------------- TIMES ----------------
         st.markdown("##### 🏠 Time Casa")
-        novo_casa_input = st.text_input("Criar Novo Time Casa")
-        casa_sel = st.selectbox("Ou Selecione:", opcoes_times_sorted)
-        st.markdown("---")
+        novo_casa_input = st.text_input(
+            "Criar Novo Time Casa",
+            key="novo_time_casa"
+        )
+
+        casa_sel = st.selectbox(
+            "Ou Selecione:",
+            opcoes_times_sorted,
+            key="select_time_casa"
+        )
 
         st.markdown("##### ✈️ Time Visitante")
-        novo_visitante_input = st.text_input("Criar Novo Time Visitante")
-        visitante_sel = st.selectbox("Ou Selecione:", opcoes_times_sorted)
-        st.markdown("---")
+        novo_visitante_input = st.text_input(
+            "Criar Novo Time Visitante",
+            key="novo_time_visitante"
+        )
+
+        visitante_sel = st.selectbox(
+            "Ou Selecione:",
+            opcoes_times_sorted,
+            key="select_time_visitante"
+        )
 
         st.markdown("##### 🏆 Campeonato")
-        novo_campeonato_input = st.text_input("Criar Novo Campeonato")
-        campeonato_sel = st.selectbox("Ou Selecione:", opcoes_campeonato)
-        st.markdown("---")
+        novo_local_input = st.text_input(
+            "Criar Novo Local",
+            key="novo_local"
+        )
 
-        st.markdown("##### 🏟️ Local")
-        novo_local_input = st.text_input("Criar Novo Local")
-        local_sel = st.selectbox("Ou Selecione:", opcoes_local)
-        st.markdown("---")
+        local_sel = st.selectbox(
+            "Ou Selecione:",
+            opcoes_local,
+            key="select_local"
+        )
 
         # ---------------- FORMULÁRIO FINAL ----------------
         with st.form("form_jogo", clear_on_submit=True):
@@ -648,8 +664,6 @@ with tab[0]:
         df_exibicao.index += 1
         df_exibicao.insert(0, 'Nº', df_exibicao.index)
         st.dataframe(df_exibicao, use_container_width=True)
-
-
 
 
 
