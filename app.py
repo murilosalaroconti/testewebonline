@@ -651,8 +651,7 @@ with tab[0]:
 
 
 
-    plt.tight_layout()
-    st.pyplot(fig)
+   
 
 # Aba Treinos
 # --------------------------
@@ -2650,3 +2649,4 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
