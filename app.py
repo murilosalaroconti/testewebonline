@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 from google.oauth2.service_account import Credentials
 import gspread
+import plotly.express as px
 
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
@@ -2836,4 +2837,5 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
 
