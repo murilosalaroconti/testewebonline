@@ -110,7 +110,12 @@ def conectar_google_sheets_test():
 # ----------------------
 # Cria o client apenas uma vez
 # ----------------------
-client = conectar_google_sheets_test()
+client = conectar_google_sheets()
+@st.cache_resource
+def get_client():
+    return conectar_google_sheets()
+
+
 
 # Botão para atualizar dados
 # ------------------------------
