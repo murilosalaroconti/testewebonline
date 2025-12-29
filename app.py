@@ -2729,43 +2729,42 @@ with tab[5]:
             # ======================================================
             st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
 
-            radar_vals = []
-            for col in scout_cols:
-                max_val = df[col].max()
-                valor = jogo[col]
-                radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
-
-            radar_vals += radar_vals[:1]
-            radar_labels = scout_cols + [scout_cols[0]]
-
             fig_radar = go.Figure()
 
-            fig_radar.add_trace(go.Scatterpolar(
-                r=radar_vals,
-                theta=radar_labels,
-                fill='toself',
-                line=dict(color='#00E5FF', width=4),
-                fillcolor='rgba(0, 229, 255, 0.45)',
-                marker=dict(size=8)
-            ))
+            for scout in scout_cols:
+                max_val = df[scout].max()
+                valor = jogo[scout]
+
+                porcentagem = (valor / max_val) * 100 if max_val > 0 else 0
+
+                fig_radar.add_trace(
+                    go.Scatterpolar(
+                        r=[porcentagem, porcentagem],
+                        theta=[scout, scout],
+                        fill='toself',
+                        name=scout,
+                        line=dict(color=scout_colors[scout], width=3),
+                        fillcolor=scout_colors[scout].replace(")", ", 0.35)").replace("rgb", "rgba")
+                    )
+                )
 
             fig_radar.update_layout(
                 polar=dict(
                     bgcolor="#0E1117",
                     radialaxis=dict(
                         range=[0, 100],
-                        showticklabels=True,
-                        ticks="",
+                        visible=True,
                         gridcolor="rgba(255,255,255,0.15)"
                     ),
                     angularaxis=dict(
-                        gridcolor="rgba(255,255,255,0.15)"
+                        tickfont=dict(size=12, color="white")
                     )
                 ),
                 paper_bgcolor="#0E1117",
-                font=dict(color="white", size=13),
-                showlegend=False,
-                height=480
+                font=dict(color="white"),
+                showlegend=True,
+                legend=dict(orientation="h", y=-0.15),
+                height=500
             )
 
             st.plotly_chart(fig_radar, use_container_width=True)
