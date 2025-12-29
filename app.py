@@ -682,7 +682,7 @@ with tab[0]:
                     "Chutes Errados": st.session_state.chutes_errados,
                     "Desarmes": st.session_state.desarmes,
                     "Passes-chave": st.session_state.passes_chave,
-                    "Passes Errados": st.session_state.passes_errados
+                    "Passes Errados": st.session_state.passes_errados,
                     "Faltas Sofridas": st.session_state.faltas_sofridas,
                     "Participações Indiretas": st.session_state.part_indireta
                 }
