@@ -504,7 +504,7 @@ with tab[0]:
         "chutes_errados",
         "desarmes",
         "passes_chave",
-        "passes_errados"
+        "passes_errados",
         "faltas_sofridas",
         "part_indireta"
     ]
@@ -614,9 +614,9 @@ with tab[0]:
             st.button("🎯 Passe-chave +1",
                       on_click=lambda: st.session_state.update(
                           {"passes_chave": st.session_state.passes_chave + 1}))
-            st.button("❌ Chute Errado +1",
+            st.button("❌ Passe Errado +1",
                       on_click=lambda: st.session_state.update(
-                          {"chutes_errados": st.session_state.chutes_errados + 1}))
+                          {"passes_errados": st.session_state.passes_errados + 1}))
             st.button("⚡ Falta sofrida +1",
                       on_click=lambda: st.session_state.update(
                           {"faltas_sofridas": st.session_state.faltas_sofridas + 1}))
