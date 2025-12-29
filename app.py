@@ -14,6 +14,7 @@ from google.oauth2.service_account import Credentials
 import gspread
 import plotly.express as px
 
+
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
@@ -2704,6 +2705,52 @@ with tab[5]:
             )
             st.plotly_chart(fig, use_container_width=True)
 
+        # 🎮 RADAR CHART ESTILO FIFA
+        # ======================================================
+
+        st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
+
+        # Normalização 0–100 com base no histórico
+        radar_vals = []
+        for col in scout_cols:
+            max_val = df[col].max()
+            valor = jogo[col]
+            radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+
+        # Fecha o radar
+        radar_vals += radar_vals[:1]
+        radar_labels = scout_cols + [scout_cols[0]]
+
+        fig_radar = go.Figure()
+
+        fig_radar.add_trace(go.Scatterpolar(
+            r=radar_vals,
+            theta=radar_labels,
+            fill='toself',
+            name='Scout do Jogo',
+            line=dict(color='#00E5FF', width=3),
+            fillcolor='rgba(0, 229, 255, 0.35)'
+        ))
+
+        fig_radar.update_layout(
+            polar=dict(
+                radialaxis=dict(
+                    visible=True,
+                    range=[0, 100],
+                    tickfont=dict(size=10),
+                    gridcolor="rgba(255,255,255,0.2)"
+                ),
+                angularaxis=dict(
+                    tickfont=dict(size=12)
+                )
+            ),
+            showlegend=False,
+            height=500,
+            margin=dict(t=40, b=40, l=40, r=40)
+        )
+
+        st.plotly_chart(fig_radar, use_container_width=True)
+
         # ======================================================
         # 📊 2️⃣ MÉDIA POR JOGO
         # ======================================================
@@ -2837,5 +2884,4 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
-
 
