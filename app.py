@@ -650,7 +650,6 @@ with tab[0]:
                 local_final = novo_local_input.strip() if novo_local_input.strip() else local_sel
 
                 data_str = data.strftime("%d/%m/%Y")
-                df_reg = load_registros()
 
                 novo = {
                     "Casa": casa_final,
@@ -674,14 +673,19 @@ with tab[0]:
                     "Participações Indiretas": st.session_state.part_indireta
                 }
 
-                adicionar_jogo(df_reg, novo)
+                # 🔄 FEEDBACK VISUAL (NÃO GASTA API)
+                with st.spinner("💾 Salvando jogo..."):
+                    df_reg = load_registros()
+                    adicionar_jogo(df_reg, novo)
 
-                # RESET SCOUT
+                # ✅ TOAST FLUTUANTE
+                st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
+
+                # 🔁 RESET SCOUT
                 for s in scouts:
                     st.session_state[s] = 0
 
-                st.success("Registro adicionado! Recarregando lista...")
-                st.rerun()
+
 
     # ----------------------------------------------------------------------
     # COLUNA 2 - TABELA
