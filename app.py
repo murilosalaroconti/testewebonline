@@ -2633,6 +2633,125 @@ with tab[5]:
 
         st.markdown("---")
 
+        # 📊 ANÁLISE DE SCOUTS
+        # ======================================================
+
+        st.markdown("## 📊 Análise de Scouts")
+
+        # Garante colunas
+        scout_cols = [
+            "Chutes",
+            "Desarmes",
+            "Passes-chave",
+            "Faltas Sofridas",
+            "Participações Indiretas"
+        ]
+
+        for c in scout_cols:
+            if c not in df.columns:
+                df[c] = 0
+            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+
+        # ---------------------------
+        # MODO DE VISUALIZAÇÃO
+        # ---------------------------
+        modo_scout = st.radio(
+            "Modo de análise:",
+            [
+                "🎯 Scout por jogo",
+                "📊 Média por jogo",
+                "⚖️ Comparação por modalidade"
+            ],
+            horizontal=True
+        )
+
+        # ======================================================
+        # 🎯 1️⃣ SCOUT POR JOGO
+        # ======================================================
+        if modo_scout == "🎯 Scout por jogo":
+
+            df_jogos = df.copy()
+            df_jogos["Jogo"] = (
+                    df_jogos["Data"].astype(str) + " | " +
+                    df_jogos["Casa"] + " x " +
+                    df_jogos["Visitante"]
+            )
+
+            jogo_sel = st.selectbox(
+                "Selecione o jogo:",
+                df_jogos["Jogo"].unique()
+            )
+
+            jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
+
+            c1, c2, c3, c4, c5 = st.columns(5)
+
+            c1.metric("🥅 Chutes", int(jogo["Chutes"]))
+            c2.metric("🛡️ Desarmes", int(jogo["Desarmes"]))
+            c3.metric("🎯 Passes-chave", int(jogo["Passes-chave"]))
+            c4.metric("⚡ Faltas Sofridas", int(jogo["Faltas Sofridas"]))
+            c5.metric("🔁 Part. Indiretas", int(jogo["Participações Indiretas"]))
+
+            scout_vals = jogo[scout_cols]
+
+            fig = px.bar(
+                scout_vals,
+                x=scout_vals.index,
+                y=scout_vals.values,
+                labels={"x": "Scout", "y": "Quantidade"},
+                title="Distribuição de Scouts no Jogo"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # ======================================================
+        # 📊 2️⃣ MÉDIA POR JOGO
+        # ======================================================
+        elif modo_scout == "📊 Média por jogo":
+
+            total_jogos = len(df)
+            medias = df[scout_cols].sum() / total_jogos if total_jogos > 0 else 0
+
+            c1, c2, c3, c4, c5 = st.columns(5)
+
+            c1.metric("🥅 Chutes/jogo", round(medias["Chutes"], 2))
+            c2.metric("🛡️ Desarmes/jogo", round(medias["Desarmes"], 2))
+            c3.metric("🎯 Passes-chave/jogo", round(medias["Passes-chave"], 2))
+            c4.metric("⚡ Faltas Sofridas/jogo", round(medias["Faltas Sofridas"], 2))
+            c5.metric("🔁 Part. Indiretas/jogo", round(medias["Participações Indiretas"], 2))
+
+            fig = px.bar(
+                medias,
+                x=medias.index,
+                y=medias.values,
+                labels={"x": "Scout", "y": "Média por jogo"},
+                title="Média de Scouts por Jogo"
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+        # ======================================================
+        # ⚖️ 3️⃣ COMPARAÇÃO POR MODALIDADE
+        # ======================================================
+        elif modo_scout == "⚖️ Comparação por modalidade":
+
+            if "Condição do Campo" not in df.columns:
+                st.warning("Modalidade não encontrada.")
+            else:
+                comp = (
+                    df.groupby("Condição do Campo")[scout_cols]
+                    .mean()
+                    .reset_index()
+                )
+
+                fig = px.bar(
+                    comp,
+                    x="Condição do Campo",
+                    y=scout_cols,
+                    barmode="group",
+                    title="Comparação de Scouts por Modalidade"
+                )
+
+                st.plotly_chart(fig, use_container_width=True)
+
         # GRÁFICO 3: Sono Diário (Garantindo o funcionamento)
         st.markdown("### 🌙 Sono Diário")
 
