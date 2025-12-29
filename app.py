@@ -2671,7 +2671,6 @@ with tab[5]:
         # 🎯 1️⃣ SCOUT POR JOGO
         # ======================================================
         if modo_scout == "🎯 Scout por jogo":
-
             df_jogos = df.copy()
             df_jogos["Jogo"] = (
                     df_jogos["Data"].astype(str) + " | " +
@@ -2710,14 +2709,12 @@ with tab[5]:
 
         st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
 
-        # Normalização 0–100 com base no histórico
         radar_vals = []
         for col in scout_cols:
             max_val = df[col].max()
             valor = jogo[col]
             radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
-        # Fecha o radar
         radar_vals += radar_vals[:1]
         radar_labels = scout_cols + [scout_cols[0]]
 
@@ -2727,26 +2724,16 @@ with tab[5]:
             r=radar_vals,
             theta=radar_labels,
             fill='toself',
-            name='Scout do Jogo',
             line=dict(color='#00E5FF', width=3),
             fillcolor='rgba(0, 229, 255, 0.35)'
         ))
 
         fig_radar.update_layout(
             polar=dict(
-                radialaxis=dict(
-                    visible=True,
-                    range=[0, 100],
-                    tickfont=dict(size=10),
-                    gridcolor="rgba(255,255,255,0.2)"
-                ),
-                angularaxis=dict(
-                    tickfont=dict(size=12)
-                )
+                radialaxis=dict(range=[0, 100], visible=True),
             ),
             showlegend=False,
-            height=500,
-            margin=dict(t=40, b=40, l=40, r=40)
+            height=450
         )
 
         st.plotly_chart(fig_radar, use_container_width=True)
