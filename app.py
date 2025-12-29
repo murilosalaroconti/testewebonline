@@ -27,7 +27,7 @@ st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_si
 EXPECTED_REGISTROS_COLUMNS = [
     "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
     "Minutos Jogados", "Gols Marcados", "Assistências",
-    "Chutes", "Desarmes", "Passes-chave", "Faltas Sofridas", "Participações Indiretas",
+    "Chutes","Chutes Errados", "Desarmes", "Passes-chave","Passes Errados" "Faltas Sofridas", "Participações Indiretas",
     "Resultado", "Local", "Condição do Campo",
     "Treino", "Date", "Hora"
 ]
@@ -501,8 +501,10 @@ with tab[0]:
     # ----------------------------------------------------------------------
     scouts = [
         "chutes",
+        "chutes_errados",
         "desarmes",
         "passes_chave",
+        "passes_errados"
         "faltas_sofridas",
         "part_indireta"
     ]
@@ -601,6 +603,9 @@ with tab[0]:
             st.button("🥅 Chute +1",
                       on_click=lambda: st.session_state.update(
                           {"chutes": st.session_state.chutes + 1}))
+            st.button("❌ Chute Errado +1",
+                      on_click=lambda: st.session_state.update(
+                          {"chutes_errados": st.session_state.chutes_errados + 1}))
             st.button("🛡️ Desarme +1",
                       on_click=lambda: st.session_state.update(
                           {"desarmes": st.session_state.desarmes + 1}))
@@ -609,6 +614,9 @@ with tab[0]:
             st.button("🎯 Passe-chave +1",
                       on_click=lambda: st.session_state.update(
                           {"passes_chave": st.session_state.passes_chave + 1}))
+            st.button("❌ Chute Errado +1",
+                      on_click=lambda: st.session_state.update(
+                          {"chutes_errados": st.session_state.chutes_errados + 1}))
             st.button("⚡ Falta sofrida +1",
                       on_click=lambda: st.session_state.update(
                           {"faltas_sofridas": st.session_state.faltas_sofridas + 1}))
@@ -620,8 +628,10 @@ with tab[0]:
 
         st.markdown("#### 🔢 Contagem atual")
         st.write(f"🥅 Chutes: {st.session_state.chutes}")
+        st.write(f"❌ Chutes Errados: {st.session_state.chutes_errados}")
         st.write(f"🛡️ Desarmes: {st.session_state.desarmes}")
         st.write(f"🎯 Passes-chave: {st.session_state.passes_chave}")
+        st.write(f"❌ Passes Errados: {st.session_state.passes_errados}")
         st.write(f"⚡ Faltas sofridas: {st.session_state.faltas_sofridas}")
         st.write(f"🔁 Part. Indireta: {st.session_state.part_indireta}")
 
@@ -669,8 +679,10 @@ with tab[0]:
 
                     # SCOUT AO VIVO
                     "Chutes": st.session_state.chutes,
+                    "Chutes Errados": st.session_state.chutes_errados,
                     "Desarmes": st.session_state.desarmes,
                     "Passes-chave": st.session_state.passes_chave,
+                    "Passes Errados": st.session_state.passes_errados
                     "Faltas Sofridas": st.session_state.faltas_sofridas,
                     "Participações Indiretas": st.session_state.part_indireta
                 }
