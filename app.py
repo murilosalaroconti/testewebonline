@@ -2645,6 +2645,11 @@ with tab[5]:
             "Participações Indiretas": "#FF5252"  # Vermelho
         }
 
+        def hex_to_rgba(hex_color, alpha=0.35):
+            hex_color = hex_color.lstrip("#")
+            r, g, b = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+            return f"rgba({r},{g},{b},{alpha})"
+
         # 📊 ANÁLISE DE SCOUTS
         # ======================================================
 
@@ -2734,17 +2739,16 @@ with tab[5]:
             for scout in scout_cols:
                 max_val = df[scout].max()
                 valor = jogo[scout]
-
                 porcentagem = (valor / max_val) * 100 if max_val > 0 else 0
 
                 fig_radar.add_trace(
                     go.Scatterpolar(
-                        r=[porcentagem, porcentagem],
-                        theta=[scout, scout],
+                        r=[porcentagem],
+                        theta=[scout],
                         fill='toself',
                         name=scout,
                         line=dict(color=SCOUT_COLORS[scout], width=3),
-                        fillcolor=scout_colors[scout].replace(")", ", 0.35)").replace("rgb", "rgba")
+                        fillcolor=hex_to_rgba(SCOUT_COLORS[scout], 0.35)
                     )
                 )
 
