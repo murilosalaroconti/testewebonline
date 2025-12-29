@@ -2671,6 +2671,7 @@ with tab[5]:
         # 🎯 1️⃣ SCOUT POR JOGO
         # ======================================================
         if modo_scout == "🎯 Scout por jogo":
+
             df_jogos = df.copy()
             df_jogos["Jogo"] = (
                     df_jogos["Data"].astype(str) + " | " +
@@ -2704,39 +2705,39 @@ with tab[5]:
             )
             st.plotly_chart(fig, use_container_width=True)
 
-        # 🎮 RADAR CHART ESTILO FIFA
-        # ======================================================
+            # ======================================================
+            # 🎮 RADAR CHART ESTILO FIFA (DENTRO DO IF)
+            # ======================================================
+            st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
 
-        st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
+            radar_vals = []
+            for col in scout_cols:
+                max_val = df[col].max()
+                valor = jogo[col]
+                radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
-        radar_vals = []
-        for col in scout_cols:
-            max_val = df[col].max()
-            valor = jogo[col]
-            radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+            radar_vals += radar_vals[:1]
+            radar_labels = scout_cols + [scout_cols[0]]
 
-        radar_vals += radar_vals[:1]
-        radar_labels = scout_cols + [scout_cols[0]]
+            fig_radar = go.Figure()
 
-        fig_radar = go.Figure()
+            fig_radar.add_trace(go.Scatterpolar(
+                r=radar_vals,
+                theta=radar_labels,
+                fill='toself',
+                line=dict(color='#00E5FF', width=3),
+                fillcolor='rgba(0, 229, 255, 0.35)'
+            ))
 
-        fig_radar.add_trace(go.Scatterpolar(
-            r=radar_vals,
-            theta=radar_labels,
-            fill='toself',
-            line=dict(color='#00E5FF', width=3),
-            fillcolor='rgba(0, 229, 255, 0.35)'
-        ))
+            fig_radar.update_layout(
+                polar=dict(
+                    radialaxis=dict(range=[0, 100], visible=True),
+                ),
+                showlegend=False,
+                height=450
+            )
 
-        fig_radar.update_layout(
-            polar=dict(
-                radialaxis=dict(range=[0, 100], visible=True),
-            ),
-            showlegend=False,
-            height=450
-        )
-
-        st.plotly_chart(fig_radar, use_container_width=True)
+            st.plotly_chart(fig_radar, use_container_width=True)
 
         # ======================================================
         # 📊 2️⃣ MÉDIA POR JOGO
