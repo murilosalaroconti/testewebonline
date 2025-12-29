@@ -2734,23 +2734,35 @@ with tab[5]:
             # ======================================================
             st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
 
-            fig_radar = go.Figure()
-
+            radar_vals = []
             for scout in scout_cols:
                 max_val = df[scout].max()
                 valor = jogo[scout]
-                porcentagem = (valor / max_val) * 100 if max_val > 0 else 0
+                radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
-                fig_radar.add_trace(
-                    go.Scatterpolar(
-                        r=[porcentagem],
-                        theta=[scout],
-                        fill='toself',
-                        name=scout,
-                        line=dict(color=SCOUT_COLORS[scout], width=3),
-                        fillcolor=hex_to_rgba(SCOUT_COLORS[scout], 0.35)
-                    )
+            # Fecha o polígono
+            radar_vals += radar_vals[:1]
+            radar_labels = scout_cols + [scout_cols[0]]
+
+            # Cor FIFA (pode trocar depois)
+            main_color = "#00E5FF"  # Ciano FIFA
+
+            fig_radar = go.Figure()
+
+            fig_radar.add_trace(
+                go.Scatterpolar(
+                    r=radar_vals,
+                    theta=radar_labels,
+                    mode="lines",  # 🔥 ISSO remove as bolinhas
+                    fill="toself",
+                    line=dict(
+                        color=main_color,
+                        width=4
+                    ),
+                    fillcolor=hex_to_rgba(main_color, 0.35),
+                    name="Scout Geral"
                 )
+            )
 
             fig_radar.update_layout(
                 polar=dict(
@@ -2761,13 +2773,12 @@ with tab[5]:
                         gridcolor="rgba(255,255,255,0.15)"
                     ),
                     angularaxis=dict(
-                        tickfont=dict(size=12, color="white")
+                        tickfont=dict(size=13, color="white")
                     )
                 ),
                 paper_bgcolor="#0E1117",
                 font=dict(color="white"),
-                showlegend=True,
-                legend=dict(orientation="h", y=-0.15),
+                showlegend=False,
                 height=500
             )
 
