@@ -2743,7 +2743,7 @@ with tab[5]:
                         theta=[scout, scout],
                         fill='toself',
                         name=scout,
-                        line=dict(color=scout_colors[scout], width=3),
+                        line=dict(color=SCOUT_COLORS[scout], width=3),
                         fillcolor=scout_colors[scout].replace(")", ", 0.35)").replace("rgb", "rgba")
                     )
                 )
