@@ -110,7 +110,7 @@ def conectar_google_sheets_test():
 # ----------------------
 # Cria o client apenas uma vez
 # ----------------------
-client = conectar_google_sheets()
+
 @st.cache_resource
 def get_client():
     return conectar_google_sheets()
@@ -140,33 +140,40 @@ def parse_duration_to_hours(dur_str):
 
 @st.cache_data(ttl=300)  # TTL = 300 segundos = 5 minutos
 def load_registros():
+    client = get_client()
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
     dados = sheet.get_all_records()
     df = pd.DataFrame(dados)
+
     for col in EXPECTED_REGISTROS_COLUMNS:
         if col not in df.columns:
             df[col] = ""
+
     return df[EXPECTED_REGISTROS_COLUMNS]
 
 def save_registros(df):
+    client = get_client()
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
-    print("SALVO COM SUCESSO NO GOOGLE SHEETS")
 
 EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
 
 @st.cache_data(ttl=300)
 def load_treinos_df():
+    client = get_client()
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
     dados = sheet.get_all_records()
     df = pd.DataFrame(dados)
+
     for col in EXPECTED_TREINOS_COLUMNS:
         if col not in df.columns:
             df[col] = ""
+
     return df[EXPECTED_TREINOS_COLUMNS]
 
 def save_treinos_df(df):
+    client = get_client()
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
@@ -188,15 +195,19 @@ ALL_COLUMNS = [
 
 @st.cache_data(ttl=300)
 def load_sono_df():
+    client = get_client()
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
     dados = sheet.get_all_records()
     df = pd.DataFrame(dados)
+
     for col in ALL_COLUMNS:
         if col not in df.columns:
             df[col] = ""
+
     return df[ALL_COLUMNS]
 
 def save_sono_df(df):
+    client = get_client()
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
