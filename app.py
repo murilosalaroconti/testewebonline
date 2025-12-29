@@ -27,7 +27,7 @@ st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_si
 EXPECTED_REGISTROS_COLUMNS = [
     "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
     "Minutos Jogados", "Gols Marcados", "Assistências",
-    "Chutes","Chutes Errados", "Desarmes", "Passes-chave","Passes Errados" "Faltas Sofridas", "Participações Indiretas",
+    "Chutes","Chutes Errados", "Desarmes", "Passes-chave","Passes Errados", "Faltas Sofridas", "Participações Indiretas",
     "Resultado", "Local", "Condição do Campo",
     "Treino", "Date", "Hora"
 ]
@@ -2945,4 +2945,5 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
+
 
