@@ -2670,8 +2670,10 @@ with tab[5]:
         # Garante colunas
         scout_cols = [
             "Chutes",
+            "Chutes Errados",
             "Desarmes",
             "Passes-chave",
+            "Passes Errados",
             "Faltas Sofridas",
             "Participações Indiretas"
         ]
@@ -2713,13 +2715,17 @@ with tab[5]:
 
             jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
 
-            c1, c2, c3, c4, c5 = st.columns(5)
+            c1, c2, c3, c4 = st.columns(4)
+            c5, c6, c7 = st.columns(3)
 
             c1.metric("🥅 Chutes", int(jogo["Chutes"]))
-            c2.metric("🛡️ Desarmes", int(jogo["Desarmes"]))
+            c2.metric("❌ Chutes Errados", int(jogo["Chutes Errados"]))
             c3.metric("🎯 Passes-chave", int(jogo["Passes-chave"]))
-            c4.metric("⚡ Faltas Sofridas", int(jogo["Faltas Sofridas"]))
-            c5.metric("🔁 Part. Indiretas", int(jogo["Participações Indiretas"]))
+            c4.metric("❌ Passes Errados", int(jogo["Passes Errados"]))
+
+            c5.metric("🛡️ Desarmes", int(jogo["Desarmes"]))
+            c6.metric("⚡ Faltas Sofridas", int(jogo["Faltas Sofridas"]))
+            c7.metric("🔁 Part. Indiretas", int(jogo["Participações Indiretas"]))
 
             scout_vals = jogo[scout_cols]
 
@@ -2945,5 +2951,4 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
-
 
