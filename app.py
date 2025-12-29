@@ -2635,6 +2635,16 @@ with tab[5]:
 
         st.markdown("---")
 
+        #===============================================
+        # 🎨 Paleta FIFA
+        SCOUT_COLORS = {
+            "Chutes": "#00E5FF",  # Ciano
+            "Desarmes": "#7C4DFF",  # Roxo
+            "Passes-chave": "#00E676",  # Verde
+            "Faltas Sofridas": "#FF9100",  # Laranja
+            "Participações Indiretas": "#FF5252"  # Vermelho
+        }
+
         # 📊 ANÁLISE DE SCOUTS
         # ======================================================
 
@@ -2697,12 +2707,21 @@ with tab[5]:
             scout_vals = jogo[scout_cols]
 
             fig = px.bar(
-                scout_vals,
                 x=scout_vals.index,
                 y=scout_vals.values,
+                color=scout_vals.index,
+                color_discrete_map=SCOUT_COLORS,
                 labels={"x": "Scout", "y": "Quantidade"},
                 title="Distribuição de Scouts no Jogo"
             )
+
+            fig.update_layout(
+                showlegend=False,
+                plot_bgcolor="#0E1117",
+                paper_bgcolor="#0E1117",
+                font=dict(color="white")
+            )
+
             st.plotly_chart(fig, use_container_width=True)
 
             # ======================================================
@@ -2725,16 +2744,28 @@ with tab[5]:
                 r=radar_vals,
                 theta=radar_labels,
                 fill='toself',
-                line=dict(color='#00E5FF', width=3),
-                fillcolor='rgba(0, 229, 255, 0.35)'
+                line=dict(color='#00E5FF', width=4),
+                fillcolor='rgba(0, 229, 255, 0.45)',
+                marker=dict(size=8)
             ))
 
             fig_radar.update_layout(
                 polar=dict(
-                    radialaxis=dict(range=[0, 100], visible=True),
+                    bgcolor="#0E1117",
+                    radialaxis=dict(
+                        range=[0, 100],
+                        showticklabels=True,
+                        ticks="",
+                        gridcolor="rgba(255,255,255,0.15)"
+                    ),
+                    angularaxis=dict(
+                        gridcolor="rgba(255,255,255,0.15)"
+                    )
                 ),
+                paper_bgcolor="#0E1117",
+                font=dict(color="white", size=13),
                 showlegend=False,
-                height=450
+                height=480
             )
 
             st.plotly_chart(fig_radar, use_container_width=True)
@@ -2756,12 +2787,21 @@ with tab[5]:
             c5.metric("🔁 Part. Indiretas/jogo", round(medias["Participações Indiretas"], 2))
 
             fig = px.bar(
-                medias,
                 x=medias.index,
                 y=medias.values,
+                color=medias.index,
+                color_discrete_map=SCOUT_COLORS,
                 labels={"x": "Scout", "y": "Média por jogo"},
                 title="Média de Scouts por Jogo"
             )
+
+            fig.update_layout(
+                showlegend=False,
+                plot_bgcolor="#0E1117",
+                paper_bgcolor="#0E1117",
+                font=dict(color="white")
+            )
+
             st.plotly_chart(fig, use_container_width=True)
 
         # ======================================================
@@ -2783,7 +2823,14 @@ with tab[5]:
                     x="Condição do Campo",
                     y=scout_cols,
                     barmode="group",
+                    color_discrete_map=SCOUT_COLORS,
                     title="Comparação de Scouts por Modalidade"
+                )
+
+                fig.update_layout(
+                    plot_bgcolor="#0E1117",
+                    paper_bgcolor="#0E1117",
+                    font=dict(color="white")
                 )
 
                 st.plotly_chart(fig, use_container_width=True)
@@ -2872,5 +2919,4 @@ with tab[5]:
 st.markdown("""---
 Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
 """)
-
 
