@@ -2821,7 +2821,7 @@ with tab[5]:
             # ======================================================
             st.markdown("### 📝 Análise Técnica do Jogo")
 
-            hutes_certos = jogo["Chutes"]
+            chutes_certos = jogo["Chutes"]
             chutes_errados = jogo.get("Chutes Errados", 0)
             finalizacoes = chutes_certos + chutes_errados
 
