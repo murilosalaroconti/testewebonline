@@ -2821,37 +2821,75 @@ with tab[5]:
             # ======================================================
             st.markdown("### 📝 Análise Técnica do Jogo")
 
-            chutes = jogo["Chutes"]
+            hutes_certos = jogo["Chutes"]
+            chutes_errados = jogo.get("Chutes Errados", 0)
+            finalizacoes = chutes_certos + chutes_errados
+
             gols = int(jogo.get("Gols Marcados", 0))
+            assistencias = int(jogo.get("Assistências", 0)) if "Assistências" in jogo else 0
+
             passes_chave = jogo["Passes-chave"]
             passes_errados = jogo.get("Passes Errados", 0)
+
             desarmes = jogo["Desarmes"]
             faltas = jogo["Faltas Sofridas"]
 
             analise = []
 
-            if chutes > 0:
+            # ===============================
+            # ⚽ FINALIZAÇÕES
+            # ===============================
+            if finalizacoes > 0:
                 if gols > 0:
-                    eficiencia = gols / chutes
-                    if eficiencia >= 0.3:
-                        analise.append(f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols** com boa eficiência.")
+                    eficiencia = gols / finalizacoes
+                    if eficiencia >= 0.25:
+                        analise.append(
+                            f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols** com boa eficiência."
+                        )
                     else:
                         analise.append(
-                            f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols**, mas pode melhorar a precisão.")
+                            f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols**, mas pode melhorar a precisão."
+                        )
                 else:
-                    analise.append(f"⚽ Tentou **{chutes} finalizações**, mas não marcou gols.")
+                    analise.append(
+                        f"⚽ Tentou **{finalizacoes} finalizações**, mas não marcou gols."
+                    )
 
+            # ===============================
+            # 🎯 PASSES-CHAVE x ASSISTÊNCIA
+            # ===============================
+            if passes_chave > 0:
+                if assistencias > 0:
+                    analise.append(
+                        f"🎯 Criou **{passes_chave} chances**, resultando em **{assistencias} assistência(s)**."
+                    )
+                else:
+                    analise.append(
+                        f"🎯 Criou **{passes_chave} chances claras**, mas sem conversão em gol."
+                    )
+
+            # ===============================
+            # ⚠️ ERROS DE PASSE
+            # ===============================
             if passes_errados > passes_chave:
-                analise.append("⚠️ Teve mais erros do que passes decisivos, atenção ao passe.")
+                analise.append(
+                    "⚠️ Teve mais erros do que passes decisivos, atenção à tomada de decisão."
+                )
 
+            # ===============================
+            # 🛡️ DEFESA
+            # ===============================
             if desarmes >= 5:
-                analise.append(f"🛡️ Forte presença defensiva com **{desarmes} desarmes**.")
+                analise.append(
+                    f"🛡️ Forte presença defensiva com **{desarmes} desarmes**."
+                )
 
             if faltas >= 4:
-                analise.append(f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva.")
+                analise.append(
+                    f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva."
+                )
 
-            for linha in analise:
-                st.write(linha)
+       
 
 
 
