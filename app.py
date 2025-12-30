@@ -3031,22 +3031,7 @@ with tab[5]:
                 }
             )
 
-            if st.button("📄 Gerar PDF do Jogo"):
-                caminho_pdf = gerar_pdf_jogo(
-                    jogo=jogo,
-                    score_formatado=score_formatado,
-                    fig_barra=fig,
-                    fig_radar=fig_radar,
-                    analise_texto=analise_texto_pdf
-                )
 
-                with open(caminho_pdf, "rb") as f:
-                    st.download_button(
-                        label="⬇️ Baixar PDF do Jogo",
-                        data=f,
-                        file_name="relatorio_jogo.pdf",
-                        mime="application/pdf"
-                    )
 
             # ======================================================
             # ======================================================
@@ -3213,6 +3198,17 @@ with tab[5]:
             for linha in analise:
                 st.write(linha)
             analise_texto_pdf = "\n".join(analise)
+
+            if st.button("📄 Gerar PDF do Jogo"):
+                if score_formatado is None:
+                    st.warning("Selecione um jogo para gerar o PDF.")
+                else:
+                    gerar_pdf_jogo(
+                        jogo=jogo,
+                        score_formatado=score_formatado,
+                        score_final=score_final
+                    )
+
 
 
 
