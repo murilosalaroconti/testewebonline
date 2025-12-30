@@ -2118,6 +2118,37 @@ inject_custom_css()
 # --------------------------------------------------------------------------
 # INÍCIO DO CÓDIGO DENTRO DO with tab[5] - DASHBOARD
 
+st.markdown("""
+<style>
+.scout-card {
+    background: linear-gradient(135deg, #1F2430, #0E1117);
+    border-radius: 16px;
+    padding: 18px;
+    text-align: center;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+    color: white;
+    height: 100%;
+}
+
+.scout-card .title {
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+.scout-card .value {
+    font-size: 38px;
+    font-weight: bold;
+    margin: 6px 0;
+}
+
+.scout-card .icon {
+    font-size: 28px;
+    margin-bottom: 6px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
 with tab[5]:
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
@@ -2716,17 +2747,71 @@ with tab[5]:
             jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
 
             # ---------------- MÉTRICAS ----------------
-            c1, c2, c3, c4 = st.columns(4)
-            c5, c6, c7 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
+            col5, col6, col7 = st.columns(3)
 
-            c1.metric("🥅 Chutes", int(jogo["Chutes"]))
-            c2.metric("❌ Chutes Errados", int(jogo.get("Chutes Errados", 0)))
-            c3.metric("🎯 Passes-chave", int(jogo["Passes-chave"]))
-            c4.metric("❌ Passes Errados", int(jogo.get("Passes Errados", 0)))
+            with col1:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">🥅</div>
+                    <div class="title">Chutes Certos</div>
+                    <div class="value">{int(jogo["Chutes"])}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
-            c5.metric("🛡️ Desarmes", int(jogo["Desarmes"]))
-            c6.metric("⚡ Faltas Sofridas", int(jogo["Faltas Sofridas"]))
-            c7.metric("🔁 Part. Indiretas", int(jogo["Participações Indiretas"]))
+            with col2:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">❌</div>
+                    <div class="title">Chutes Errados</div>
+                    <div class="value">{int(jogo.get("Chutes Errados", 0))}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col3:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">🎯</div>
+                    <div class="title">Passes-chave</div>
+                    <div class="value">{int(jogo["Passes-chave"])}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col4:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">❌</div>
+                    <div class="title">Passes Errados</div>
+                    <div class="value">{int(jogo.get("Passes Errados", 0))}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col5:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">🛡️</div>
+                    <div class="title">Desarmes</div>
+                    <div class="value">{int(jogo["Desarmes"])}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col6:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">⚡</div>
+                    <div class="title">Faltas Sofridas</div>
+                    <div class="value">{int(jogo["Faltas Sofridas"])}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            with col7:
+                st.markdown(f"""
+                <div class="scout-card">
+                    <div class="icon">🔁</div>
+                    <div class="title">Participações</div>
+                    <div class="value">{int(jogo["Participações Indiretas"])}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
             # ---------------- GRÁFICO ----------------
             scout_vals = jogo[scout_cols]
