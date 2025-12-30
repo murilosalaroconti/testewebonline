@@ -2972,7 +2972,31 @@ with tab[5]:
 
                 ax_sono.plot(x, y, linestyle='--', linewidth=2, color='#2196F3')
 
-                # Média DO PERÍODO
+                # 🔹 PONTOS + TEXTO EM CIMA
+                for i, val in enumerate(y):
+                    if val < 6:
+                        color = "red"
+                    elif val > 8:
+                        color = "lightgreen"
+                    else:
+                        color = "#FF9800"  # laranja
+
+                    ax_sono.scatter(i, val, color=color, s=80, zorder=3)
+
+                    horas = int(val)
+                    minutos = int((val - horas) * 60)
+
+                    ax_sono.text(
+                        i,
+                        val + 0.15,
+                        f"{horas}h{minutos:02d}",
+                        ha='center',
+                        color='white',
+                        fontsize=9,
+                        zorder=4
+                    )
+
+                # 🔹 MÉDIA DO PERÍODO
                 media = df_sono_periodo["Duração_Horas"].mean()
                 horas_med = int(media)
                 minutos_med = int((media - horas_med) * 60)
@@ -2989,9 +3013,8 @@ with tab[5]:
                 ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
 
                 datas_formatadas = df_sono_periodo['Data_DT'].dt.strftime('%d/%m/%Y')
-
                 ax_sono.set_xticks(x)
-                ax_sono.set_xticklabels(datas_formatadas, rotation=45, ha='right')
+                ax_sono.set_xticklabels(datas_formatadas, rotation=45, ha='right', color='white')
 
                 ax_sono.set_ylabel("Duração (horas)", color='white')
                 ax_sono.set_title("Sono no Período Selecionado", color='white')
