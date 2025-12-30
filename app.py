@@ -2853,6 +2853,83 @@ with tab[5]:
             for linha in analise:
                 st.write(linha)
 
+        st.markdown("### 🌙 Sono na Semana do Jogo")
+
+        # Data do jogo
+        data_jogo = pd.to_datetime(jogo["Data"], dayfirst=True)
+
+        # Intervalo: 7 dias antes até o dia do jogo
+        sono_inicio_auto = data_jogo - pd.Timedelta(days=7)
+        sono_fim_auto = data_jogo
+
+        df_sono_semana = df_sono_f[
+            (df_sono_f["Data_DT"] >= sono_inicio_auto) &
+            (df_sono_f["Data_DT"] <= sono_fim_auto)
+            ].copy()
+
+        if df_sono_semana.empty:
+            st.info("Sem registros de sono na semana que antecedeu o jogo.")
+        else:
+            df_sono_semana = df_sono_semana.sort_values("Data_DT")
+
+            fig_sono, ax_sono = plt.subplots(figsize=(12, 5))
+
+            # Dark mode
+            fig_sono.patch.set_facecolor('#0E1117')
+            ax_sono.set_facecolor('#0E1117')
+            ax_sono.tick_params(colors='white')
+            ax_sono.spines['bottom'].set_color('white')
+            ax_sono.spines['left'].set_color('white')
+
+            x = range(len(df_sono_semana))
+            y = df_sono_semana["Duração_Horas"].values
+
+            ax_sono.plot(x, y, linestyle='--', linewidth=2, color='#2196F3')
+
+            # Pontos + texto
+            for i, val in enumerate(y):
+                if val < 6:
+                    color = "red"
+                elif val > 8:
+                    color = "lightgreen"
+                else:
+                    color = "#FF9800"
+
+                ax_sono.scatter(i, val, color=color, s=80, zorder=3)
+
+                h = int(val)
+                m = int((val - h) * 60)
+                ax_sono.text(i, val + 0.15, f"{h}h{m:02d}", ha='center', color='white', fontsize=9)
+
+            # Média da semana
+            media = df_sono_semana["Duração_Horas"].mean()
+            h_med = int(media)
+            m_med = int((media - h_med) * 60)
+
+            ax_sono.axhline(
+                media,
+                color='#009688',
+                linestyle='-',
+                linewidth=1,
+                label=f"Média da semana ({h_med}h{m_med:02d})"
+            )
+
+            ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
+            ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
+
+            datas = df_sono_semana["Data_DT"].dt.strftime("%d/%m")
+            ax_sono.set_xticks(x)
+            ax_sono.set_xticklabels(datas, rotation=45, color='white')
+
+            ax_sono.set_title("Sono nos 7 dias anteriores ao jogo", color='white')
+            ax_sono.set_ylabel("Horas dormidas", color='white')
+            ax_sono.grid(True, linestyle=':', alpha=0.3)
+            ax_sono.legend(facecolor='#1F2430', edgecolor='white', labelcolor='white')
+
+            plt.tight_layout()
+            st.pyplot(fig_sono)
+            plt.close(fig_sono)
+
         # ======================================================
         # 📊 2️⃣ MÉDIA POR JOGO
         # ======================================================
