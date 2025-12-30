@@ -2736,8 +2736,17 @@ with tab[5]:
                 y=scout_vals.values,
                 color=scout_vals.index,
                 color_discrete_map=SCOUT_COLORS,
+                text=scout_vals.values,  # 👈 MOSTRA OS VALORES
                 labels={"x": "Scout", "y": "Quantidade"},
                 title="Distribuição de Scouts no Jogo"
+            )
+
+            fig.update_traces(
+                textposition="inside",  # 👈 DENTRO DA BARRA
+                textfont=dict(
+                    color="white",
+                    size=14
+                )
             )
 
             fig.update_layout(
@@ -2747,7 +2756,16 @@ with tab[5]:
                 font=dict(color="white")
             )
 
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(
+                fig,
+                use_container_width=True,
+                config={
+                    "scrollZoom": False,
+                    "displayModeBar": False,
+                    "doubleClick": False,
+                    "responsive": False
+                }
+            )
 
             # ---------------- RADAR ----------------
             st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
@@ -2785,7 +2803,16 @@ with tab[5]:
                 height=500
             )
 
-            st.plotly_chart(fig_radar, use_container_width=True)
+            st.plotly_chart(
+                fig_radar,
+                use_container_width=True,
+                config={
+                    "scrollZoom": False,
+                    "displayModeBar": False,
+                    "doubleClick": False,
+                    "responsive": False
+                }
+            )
 
             # ======================================================
             # 📝 ANÁLISE TÉCNICA DO JOGO (AGORA NO LUGAR CERTO)
