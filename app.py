@@ -2171,6 +2171,7 @@ st.markdown("""
     background: linear-gradient(135deg, #FF5252, #B71C1C);
 }
 </style>
+""", unsafe_allow_html=True)
 
 
 
