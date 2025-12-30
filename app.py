@@ -2938,7 +2938,7 @@ with tab[5]:
             # ---------------- GRÁFICO ----------------
             scout_vals = jogo[scout_cols]
 
-            fig = px.bar(
+            fig_barra = px.bar(
                 x=scout_vals.index,
                 y=scout_vals.values,
                 color=scout_vals.index,
@@ -3206,11 +3206,10 @@ with tab[5]:
                     gerar_pdf_jogo(
                         jogo=jogo,
                         score_formatado=score_formatado,
-                        score_final=score_final
+                        fig_barra=fig_barra,
+                        fig_radar=fig_radar,
+                        analise_texto=analise_texto_pdf
                     )
-
-
-
 
 
         # ======================================================
