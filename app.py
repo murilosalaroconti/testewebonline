@@ -2889,7 +2889,8 @@ with tab[5]:
                     f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva."
                 )
 
-       
+            for linha in analise:
+                st.write(linha)
 
 
 
