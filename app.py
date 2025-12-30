@@ -2713,7 +2713,7 @@ with tab[5]:
         st.markdown("---")
 
 
-        def gerar_pdf_jogo(jogo, score_formatado, fig_barra, fig_radar, analise_texto):
+        def gerar_pdf_jogo(jogo, score_formatado, analise_texto):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 caminho_pdf = tmp.name
 
@@ -2770,20 +2770,14 @@ with tab[5]:
             story.append(tabela)
             story.append(Spacer(1, 16))
 
-            # 🔹 SALVA GRÁFICOS COMO IMAGEM
-            img_barra = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            fig_barra.write_image(img_barra.name, scale=2)
 
-            img_radar = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            fig_radar.write_image(img_radar.name, scale=2)
-
-            story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
-            story.append(Image(img_barra.name, width=14 * cm, height=7 * cm))
+            # 🔹 OBSERVAÇÃO SOBRE GRÁFICOS
+            story.append(Paragraph(
+                "<b>Gráficos de desempenho:</b><br/>"
+                "Os gráficos de scouts e radar estão disponíveis na versão interativa do painel.",
+                styles["Normal"]
+            ))
             story.append(Spacer(1, 14))
-
-            story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
-            story.append(Image(img_radar.name, width=14 * cm, height=7 * cm))
-            story.append(Spacer(1, 16))
 
             # 🔹 ANÁLISE TÉCNICA
             story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
@@ -3203,10 +3197,9 @@ with tab[5]:
                     gerar_pdf_jogo(
                         jogo=jogo,
                         score_formatado=score_formatado,
-                        fig_barra=fig_barra,
-                        fig_radar=fig_radar,
                         analise_texto=analise_texto_pdf
                     )
+
 
 
         # ======================================================
