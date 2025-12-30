@@ -2790,15 +2790,21 @@ with tab[5]:
 
         def gerar_barra_pdf(jogo, scout_cols):
             fig, ax = plt.subplots(figsize=(8, 4))
-            valores = jogo[scout_cols].values
 
-            ax.bar(scout_cols, valores, color="#00E5FF")
+            valores = jogo[scout_cols].values
+            cores = [SCOUT_COLORS[s] for s in scout_cols]
+
+            ax.bar(scout_cols, valores, color=cores)
+
             ax.set_facecolor("#0E1117")
             fig.patch.set_facecolor("#0E1117")
 
             ax.tick_params(colors="white", rotation=45)
             ax.set_title("Distribuição de Scouts", color="white")
             ax.grid(axis="y", linestyle=":", alpha=0.3)
+
+            for i, val in enumerate(valores):
+                ax.text(i, val + 0.1, str(int(val)), ha="center", color="white", fontsize=9)
 
             caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
             plt.tight_layout()
@@ -2808,22 +2814,27 @@ with tab[5]:
             return caminho
 
 
-        def gerar_radar_pdf(jogo, scout_cols):
-            valores = jogo[scout_cols].values
-            max_vals = [max(valores[i], 1) for i in range(len(valores))]
-            percentuais = [(v / m) * 100 for v, m in zip(valores, max_vals)]
+        def gerar_radar_pdf(jogo, scout_cols, df):
+            radar_vals = []
 
-            percentuais += percentuais[:1]
+            for scout in scout_cols:
+                max_val = df[scout].max()
+                valor = jogo[scout]
+                radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+
+            radar_vals += radar_vals[:1]
             labels = scout_cols + [scout_cols[0]]
 
             fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(6, 6))
-            ax.plot(labels, percentuais, color="#00E5FF", linewidth=2)
-            ax.fill(labels, percentuais, color="#00E5FF", alpha=0.3)
+
+            ax.plot(labels, radar_vals, color="#00E5FF", linewidth=2)
+            ax.fill(labels, radar_vals, color="#00E5FF", alpha=0.35)
 
             ax.set_facecolor("#0E1117")
             fig.patch.set_facecolor("#0E1117")
+
             ax.tick_params(colors="white")
-            ax.set_title("Radar de Scouts", color="white", pad=20)
+            ax.set_title("Radar de Scouts (estilo FIFA)", color="white", pad=20)
 
             caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
             plt.tight_layout()
@@ -3237,7 +3248,8 @@ with tab[5]:
 
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
-                img_radar = gerar_radar_pdf(jogo, scout_cols)
+                img_radar = gerar_radar_pdf(jogo, scout_cols, df)
+
 
                 caminho_pdf = gerar_pdf_jogo(
                     jogo=jogo,
