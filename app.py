@@ -2713,7 +2713,7 @@ with tab[5]:
         st.markdown("---")
 
 
-        def gerar_pdf_jogo(jogo, score_formatado, analise_texto):
+        def gerar_pdf_jogo(jogo, score_formatado, analise_texto, img_barra, img_radar):
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 caminho_pdf = tmp.name
 
@@ -2770,14 +2770,14 @@ with tab[5]:
             story.append(tabela)
             story.append(Spacer(1, 16))
 
+            # 🔹 GRÁFICOS
+            story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
+            story.append(Image(img_barra, width=16 * cm, height=7 * cm))
+            story.append(Spacer(1, 16))
 
-            # 🔹 OBSERVAÇÃO SOBRE GRÁFICOS
-            story.append(Paragraph(
-                "<b>Gráficos de desempenho:</b><br/>"
-                "Os gráficos de scouts e radar estão disponíveis na versão interativa do painel.",
-                styles["Normal"]
-            ))
-            story.append(Spacer(1, 14))
+            story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
+            story.append(Image(img_radar, width=14 * cm, height=14 * cm))
+            story.append(Spacer(1, 18))
 
             # 🔹 ANÁLISE TÉCNICA
             story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
@@ -2786,6 +2786,51 @@ with tab[5]:
             doc.build(story)
 
             return caminho_pdf
+
+
+        def gerar_barra_pdf(jogo, scout_cols):
+            fig, ax = plt.subplots(figsize=(8, 4))
+            valores = jogo[scout_cols].values
+
+            ax.bar(scout_cols, valores, color="#00E5FF")
+            ax.set_facecolor("#0E1117")
+            fig.patch.set_facecolor("#0E1117")
+
+            ax.tick_params(colors="white", rotation=45)
+            ax.set_title("Distribuição de Scouts", color="white")
+            ax.grid(axis="y", linestyle=":", alpha=0.3)
+
+            caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+            plt.tight_layout()
+            plt.savefig(caminho, dpi=200)
+            plt.close(fig)
+
+            return caminho
+
+
+        def gerar_radar_pdf(jogo, scout_cols):
+            valores = jogo[scout_cols].values
+            max_vals = [max(valores[i], 1) for i in range(len(valores))]
+            percentuais = [(v / m) * 100 for v, m in zip(valores, max_vals)]
+
+            percentuais += percentuais[:1]
+            labels = scout_cols + [scout_cols[0]]
+
+            fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(6, 6))
+            ax.plot(labels, percentuais, color="#00E5FF", linewidth=2)
+            ax.fill(labels, percentuais, color="#00E5FF", alpha=0.3)
+
+            ax.set_facecolor("#0E1117")
+            fig.patch.set_facecolor("#0E1117")
+            ax.tick_params(colors="white")
+            ax.set_title("Radar de Scouts", color="white", pad=20)
+
+            caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+            plt.tight_layout()
+            plt.savefig(caminho, dpi=200)
+            plt.close(fig)
+
+            return caminho
 
 
         #===============================================
@@ -3191,22 +3236,25 @@ with tab[5]:
             analise_texto_pdf = "\n".join(analise)
 
             if st.button("📄 Gerar PDF do Jogo"):
-                if score_formatado is None:
-                    st.warning("Selecione um jogo para gerar o PDF.")
-                else:
-                    caminho_pdf = gerar_pdf_jogo(
-                        jogo=jogo,
-                        score_formatado=score_formatado,
-                        analise_texto=analise_texto_pdf
+                img_barra = gerar_barra_pdf(jogo, scout_cols)
+                img_radar = gerar_radar_pdf(jogo, scout_cols)
+
+                caminho_pdf = gerar_pdf_jogo(
+                    jogo=jogo,
+                    score_formatado=score_formatado,
+                    analise_texto=analise_texto_pdf,
+                    img_barra=img_barra,
+                    img_radar=img_radar
+                )
+
+                with open(caminho_pdf, "rb") as f:
+                    st.download_button(
+                        label="⬇️ Baixar PDF do Jogo",
+                        data=f,
+                        file_name=f"relatorio_jogo_{jogo['Data']}.pdf",
+                        mime="application/pdf"
                     )
 
-                    with open(caminho_pdf, "rb") as f:
-                        st.download_button(
-                            label="⬇️ Baixar PDF do Jogo",
-                            data=f,
-                            file_name=f"relatorio_jogo_{jogo['Data']}.pdf",
-                            mime="application/pdf"
-                        )
 
 
 
