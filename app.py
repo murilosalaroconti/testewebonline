@@ -2767,64 +2767,64 @@ with tab[5]:
 
             with col1:
                 st.markdown(f"""
-                <div class="scout-card bg-chute">
+                <div class="scout-card bg-chutes">
                     <div class="icon">🥅</div>
-                    <div class="title">Chutes Certos</div>
-                    <div class="value">{int(jogo["Chutes"])}</div>
+                    <div class="scout-title">Chutes Certos</div>
+                    <div class="scout-value">{int(jogo["Chutes"])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col2:
                 st.markdown(f"""
-                <div class="scout-card bg-erro">
+                <div class="scout-card bg-erros">
                     <div class="icon">❌</div>
-                    <div class="title">Chutes Errados</div>
-                    <div class="value">{int(jogo.get("Chutes Errados", 0))}</div>
+                    <div class="scout-title">Chutes Errados</div>
+                    <div class="scout-value">{int(jogo.get("Chutes Errados", 0))}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col3:
                 st.markdown(f"""
-                <div class="scout-card bg-passe">
+                <div class="scout-card bg-passes">
                     <div class="icon">🎯</div>
-                    <div class="title">Passes-chave</div>
-                    <div class="value">{int(jogo["Passes-chave"])}</div>
+                    <div class="scout-title">Passes-chave</div>
+                    <div class="scout-value">{int(jogo["Passes-chave"])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col4:
                 st.markdown(f"""
-                <div class="scout-card bg-erro">
+                <div class="scout-card bg-erros">
                     <div class="icon">📉</div>
-                    <div class="title">Passes Errados</div>
-                    <div class="value">{int(jogo.get("Passes Errados", 0))}</div>
+                    <div class="scout-title">Passes Errados</div>
+                    <div class="scout-value">{int(jogo.get("Passes Errados", 0))}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col5:
                 st.markdown(f"""
-                <div class="scout-card bg-desarme">
+                <div class="scout-card bg-desarmes">
                     <div class="icon">🛡️</div>
-                    <div class="title">Desarmes</div>
-                    <div class="value">{int(jogo["Desarmes"])}</div>
+                    <div class="scout-title">Desarmes</div>
+                    <div class="scout-value">{int(jogo["Desarmes"])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col6:
                 st.markdown(f"""
-                <div class="scout-card bg-falta">
+                <div class="scout-card bg-faltas">
                     <div class="icon">⚡</div>
-                    <div class="title">Faltas Sofridas</div>
-                    <div class="value">{int(jogo["Faltas Sofridas"])}</div>
+                    <div class="scout-title">Faltas Sofridas</div>
+                    <div class="scout-value">{int(jogo["Faltas Sofridas"])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with col7:
                 st.markdown(f"""
-                <div class="scout-card bg-part">
+                <div class="scout-card bg-indiretas">
                     <div class="icon">🔁</div>
-                    <div class="title">Participações</div>
-                    <div class="value">{int(jogo["Participações Indiretas"])}</div>
+                    <div class="scout-title">Participações</div>
+                    <div class="scout-value">{int(jogo["Participações Indiretas"])}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
