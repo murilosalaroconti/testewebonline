@@ -2140,6 +2140,8 @@ st.markdown("""
     margin-top: 6px;
 }
 
+/* === MESMAS CORES DO GRÁFICO === */
+
 .bg-chutes {
     background: linear-gradient(135deg, #00E5FF, #0288D1);
 }
@@ -2148,17 +2150,17 @@ st.markdown("""
     background: linear-gradient(135deg, #FF1744, #B71C1C);
 }
 
-.bg-passes-errados {
-    background: linear-gradient(135deg, #FF5252, #C62828);
+.bg-passes {
+    background: linear-gradient(135deg, #00E676, #2E7D32);
 }
 
+/* 👇 AQUI ESTAVA O ERRO */
+.bg-passes-errados {
+    background: linear-gradient(135deg, #9E9E9E, #616161);
+}
 
 .bg-desarmes {
     background: linear-gradient(135deg, #7C4DFF, #512DA8);
-}
-
-.bg-passes {
-    background: linear-gradient(135deg, #00E676, #2E7D32);
 }
 
 .bg-faltas {
@@ -2169,7 +2171,7 @@ st.markdown("""
     background: linear-gradient(135deg, #FF5252, #B71C1C);
 }
 </style>
-""", unsafe_allow_html=True)
+
 
 
 
