@@ -2948,7 +2948,7 @@ with tab[5]:
                 title="Distribuição de Scouts no Jogo"
             )
 
-            fig.update_traces(
+            fig_barra.update_traces(
                 texttemplate='%{y}',
                 textposition='inside',
                 insidetextanchor='middle',
@@ -2958,29 +2958,26 @@ with tab[5]:
                 )
             )
 
-            fig.update_layout(
+            fig_barra.update_layout(
                 showlegend=False,
                 plot_bgcolor="#0E1117",
                 paper_bgcolor="#0E1117",
-                font=dict(color="white")
+                font=dict(color="white"),
+                dragmode=False,
+                hovermode=False
             )
 
-            fig.update_layout(
-                dragmode=False,  # ❌ remove pan / seleção
-                hovermode=False,  # ❌ remove hover interativo
-            )
-
-            fig.update_xaxes(fixedrange=True)
-            fig.update_yaxes(fixedrange=True)
+            fig_barra.update_xaxes(fixedrange=True)
+            fig_barra.update_yaxes(fixedrange=True)
 
             st.plotly_chart(
-                fig,
+                fig_barra,
                 use_container_width=True,
                 config={
                     "scrollZoom": False,
                     "displayModeBar": False,
                     "doubleClick": False,
-                    "staticPlot": True  # 🔥 TRAVA TOTAL (zoom, toque, arrasto)
+                    "staticPlot": True
                 }
             )
 
