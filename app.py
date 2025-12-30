@@ -2940,6 +2940,55 @@ with tab[5]:
             )
 
             # ======================================================
+            # ⭐ SCORE GERAL DO JOGO
+            # ======================================================
+
+            st.markdown("### ⭐ Score Geral do Jogo")
+
+            # Normalizações seguras (evita divisão por zero)
+            max_chutes = df["Chutes"].max() or 1
+            max_passes_chave = df["Passes-chave"].max() or 1
+            max_desarmes = df["Desarmes"].max() or 1
+            max_erros = (df["Chutes Errados"] + df["Passes Errados"]).max() or 1
+
+            # Cálculo dos componentes
+            score_chutes = (jogo["Chutes"] / max_chutes) * 2.5
+            score_passes = (jogo["Passes-chave"] / max_passes_chave) * 2.5
+            score_defesa = (jogo["Desarmes"] / max_desarmes) * 2.5
+
+            erros_total = jogo.get("Chutes Errados", 0) + jogo.get("Passes Errados", 0)
+            penalidade_erros = (erros_total / max_erros) * 2.5
+
+            # Score final
+            score_final = score_chutes + score_passes + score_defesa - penalidade_erros
+            score_final = max(0, min(10, score_final))
+            score_formatado = f"{score_final:.1f}"
+
+            # Cor dinâmica do score
+            if score_final >= 7.5:
+                cor_score = "#00E676"  # verde
+            elif score_final >= 5:
+                cor_score = "#FFB300"  # amarelo
+            else:
+                cor_score = "#FF1744"  # vermelho
+
+            # Card visual
+            st.markdown(f"""
+            <div style="
+                background: linear-gradient(135deg, {cor_score}, #0E1117);
+                border-radius: 20px;
+                padding: 25px;
+                text-align: center;
+                color: white;
+                box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+            ">
+                <div style="font-size:18px; opacity:0.9;">Desempenho Geral</div>
+                <div style="font-size:54px; font-weight:bold;">{score_formatado}</div>
+                <div style="opacity:0.85;">Nota baseada em impacto ofensivo, defensivo e erros</div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # ======================================================
             # 📝 ANÁLISE TÉCNICA DO JOGO (AGORA NO LUGAR CERTO)
             # ======================================================
             st.markdown("### 📝 Análise Técnica do Jogo")
