@@ -2940,39 +2940,66 @@ with tab[5]:
             )
 
             # ======================================================
-            # ⭐ SCORE GERAL DO JOGO
+            # ⭐ SCORE GERAL DO JOGO (LÓGICA AJUSTADA)
             # ======================================================
 
             st.markdown("### ⭐ Score Geral do Jogo")
 
-            # Normalizações seguras (evita divisão por zero)
-            max_chutes = df["Chutes"].max() or 1
+            # 🔒 Normalizações seguras
+            max_gols = df["Gols Marcados"].max() or 1
             max_passes_chave = df["Passes-chave"].max() or 1
             max_desarmes = df["Desarmes"].max() or 1
+            max_finalizacoes = (df["Chutes"] + df["Chutes Errados"]).max() or 1
             max_erros = (df["Chutes Errados"] + df["Passes Errados"]).max() or 1
 
-            # Cálculo dos componentes
-            score_chutes = (jogo["Chutes"] / max_chutes) * 2.5
-            score_passes = (jogo["Passes-chave"] / max_passes_chave) * 2.5
-            score_defesa = (jogo["Desarmes"] / max_desarmes) * 2.5
+            # 📌 Dados do jogo
+            gols = jogo.get("Gols Marcados", 0)
+            passes_chave = jogo.get("Passes-chave", 0)
+            desarmes = jogo.get("Desarmes", 0)
 
-            erros_total = jogo.get("Chutes Errados", 0) + jogo.get("Passes Errados", 0)
-            penalidade_erros = (erros_total / max_erros) * 2.5
+            chutes_certos = jogo.get("Chutes", 0)
+            chutes_errados = jogo.get("Chutes Errados", 0)
+            finalizacoes = chutes_certos + chutes_errados
 
-            # Score final
-            score_final = score_chutes + score_passes + score_defesa - penalidade_erros
+            passes_errados = jogo.get("Passes Errados", 0)
+            erros_total = chutes_errados + passes_errados
+
+            # ===============================
+            # 🔢 COMPONENTES DO SCORE
+            # ===============================
+
+            score_gols = (gols / max_gols) * 3.0
+            score_passes = (passes_chave / max_passes_chave) * 2.0
+            score_defesa = (desarmes / max_desarmes) * 2.0
+
+            # 📈 Eficiência ofensiva
+            eficiencia = gols / finalizacoes if finalizacoes > 0 else 0
+            score_eficiencia = eficiencia * 2.0
+
+            # ❌ Penalidade de erros (bem mais leve)
+            penalidade_erros = (erros_total / max_erros) * 1.5
+
+            # ⭐ SCORE FINAL
+            score_final = (
+                    score_gols +
+                    score_passes +
+                    score_defesa +
+                    score_eficiencia -
+                    penalidade_erros
+            )
+
             score_final = max(0, min(10, score_final))
             score_formatado = f"{score_final:.1f}"
 
-            # Cor dinâmica do score
+            # 🎨 Cor dinâmica
             if score_final >= 7.5:
-                cor_score = "#00E676"  # verde
+                cor_score = "#00E676"  # Verde
             elif score_final >= 5:
-                cor_score = "#FFB300"  # amarelo
+                cor_score = "#FFB300"  # Amarelo
             else:
-                cor_score = "#FF1744"  # vermelho
+                cor_score = "#FF1744"  # Vermelho
 
-            # Card visual
+            # 🧱 Card visual (INALTERADO)
             st.markdown(f"""
             <div style="
                 background: linear-gradient(135deg, {cor_score}, #0E1117);
@@ -2984,7 +3011,7 @@ with tab[5]:
             ">
                 <div style="font-size:18px; opacity:0.9;">Desempenho Geral</div>
                 <div style="font-size:54px; font-weight:bold;">{score_formatado}</div>
-                <div style="opacity:0.85;">Nota baseada em impacto ofensivo, defensivo e erros</div>
+                <div style="opacity:0.85;">Nota baseada em impacto ofensivo, defensivo e eficiência</div>
             </div>
             """, unsafe_allow_html=True)
 
