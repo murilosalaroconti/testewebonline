@@ -2742,9 +2742,11 @@ with tab[5]:
             )
 
             fig.update_traces(
-                textposition="inside",  # 👈 DENTRO DA BARRA
+                texttemplate='%{y}',
+                textposition='inside',
+                insidetextanchor='middle',
                 textfont=dict(
-                    color="white",
+                    color='white',
                     size=14
                 )
             )
