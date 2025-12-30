@@ -2144,6 +2144,15 @@ st.markdown("""
     background: linear-gradient(135deg, #00E5FF, #0288D1);
 }
 
+.bg-chutes-errados {
+    background: linear-gradient(135deg, #FF1744, #B71C1C);
+}
+
+.bg-passes-errados {
+    background: linear-gradient(135deg, #FF5252, #C62828);
+}
+
+
 .bg-desarmes {
     background: linear-gradient(135deg, #7C4DFF, #512DA8);
 }
@@ -2776,7 +2785,7 @@ with tab[5]:
 
             with col2:
                 st.markdown(f"""
-                <div class="scout-card bg-erros">
+                <div class="scout-card bg-chutes-errados">
                     <div class="icon">❌</div>
                     <div class="scout-title">Chutes Errados</div>
                     <div class="scout-value">{int(jogo.get("Chutes Errados", 0))}</div>
@@ -2794,7 +2803,7 @@ with tab[5]:
 
             with col4:
                 st.markdown(f"""
-                <div class="scout-card bg-erros">
+                <div class="scout-card bg-passes-errados">
                     <div class="icon">📉</div>
                     <div class="scout-title">Passes Errados</div>
                     <div class="scout-value">{int(jogo.get("Passes Errados", 0))}</div>
