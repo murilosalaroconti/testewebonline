@@ -2803,6 +2803,72 @@ with tab[5]:
             st.plotly_chart(fig_radar, use_container_width=True)
 
         # ======================================================
+        # 📝 ANÁLISE AUTOMÁTICA DO JOGO (RESUMO TÉCNICO)
+        # ======================================================
+
+        st.markdown("### 📝 Análise Técnica do Jogo")
+
+        chutes = jogo["Chutes"]
+        gols = int(jogo.get("Gols Marcados", 0))
+        passes_chave = jogo["Passes-chave"]
+        desarmes = jogo["Desarmes"]
+        faltas = jogo["Faltas Sofridas"]
+
+        # Se você adicionou depois (opcional)
+        passes_errados = jogo.get("Passes Errados", 0)
+        chutes_errados = jogo.get("Chutes Errados", 0)
+
+        analise = []
+
+        # 🎯 FINALIZAÇÃO
+        if chutes > 0:
+            if gols > 0:
+                eficiencia = gols / chutes
+                if eficiencia >= 0.3:
+                    analise.append(
+                        f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols** e teve **boa eficiência ofensiva**."
+                    )
+                else:
+                    analise.append(
+                        f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols**, mas pode melhorar a **precisão nas finalizações**."
+                    )
+            else:
+                analise.append(
+                    f"⚽ Tentou **{chutes} finalizações**, porém **não marcou gols**, indicando necessidade de trabalhar conclusão."
+                )
+
+        # 🎯 PASSES
+        if passes_chave > 0:
+            analise.append(
+                f"🎯 Criou **{passes_chave} passes decisivos**, contribuindo bem na organização ofensiva."
+            )
+
+        if passes_errados > passes_chave:
+            analise.append(
+                f"⚠️ Errou mais passes do que acertou decisivamente, ponto de atenção para treinos técnicos."
+            )
+
+        # 🛡️ DEFESA
+        if desarmes >= 5:
+            analise.append(
+                f"🛡️ Forte presença defensiva com **{desarmes} desarmes**, mostrando boa leitura de jogo."
+            )
+        elif desarmes > 0:
+            analise.append(
+                f"🛡️ Contribuiu defensivamente com **{desarmes} desarmes**."
+            )
+
+        # ⚡ FALTAS
+        if faltas >= 4:
+            analise.append(
+                f"⚡ Sofreu **{faltas} faltas**, demonstrando agressividade ofensiva e poder de progressão."
+            )
+
+        # 📝 EXIBIÇÃO FINAL
+        for linha in analise:
+            st.write(linha)
+
+        # ======================================================
         # 📊 2️⃣ MÉDIA POR JOGO
         # ======================================================
         elif modo_scout == "📊 Média por jogo":
