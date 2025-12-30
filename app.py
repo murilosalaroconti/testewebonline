@@ -2715,18 +2715,20 @@ with tab[5]:
 
             jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
 
+            # ---------------- MÉTRICAS ----------------
             c1, c2, c3, c4 = st.columns(4)
             c5, c6, c7 = st.columns(3)
 
             c1.metric("🥅 Chutes", int(jogo["Chutes"]))
-            c2.metric("❌ Chutes Errados", int(jogo["Chutes Errados"]))
+            c2.metric("❌ Chutes Errados", int(jogo.get("Chutes Errados", 0)))
             c3.metric("🎯 Passes-chave", int(jogo["Passes-chave"]))
-            c4.metric("❌ Passes Errados", int(jogo["Passes Errados"]))
+            c4.metric("❌ Passes Errados", int(jogo.get("Passes Errados", 0)))
 
             c5.metric("🛡️ Desarmes", int(jogo["Desarmes"]))
             c6.metric("⚡ Faltas Sofridas", int(jogo["Faltas Sofridas"]))
             c7.metric("🔁 Part. Indiretas", int(jogo["Participações Indiretas"]))
 
+            # ---------------- GRÁFICO ----------------
             scout_vals = jogo[scout_cols]
 
             fig = px.bar(
@@ -2747,9 +2749,7 @@ with tab[5]:
 
             st.plotly_chart(fig, use_container_width=True)
 
-            # ======================================================
-            # 🎮 RADAR CHART ESTILO FIFA (DENTRO DO IF)
-            # ======================================================
+            # ---------------- RADAR ----------------
             st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
 
             radar_vals = []
@@ -2758,41 +2758,26 @@ with tab[5]:
                 valor = jogo[scout]
                 radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
-            # Fecha o polígono
             radar_vals += radar_vals[:1]
             radar_labels = scout_cols + [scout_cols[0]]
 
-            # Cor FIFA (pode trocar depois)
-            main_color = "#00E5FF"  # Ciano FIFA
-
             fig_radar = go.Figure()
-
             fig_radar.add_trace(
                 go.Scatterpolar(
                     r=radar_vals,
                     theta=radar_labels,
-                    mode="lines",  # 🔥 ISSO remove as bolinhas
+                    mode="lines",
                     fill="toself",
-                    line=dict(
-                        color=main_color,
-                        width=4
-                    ),
-                    fillcolor=hex_to_rgba(main_color, 0.35),
-                    name="Scout Geral"
+                    line=dict(color="#00E5FF", width=4),
+                    fillcolor="rgba(0,229,255,0.35)"
                 )
             )
 
             fig_radar.update_layout(
                 polar=dict(
                     bgcolor="#0E1117",
-                    radialaxis=dict(
-                        range=[0, 100],
-                        visible=True,
-                        gridcolor="rgba(255,255,255,0.15)"
-                    ),
-                    angularaxis=dict(
-                        tickfont=dict(size=13, color="white")
-                    )
+                    radialaxis=dict(range=[0, 100], gridcolor="rgba(255,255,255,0.15)"),
+                    angularaxis=dict(tickfont=dict(color="white"))
                 ),
                 paper_bgcolor="#0E1117",
                 font=dict(color="white"),
@@ -2802,71 +2787,42 @@ with tab[5]:
 
             st.plotly_chart(fig_radar, use_container_width=True)
 
-        # ======================================================
-        # 📝 ANÁLISE AUTOMÁTICA DO JOGO (RESUMO TÉCNICO)
-        # ======================================================
+            # ======================================================
+            # 📝 ANÁLISE TÉCNICA DO JOGO (AGORA NO LUGAR CERTO)
+            # ======================================================
+            st.markdown("### 📝 Análise Técnica do Jogo")
 
-        st.markdown("### 📝 Análise Técnica do Jogo")
+            chutes = jogo["Chutes"]
+            gols = int(jogo.get("Gols Marcados", 0))
+            passes_chave = jogo["Passes-chave"]
+            passes_errados = jogo.get("Passes Errados", 0)
+            desarmes = jogo["Desarmes"]
+            faltas = jogo["Faltas Sofridas"]
 
-        chutes = jogo["Chutes"]
-        gols = int(jogo.get("Gols Marcados", 0))
-        passes_chave = jogo["Passes-chave"]
-        desarmes = jogo["Desarmes"]
-        faltas = jogo["Faltas Sofridas"]
+            analise = []
 
-        # Se você adicionou depois (opcional)
-        passes_errados = jogo.get("Passes Errados", 0)
-        chutes_errados = jogo.get("Chutes Errados", 0)
-
-        analise = []
-
-        # 🎯 FINALIZAÇÃO
-        if chutes > 0:
-            if gols > 0:
-                eficiencia = gols / chutes
-                if eficiencia >= 0.3:
-                    analise.append(
-                        f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols** e teve **boa eficiência ofensiva**."
-                    )
+            if chutes > 0:
+                if gols > 0:
+                    eficiencia = gols / chutes
+                    if eficiencia >= 0.3:
+                        analise.append(f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols** com boa eficiência.")
+                    else:
+                        analise.append(
+                            f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols**, mas pode melhorar a precisão.")
                 else:
-                    analise.append(
-                        f"⚽ Finalizou **{chutes} vezes**, marcou **{gols} gols**, mas pode melhorar a **precisão nas finalizações**."
-                    )
-            else:
-                analise.append(
-                    f"⚽ Tentou **{chutes} finalizações**, porém **não marcou gols**, indicando necessidade de trabalhar conclusão."
-                )
+                    analise.append(f"⚽ Tentou **{chutes} finalizações**, mas não marcou gols.")
 
-        # 🎯 PASSES
-        if passes_chave > 0:
-            analise.append(
-                f"🎯 Criou **{passes_chave} passes decisivos**, contribuindo bem na organização ofensiva."
-            )
+            if passes_errados > passes_chave:
+                analise.append("⚠️ Teve mais erros do que passes decisivos, atenção ao passe.")
 
-        if passes_errados > passes_chave:
-            analise.append(
-                f"⚠️ Errou mais passes do que acertou decisivamente, ponto de atenção para treinos técnicos."
-            )
+            if desarmes >= 5:
+                analise.append(f"🛡️ Forte presença defensiva com **{desarmes} desarmes**.")
 
-        # 🛡️ DEFESA
-        if desarmes >= 5:
-            analise.append(
-                f"🛡️ Forte presença defensiva com **{desarmes} desarmes**, mostrando boa leitura de jogo."
-            )
-        elif desarmes > 0:
-            analise.append(
-                f"🛡️ Contribuiu defensivamente com **{desarmes} desarmes**."
-            )
+            if faltas >= 4:
+                analise.append(f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva.")
 
-        # ⚡ FALTAS
-        if faltas >= 4:
-            analise.append(
-                f"⚡ Sofreu **{faltas} faltas**, demonstrando agressividade ofensiva e poder de progressão."
-            )
-
-        # 📝 EXIBIÇÃO FINAL
-        for linha in analise:
-            st.write(linha)
+            for linha in analise:
+                st.write(linha)
 
         # ======================================================
         # 📊 2️⃣ MÉDIA POR JOGO
