@@ -8,12 +8,19 @@ import io
 import numpy as np
 import matplotlib.patches as mpatches
 import altair as alt
-import os
 from pathlib import Path
 from google.oauth2.service_account import Credentials
 import gspread
 import plotly.express as px
 import plotly.graph_objects as go
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.colors import HexColor, white
+from reportlab.lib.units import cm
+import tempfile
+import os
+
 
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
@@ -2705,6 +2712,88 @@ with tab[5]:
 
         st.markdown("---")
 
+
+        def gerar_pdf_jogo(jogo, score_formatado, fig_barra, fig_radar, analise_texto):
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                caminho_pdf = tmp.name
+
+            doc = SimpleDocTemplate(
+                caminho_pdf,
+                pagesize=A4,
+                rightMargin=2 * cm,
+                leftMargin=2 * cm,
+                topMargin=2 * cm,
+                bottomMargin=2 * cm
+            )
+
+            styles = getSampleStyleSheet()
+            story = []
+
+            # 🔹 TÍTULO
+            story.append(Paragraph("<b>Relatório de Desempenho do Jogo</b>", styles["Title"]))
+            story.append(Spacer(1, 12))
+
+            # 🔹 DADOS DO JOGO
+            dados_jogo = f"""
+            <b>Data:</b> {jogo['Data']}<br/>
+            <b>Jogo:</b> {jogo['Casa']} x {jogo['Visitante']}<br/>
+            <b>Modalidade:</b> {jogo.get('Condição do Campo', '-')}<br/>
+            <b>Minutagem:</b> {jogo.get('Minutos', 0)} min
+            """
+            story.append(Paragraph(dados_jogo, styles["Normal"]))
+            story.append(Spacer(1, 14))
+
+            # 🔹 SCORE
+            story.append(Paragraph(f"<b>Score Geral do Jogo:</b> {score_formatado}", styles["Heading2"]))
+            story.append(Spacer(1, 14))
+
+            # 🔹 SCOUTS
+            tabela_dados = [
+                ["Scout", "Valor"],
+                ["Chutes Certos", jogo["Chutes"]],
+                ["Chutes Errados", jogo.get("Chutes Errados", 0)],
+                ["Passes-chave", jogo["Passes-chave"]],
+                ["Passes Errados", jogo.get("Passes Errados", 0)],
+                ["Desarmes", jogo["Desarmes"]],
+                ["Faltas Sofridas", jogo["Faltas Sofridas"]],
+                ["Participações", jogo["Participações Indiretas"]],
+            ]
+
+            tabela = Table(tabela_dados, colWidths=[9 * cm, 3 * cm])
+            tabela.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0E1117")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), white),
+                ("GRID", (0, 0), (-1, -1), 0.5, white),
+                ("ALIGN", (1, 1), (-1, -1), "CENTER")
+            ]))
+
+            story.append(tabela)
+            story.append(Spacer(1, 16))
+
+            # 🔹 SALVA GRÁFICOS COMO IMAGEM
+            img_barra = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            fig_barra.write_image(img_barra.name, scale=2)
+
+            img_radar = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            fig_radar.write_image(img_radar.name, scale=2)
+
+            story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
+            story.append(Image(img_barra.name, width=14 * cm, height=7 * cm))
+            story.append(Spacer(1, 14))
+
+            story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
+            story.append(Image(img_radar.name, width=14 * cm, height=7 * cm))
+            story.append(Spacer(1, 16))
+
+            # 🔹 ANÁLISE TÉCNICA
+            story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
+            story.append(Paragraph(analise_texto.replace("\n", "<br/>"), styles["Normal"]))
+
+            doc.build(story)
+
+            return caminho_pdf
+
+
         #===============================================
         # 🎨 Paleta FIFA
         SCOUT_COLORS = {
@@ -2722,6 +2811,8 @@ with tab[5]:
             hex_color = hex_color.lstrip("#")
             r, g, b = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
             return f"rgba({r},{g},{b},{alpha})"
+
+
 
         # 📊 ANÁLISE DE SCOUTS
         # ======================================================
@@ -2756,6 +2847,7 @@ with tab[5]:
             ],
             horizontal=True
         )
+
 
         # ======================================================
         # 🎯 1️⃣ SCOUT POR JOGO
@@ -2939,6 +3031,23 @@ with tab[5]:
                 }
             )
 
+            if st.button("📄 Gerar PDF do Jogo"):
+                caminho_pdf = gerar_pdf_jogo(
+                    jogo=jogo,
+                    score_formatado=score_formatado,
+                    fig_barra=fig,
+                    fig_radar=fig_radar,
+                    analise_texto=analise_texto_pdf
+                )
+
+                with open(caminho_pdf, "rb") as f:
+                    st.download_button(
+                        label="⬇️ Baixar PDF do Jogo",
+                        data=f,
+                        file_name="relatorio_jogo.pdf",
+                        mime="application/pdf"
+                    )
+
             # ======================================================
             # ======================================================
             # ⭐ SCORE GERAL DO JOGO (LÓGICA COMPLETA E REAL)
@@ -3103,6 +3212,8 @@ with tab[5]:
 
             for linha in analise:
                 st.write(linha)
+            analise_texto_pdf = "\n".join(analise)
+
 
 
 
