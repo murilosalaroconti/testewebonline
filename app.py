@@ -2121,32 +2121,47 @@ inject_custom_css()
 st.markdown("""
 <style>
 .scout-card {
-    background: linear-gradient(135deg, #1F2430, #0E1117);
-    border-radius: 16px;
+    border-radius: 18px;
     padding: 18px;
     text-align: center;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
     color: white;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
     height: 100%;
 }
 
-.scout-card .title {
+.scout-title {
     font-size: 14px;
     opacity: 0.85;
 }
 
-.scout-card .value {
-    font-size: 38px;
+.scout-value {
+    font-size: 42px;
     font-weight: bold;
-    margin: 6px 0;
+    margin-top: 6px;
 }
 
-.scout-card .icon {
-    font-size: 28px;
-    margin-bottom: 6px;
+.bg-chutes {
+    background: linear-gradient(135deg, #00E5FF, #0288D1);
+}
+
+.bg-desarmes {
+    background: linear-gradient(135deg, #7C4DFF, #512DA8);
+}
+
+.bg-passes {
+    background: linear-gradient(135deg, #00E676, #2E7D32);
+}
+
+.bg-faltas {
+    background: linear-gradient(135deg, #FF9100, #E65100);
+}
+
+.bg-indiretas {
+    background: linear-gradient(135deg, #FF5252, #B71C1C);
 }
 </style>
 """, unsafe_allow_html=True)
+
 
 
 with tab[5]:
@@ -2752,7 +2767,7 @@ with tab[5]:
 
             with col1:
                 st.markdown(f"""
-                <div class="scout-card">
+                <div class="scout-card bg-chute">
                     <div class="icon">🥅</div>
                     <div class="title">Chutes Certos</div>
                     <div class="value">{int(jogo["Chutes"])}</div>
@@ -2761,7 +2776,7 @@ with tab[5]:
 
             with col2:
                 st.markdown(f"""
-                <div class="scout-card">
+                <div class="scout-card bg-erro">
                     <div class="icon">❌</div>
                     <div class="title">Chutes Errados</div>
                     <div class="value">{int(jogo.get("Chutes Errados", 0))}</div>
@@ -2770,7 +2785,7 @@ with tab[5]:
 
             with col3:
                 st.markdown(f"""
-                <div class="scout-card">
+                <div class="scout-card bg-passe">
                     <div class="icon">🎯</div>
                     <div class="title">Passes-chave</div>
                     <div class="value">{int(jogo["Passes-chave"])}</div>
@@ -2779,8 +2794,8 @@ with tab[5]:
 
             with col4:
                 st.markdown(f"""
-                <div class="scout-card">
-                    <div class="icon">❌</div>
+                <div class="scout-card bg-erro">
+                    <div class="icon">📉</div>
                     <div class="title">Passes Errados</div>
                     <div class="value">{int(jogo.get("Passes Errados", 0))}</div>
                 </div>
@@ -2788,7 +2803,7 @@ with tab[5]:
 
             with col5:
                 st.markdown(f"""
-                <div class="scout-card">
+                <div class="scout-card bg-desarme">
                     <div class="icon">🛡️</div>
                     <div class="title">Desarmes</div>
                     <div class="value">{int(jogo["Desarmes"])}</div>
@@ -2797,7 +2812,7 @@ with tab[5]:
 
             with col6:
                 st.markdown(f"""
-                <div class="scout-card">
+                <div class="scout-card bg-falta">
                     <div class="icon">⚡</div>
                     <div class="title">Faltas Sofridas</div>
                     <div class="value">{int(jogo["Faltas Sofridas"])}</div>
@@ -2806,7 +2821,7 @@ with tab[5]:
 
             with col7:
                 st.markdown(f"""
-                <div class="scout-card">
+                <div class="scout-card bg-part">
                     <div class="icon">🔁</div>
                     <div class="title">Participações</div>
                     <div class="value">{int(jogo["Participações Indiretas"])}</div>
