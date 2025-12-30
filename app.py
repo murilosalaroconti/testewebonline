@@ -2758,6 +2758,14 @@ with tab[5]:
                 font=dict(color="white")
             )
 
+            fig.update_layout(
+                dragmode=False,  # ❌ remove pan / seleção
+                hovermode=False,  # ❌ remove hover interativo
+            )
+
+            fig.update_xaxes(fixedrange=True)
+            fig.update_yaxes(fixedrange=True)
+
             st.plotly_chart(
                 fig,
                 use_container_width=True,
@@ -2765,7 +2773,7 @@ with tab[5]:
                     "scrollZoom": False,
                     "displayModeBar": False,
                     "doubleClick": False,
-                    "responsive": False
+                    "staticPlot": True  # 🔥 TRAVA TOTAL (zoom, toque, arrasto)
                 }
             )
 
@@ -2812,7 +2820,7 @@ with tab[5]:
                     "scrollZoom": False,
                     "displayModeBar": False,
                     "doubleClick": False,
-                    "responsive": False
+                    "staticPlot": True
                 }
             )
 
