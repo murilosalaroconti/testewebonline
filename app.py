@@ -2706,10 +2706,13 @@ with tab[5]:
         # 🎨 Paleta FIFA
         SCOUT_COLORS = {
             "Chutes": "#00E5FF",  # Ciano
+            "Chutes Errados": "#FF1744", #vermelho forte
             "Desarmes": "#7C4DFF",  # Roxo
             "Passes-chave": "#00E676",  # Verde
+            "Passes Errados": "#9E9E9E", #CINZA
             "Faltas Sofridas": "#FF9100",  # Laranja
             "Participações Indiretas": "#FF5252"  # Vermelho
+
         }
 
         def hex_to_rgba(hex_color, alpha=0.35):
