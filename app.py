@@ -3194,11 +3194,20 @@ with tab[5]:
                 if score_formatado is None:
                     st.warning("Selecione um jogo para gerar o PDF.")
                 else:
-                    gerar_pdf_jogo(
+                    caminho_pdf = gerar_pdf_jogo(
                         jogo=jogo,
                         score_formatado=score_formatado,
                         analise_texto=analise_texto_pdf
                     )
+
+                    with open(caminho_pdf, "rb") as f:
+                        st.download_button(
+                            label="⬇️ Baixar PDF do Jogo",
+                            data=f,
+                            file_name=f"relatorio_jogo_{jogo['Data']}.pdf",
+                            mime="application/pdf"
+                        )
+
 
 
 
