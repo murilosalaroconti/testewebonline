@@ -2918,77 +2918,90 @@ with tab[5]:
 
                 st.plotly_chart(fig, use_container_width=True)
 
-        # GRÁFICO 3: Sono Diário (Garantindo o funcionamento)
+        # =============================
+        # 🌙 SONO DIÁRIO (COM FILTRO PRÓPRIO)
+        # =============================
         st.markdown("### 🌙 Sono Diário")
+        st.markdown("#### 🔍 Filtro de Período do Sono")
 
-        if df_sono_f.empty or 'Duração_Horas' not in df_sono_f.columns:
-            st.info("Não há registros de sono no período selecionado ou os dados estão incompletos.")
-        else:
-            df_sono_f = df_sono_f.sort_values(by='Data_DT', ascending=True)
+        col_sono_1, col_sono_2, col_sono_3 = st.columns([1, 1, 1])
 
-            fig_sono, ax_sono = plt.subplots(figsize=(12, 6))
+        with col_sono_1:
+            sono_data_inicio = st.date_input(
+                "🗓️ Data inicial",
+                value=(pd.to_datetime('today') - pd.Timedelta(days=7)).date(),
+                key="sono_data_inicio"
+            )
 
-            # Estilo Dark Mode para o Matplotlib
-            fig_sono.patch.set_facecolor('#0E1117')
-            ax_sono.set_facecolor('#0E1117')
-            plt.rcParams['text.color'] = 'white'
-            ax_sono.tick_params(axis='x', colors='white')
-            ax_sono.tick_params(axis='y', colors='white')
-            ax_sono.spines['bottom'].set_color('white')
-            ax_sono.spines['left'].set_color('white')
-            ax_sono.yaxis.label.set_color('white')
-            ax_sono.xaxis.label.set_color('white')
-            ax_sono.set_title("Controle de Sono Diário", color='white', fontsize=14)
+        with col_sono_2:
+            sono_data_fim = st.date_input(
+                "🗓️ Data final",
+                value=pd.to_datetime('today').date(),
+                key="sono_data_fim"
+            )
 
-            # Plot de Linhas
-            x_ticks = range(len(df_sono_f))
+        with col_sono_3:
+            gerar_grafico_sono = st.button("📈 Gerar gráfico de sono")
 
-            ax_sono.plot(x_ticks, df_sono_f["Duração_Horas"].values, marker='o', linestyle='--', linewidth=2,
-                         color='#2196F3')
+        # 👇 SÓ GERA O GRÁFICO SE O USUÁRIO PEDIR
+        if gerar_grafico_sono:
 
-            # Linhas de referência e rótulos
-            media = df_sono_f["Duração_Horas"].mean()
+            df_sono_periodo = df_sono_f.copy()
 
-            ax_sono.axhline(media, color='#009688', linestyle='-', linewidth=1, label=f'Média ({media_sono_formatada})')
-            ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
-            ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
+            df_sono_periodo = df_sono_periodo[
+                (df_sono_periodo["Data_DT"] >= pd.to_datetime(sono_data_inicio)) &
+                (df_sono_periodo["Data_DT"] <= pd.to_datetime(sono_data_fim))
+                ]
 
-            for i, val in enumerate(df_sono_f["Duração_Horas"].values):
-                color = "red" if val < 6 else ("lightgreen" if val > 8 else "#FF9800")
-                ax_sono.scatter(i, val, color=color, s=80)
-                horas_l = int(val)
-                minutos_l = int((val - horas_l) * 60)
-                ax_sono.text(i, val + 0.15, f"{horas_l}h{minutos_l:02d}m", ha='center', color='white', fontsize=9)
-
-            # --- ALTERAÇÃO SOLICITADA PARA AS DATAS ---
-            x_ticks = range(len(df_sono_f))
-            datas_formatadas = df_sono_f['Data_DT'].dt.strftime('%d/%m/%Y').values
-
-            # Lógica para definir a frequência dos rótulos (pulando datas para períodos longos)
-            total_dias = len(df_sono_f)
-
-            if total_dias <= 45:
-                frequencia = 1
-            elif total_dias <= 180:
-                frequencia = 7
+            if df_sono_periodo.empty or 'Duração_Horas' not in df_sono_periodo.columns:
+                st.info("Não há registros de sono no período selecionado.")
             else:
-                frequencia = 30
+                df_sono_periodo = df_sono_periodo.sort_values(by='Data_DT')
 
-            # Aplica a frequência nos ticks e rótulos
-            indices_para_mostrar = x_ticks[::frequencia]
-            datas_para_mostrar = datas_formatadas[::frequencia]
+                fig_sono, ax_sono = plt.subplots(figsize=(12, 6))
 
-            ax_sono.set_xticks(indices_para_mostrar)
-            ax_sono.set_xticklabels(datas_para_mostrar, rotation=45, ha='right')
-            # -----------------------------------------
+                # Dark Mode
+                fig_sono.patch.set_facecolor('#0E1117')
+                ax_sono.set_facecolor('#0E1117')
+                ax_sono.tick_params(colors='white')
+                ax_sono.spines['bottom'].set_color('white')
+                ax_sono.spines['left'].set_color('white')
 
-            ax_sono.set_ylabel("Duração (horas)")
-            ax_sono.grid(True, linestyle=':', alpha=0.3)
-            ax_sono.legend(facecolor='#1F2430', edgecolor='white', labelcolor='white')
+                x = range(len(df_sono_periodo))
+                y = df_sono_periodo["Duração_Horas"].values
 
-            plt.tight_layout()
-            st.pyplot(fig_sono)
-            plt.close(fig_sono)
+                ax_sono.plot(x, y, linestyle='--', linewidth=2, color='#2196F3')
+
+                # Média DO PERÍODO
+                media = df_sono_periodo["Duração_Horas"].mean()
+                horas_med = int(media)
+                minutos_med = int((media - horas_med) * 60)
+
+                ax_sono.axhline(
+                    media,
+                    color='#009688',
+                    linestyle='-',
+                    linewidth=1,
+                    label=f'Média do período ({horas_med}h{minutos_med:02d})'
+                )
+
+                ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
+                ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
+
+                datas_formatadas = df_sono_periodo['Data_DT'].dt.strftime('%d/%m/%Y')
+
+                ax_sono.set_xticks(x)
+                ax_sono.set_xticklabels(datas_formatadas, rotation=45, ha='right')
+
+                ax_sono.set_ylabel("Duração (horas)", color='white')
+                ax_sono.set_title("Sono no Período Selecionado", color='white')
+                ax_sono.grid(True, linestyle=':', alpha=0.3)
+
+                ax_sono.legend(facecolor='#1F2430', edgecolor='white', labelcolor='white')
+
+                plt.tight_layout()
+                st.pyplot(fig_sono)
+                plt.close(fig_sono)
 
             if st.button("🔄 Recarregar Dados da Planilha"):
                 st.info("Forçando recarregamento dos dados...")
