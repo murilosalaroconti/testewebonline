@@ -2924,51 +2924,59 @@ with tab[5]:
         # 🌙 SONO DIÁRIO (COM FILTRO PRÓPRIO)
         # =============================
         st.markdown("### 🌙 Sono Diário")
-        st.markdown("#### 🔍 Filtro de Período do Sono")
+        st.markdown("#### 🔍 Filtro de Período do Sono (Gráfico)")
 
         col_sono_1, col_sono_2, col_sono_3 = st.columns([1, 1, 1])
 
         with col_sono_1:
             sono_data_inicio = st.date_input(
-                "🗓️ Data inicial",
+                "🗓️ Data inicial (sono)",
                 value=(pd.to_datetime('today') - pd.Timedelta(days=7)).date(),
-                key="sono_data_inicio"
+                key="sono_data_inicio_grafico"
             )
 
         with col_sono_2:
             sono_data_fim = st.date_input(
-                "🗓️ Data final",
+                "🗓️ Data final (sono)",
                 value=pd.to_datetime('today').date(),
-                key="sono_data_fim"
+                key="sono_data_fim_grafico"
             )
 
         with col_sono_3:
             gerar_grafico_sono = st.button("📈 Gerar gráfico de sono")
 
-        # 👇 SÓ GERA O GRÁFICO SE O USUÁRIO PEDIR
+        # 👇 GRÁFICO SOMENTE SE CLICAR NO BOTÃO
         if gerar_grafico_sono:
 
+            # 🔹 USA O DATAFRAME COMPLETO (IGNORA FILTRO DE CIMA)
             df_sono_periodo = df_sono_full.copy()
 
+            # 🔹 Converte a data
             df_sono_periodo["Data_DT"] = pd.to_datetime(
                 df_sono_periodo["Data"],
                 dayfirst=True,
                 errors="coerce"
             )
 
+            # 🔹 Converte duração para horas (OBRIGATÓRIO)
+            if "Duração do Sono (h:min)" in df_sono_periodo.columns:
+                df_sono_periodo["Duração_Horas"] = df_sono_periodo["Duração do Sono (h:min)"].apply(
+                    parse_duration_to_hours)
+
+            # 🔹 Aplica SOMENTE o filtro de baixo
             df_sono_periodo = df_sono_periodo[
                 (df_sono_periodo["Data_DT"] >= pd.to_datetime(sono_data_inicio)) &
                 (df_sono_periodo["Data_DT"] <= pd.to_datetime(sono_data_fim))
                 ]
 
-            if df_sono_periodo.empty or 'Duração_Horas' not in df_sono_periodo.columns:
+            if df_sono_periodo.empty:
                 st.info("Não há registros de sono no período selecionado.")
             else:
-                df_sono_periodo = df_sono_periodo.sort_values(by='Data_DT')
+                df_sono_periodo = df_sono_periodo.sort_values("Data_DT")
 
                 fig_sono, ax_sono = plt.subplots(figsize=(12, 6))
 
-                # Dark Mode
+                # 🎨 Dark Mode
                 fig_sono.patch.set_facecolor('#0E1117')
                 ax_sono.set_facecolor('#0E1117')
                 ax_sono.tick_params(colors='white')
@@ -2980,54 +2988,44 @@ with tab[5]:
 
                 ax_sono.plot(x, y, linestyle='--', linewidth=2, color='#2196F3')
 
-                # 🔹 PONTOS + TEXTO EM CIMA
+                # 🔹 Pontos + horas
                 for i, val in enumerate(y):
                     if val < 6:
                         color = "red"
                     elif val > 8:
                         color = "lightgreen"
                     else:
-                        color = "#FF9800"  # laranja
+                        color = "#FF9800"
 
                     ax_sono.scatter(i, val, color=color, s=80, zorder=3)
 
-                    horas = int(val)
-                    minutos = int((val - horas) * 60)
+                    h = int(val)
+                    m = int((val - h) * 60)
+                    ax_sono.text(i, val + 0.15, f"{h}h{m:02d}", ha='center', color='white', fontsize=9)
 
-                    ax_sono.text(
-                        i,
-                        val + 0.15,
-                        f"{horas}h{minutos:02d}",
-                        ha='center',
-                        color='white',
-                        fontsize=9,
-                        zorder=4
-                    )
-
-                # 🔹 MÉDIA DO PERÍODO
-                media = df_sono_periodo["Duração_Horas"].mean()
-                horas_med = int(media)
-                minutos_med = int((media - horas_med) * 60)
+                # 🔹 Média do período
+                media = y.mean()
+                h_med = int(media)
+                m_med = int((media - h_med) * 60)
 
                 ax_sono.axhline(
                     media,
                     color='#009688',
                     linestyle='-',
                     linewidth=1,
-                    label=f'Média do período ({horas_med}h{minutos_med:02d})'
+                    label=f"Média do período ({h_med}h{m_med:02d})"
                 )
 
                 ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
                 ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
 
-                datas_formatadas = df_sono_periodo['Data_DT'].dt.strftime('%d/%m/%Y')
+                datas = df_sono_periodo["Data_DT"].dt.strftime('%d/%m/%Y')
                 ax_sono.set_xticks(x)
-                ax_sono.set_xticklabels(datas_formatadas, rotation=45, ha='right', color='white')
+                ax_sono.set_xticklabels(datas, rotation=45, ha='right', color='white')
 
-                ax_sono.set_ylabel("Duração (horas)", color='white')
+                ax_sono.set_ylabel("Duração do sono (horas)", color='white')
                 ax_sono.set_title("Sono no Período Selecionado", color='white')
                 ax_sono.grid(True, linestyle=':', alpha=0.3)
-
                 ax_sono.legend(facecolor='#1F2430', edgecolor='white', labelcolor='white')
 
                 plt.tight_layout()
