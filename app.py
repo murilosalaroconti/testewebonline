@@ -2154,7 +2154,7 @@ st.markdown("""
     background: linear-gradient(135deg, #00E676, #2E7D32);
 }
 
-/* 👇 AQUI ESTAVA O ERRO */
+
 .bg-passes-errados {
     background: linear-gradient(135deg, #9E9E9E, #616161);
 }
