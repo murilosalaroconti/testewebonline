@@ -3436,7 +3436,7 @@ with tab[5]:
                     label=f"Média do período ({h_med}h{m_med:02d})"
                 )
 
-                ax_siono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
+                ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
                 ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
 
                 datas = df_sono_periodo["Data_DT"].dt.strftime('%d/%m/%Y')
