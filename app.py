@@ -2198,7 +2198,11 @@ with tab[5]:
         if 'Date' in df_treinos_full.columns:
             df_treinos_full['Date'] = df_treinos_full['Date'].astype(str)
         if 'Data' in df_sono_full.columns:
-            df_sono_full['Data'] = df_sono_full['Data'].astype(str)
+            df_sono_full['Data_DT'] = pd.to_datetime(
+                df_sono_full['Data'],
+                dayfirst=True,
+                errors="coerce"
+            )
 
         # --- NOVO BLOCO DE NORMALIZAÇÃO (Aplicar antes dos filtros de data) ---
         NOME_COLUNA_TIME = 'Treino'  # Definindo aqui para uso em todo o bloco
@@ -3432,7 +3436,7 @@ with tab[5]:
                     label=f"Média do período ({h_med}h{m_med:02d})"
                 )
 
-                ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
+                ax_siono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
                 ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
 
                 datas = df_sono_periodo["Data_DT"].dt.strftime('%d/%m/%Y')
