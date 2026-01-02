@@ -685,13 +685,13 @@ with tab[0]:
                 key="assistencias"
             )
 
-            st.markdown("##### 🏁 Resultado (placar do atleta)")
+            st.markdown("##### 🏁 Resultado da Partida")
 
             c1, c2 = st.columns(2)
 
             with c1:
                 gols_atleta = st.number_input(
-                    "Gols do Atleta",
+                    "Gols Time do Atleta",
                     min_value=0,
                     max_value=20,
                     step=1,
