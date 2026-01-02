@@ -650,16 +650,69 @@ with tab[0]:
         with st.form("form_jogo", clear_on_submit=True):
 
             data = st.date_input("Data do Jogo", format="DD/MM/YYYY", key="data")
-            horario = st.text_input("Horário (HH:MM)", key="horario")
+
+            horario = st.time_input(
+                "Horário",
+                value=datetime.time(20, 0),
+                key="horario"
+            )
+            horario_str = horario.strftime("%H:%M")
 
             quadro = st.selectbox("Quadro Jogado", OPCOES_QUADRO, key="quadro")
 
-            minutos = st.text_input("Minutos Jogados", key="minutos")
-            gols = st.text_input("Gols Marcados", key="gols")
-            assistencias = st.text_input("Assistências", key="assistencias")
+            minutos = st.number_input(
+                "Minutos Jogados",
+                min_value=0,
+                max_value=120,
+                step=1,
+                key="minutos"
+            )
 
-            resultado = st.text_input("Resultado (Placar, Ex: 4x1)", key="resultado")
-            modalidade = st.selectbox("Modalidade", OPCOES_MODALIDADE, key="modalidade")
+            gols = st.number_input(
+                "Gols Marcados",
+                min_value=0,
+                max_value=20,
+                step=1,
+                key="gols"
+            )
+
+            assistencias = st.number_input(
+                "Assistências",
+                min_value=0,
+                max_value=20,
+                step=1,
+                key="assistencias"
+            )
+
+            st.markdown("##### 🏁 Resultado (placar do atleta)")
+
+            c1, c2 = st.columns(2)
+
+            with c1:
+                gols_atleta = st.number_input(
+                    "Gols do Atleta",
+                    min_value=0,
+                    max_value=20,
+                    step=1,
+                    key="gols_atleta"
+                )
+
+            with c2:
+                gols_adversario = st.number_input(
+                    "Gols do Adversário",
+                    min_value=0,
+                    max_value=20,
+                    step=1,
+                    key="gols_adversario"
+                )
+
+            resultado = f"{gols_atleta}x{gols_adversario}"
+
+            modalidade = st.selectbox(
+                "Modalidade",
+                OPCOES_MODALIDADE,
+                key="modalidade"
+            )
 
             submitted = st.form_submit_button("Adicionar Registro")
 
