@@ -2340,6 +2340,39 @@ def gerar_radar_pdf(jogo, scout_cols, df):
 
     return caminho
 
+def calcular_score_jogo(row):
+    gols = int(row.get("Gols Marcados", 0))
+    assistencias = int(row.get("Assistências", 0))
+    passes_chave = int(row.get("Passes-chave", 0))
+    desarmes = int(row.get("Desarmes", 0))
+    faltas = int(row.get("Faltas Sofridas", 0))
+    participacoes = int(row.get("Participações Indiretas", 0))
+
+    chutes = int(row.get("Chutes", 0))
+    chutes_errados = int(row.get("Chutes Errados", 0))
+    passes_errados = int(row.get("Passes Errados", 0))
+
+    finalizacoes = chutes + chutes_errados
+    erros_total = chutes_errados + passes_errados
+
+    score = (
+        gols * 2.2 +
+        assistencias * 1.8 +
+        passes_chave * 0.6 +
+        participacoes * 0.4 +
+        faltas * 0.3 +
+        desarmes * 0.5
+    )
+
+    if finalizacoes > 0:
+        eficiencia = gols / finalizacoes
+        score += eficiencia * 1.5
+
+    score -= erros_total * 0.35
+
+    return max(0, min(10, score))
+
+
 with tab[5]:
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
@@ -3342,10 +3375,23 @@ with tab[5]:
 
                 df_tend = df_tend.sort_values("Data_DT")
 
-                df_tend["Impacto"] = (
-                        pd.to_numeric(df_tend["Gols Marcados"], errors="coerce").fillna(0) +
-                        pd.to_numeric(df_tend["Assistências"], errors="coerce").fillna(0)
+                df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
+
+                ultimos = df_tend.tail(5)["Score_Jogo"].mean()
+                anteriores = (
+                    df_tend.iloc[:-5]["Score_Jogo"].mean()
+                    if len(df_tend) > 5 else ultimos
                 )
+
+                tendencia_label = "➡️ Estável"
+                tendencia_cor = "#9E9E9E"
+
+                if ultimos - anteriores >= 0.4:
+                    tendencia_label = "⬆️ Em evolução técnica"
+                    tendencia_cor = "#00E676"
+                elif anteriores - ultimos >= 0.4:
+                    tendencia_label = "⬇️ Atenção"
+                    tendencia_cor = "#FF1744"
 
                 ultimos = df_tend.tail(5)["Impacto"].mean()
                 anteriores = df_tend.iloc[:-5]["Impacto"].mean() if len(df_tend) > 5 else ultimos
