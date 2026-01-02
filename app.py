@@ -3360,12 +3360,12 @@ with tab[5]:
             analise_texto_pdf = "\n".join(analise)
 
             # ======================================================
-            # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — BASE SCORE
+            # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
             # ======================================================
 
             st.markdown("### 📈 Tendência Recente (Últimos 5 Jogos)")
 
-            if not df_jogos.empty and len(df_jogos) >= 3:
+            if not df_jogos.empty and len(df_jogos) >= 5:
 
                 df_tend = df.copy()
 
@@ -3378,35 +3378,81 @@ with tab[5]:
                 # 👉 Score técnico por jogo
                 df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
 
-                ultimos = df_tend.tail(5)["Score_Jogo"].mean()
-                anteriores = (
-                    df_tend.iloc[:-5]["Score_Jogo"].mean()
-                    if len(df_tend) > 5 else ultimos
+                # 🔍 Últimos 5 jogos (do mais antigo para o mais recente)
+                scores = df_tend.tail(5)["Score_Jogo"].values.tolist()
+
+                ultimo = scores[-1]
+                penultimo = scores[-2]
+                antepenultimo = scores[-3]
+                media_5 = sum(scores) / len(scores)
+
+                jogos_ruins = sum(1 for s in scores if s < 4.5)
+                jogos_bons = sum(1 for s in scores if s >= 6)
+
+                queda_continua = ultimo < penultimo < antepenultimo
+                subida_continua = ultimo > penultimo > antepenultimo
+
+                oscilacao = (
+                        max(scores) - min(scores) >= 3
+                        and not subida_continua
+                        and not queda_continua
                 )
 
-                tendencia_label = "➡️ Estável"
-                tendencia_cor = "#9E9E9E"
-                tendencia_interpretacao = (
-                    "O desempenho técnico do atleta manteve um padrão semelhante "
-                    "aos jogos anteriores."
-                )
+                # ===============================
+                # 🧭 DECISÃO DE TENDÊNCIA
+                # ===============================
 
-                if ultimos - anteriores >= 0.4:
+                # 🟢 ALTA PERFORMANCE
+                if (
+                        media_5 >= 7
+                        and jogos_bons >= 3
+                        and ultimo >= 6
+                        and not queda_continua
+                ):
+                    tendencia_label = "🟢 Alta performance"
+                    tendencia_cor = "#2E7D32"
+                    tendencia_interpretacao = (
+                        "O atleta apresenta desempenho técnico elevado de forma consistente, "
+                        "com impacto positivo recorrente nas partidas recentes."
+                    )
+
+                # 🔴 QUEDA TÉCNICA
+                elif jogos_ruins >= 3 and ultimo < 4.5 and queda_continua:
+                    tendencia_label = "⬇️ Atenção — Queda técnica"
+                    tendencia_cor = "#FF1744"
+                    tendencia_interpretacao = (
+                        "O desempenho técnico apresenta queda progressiva nos jogos mais recentes, "
+                        "indicando redução consistente de impacto em campo."
+                    )
+
+                # 📈 EVOLUÇÃO
+                elif subida_continua and ultimo >= media_5:
                     tendencia_label = "⬆️ Em evolução técnica"
                     tendencia_cor = "#00E676"
                     tendencia_interpretacao = (
-                        "Apesar de oscilações recentes, o atleta apresentou um forte "
-                        "desempenho no último jogo, elevando sua média técnica."
+                        "O atleta vem demonstrando evolução técnica contínua, com melhora consistente "
+                        "nas partidas mais recentes."
                     )
 
-                elif anteriores - ultimos >= 0.4:
-                    tendencia_label = "⬇️ Atenção"
-                    tendencia_cor = "#FF1744"
+                # 🎢 OSCILAÇÃO
+                elif oscilacao:
+                    tendencia_label = "➡️ Oscilação técnica"
+                    tendencia_cor = "#FFC107"
                     tendencia_interpretacao = (
-                        "Houve queda no rendimento técnico recente, indicando "
-                        "necessidade de atenção e ajustes."
+                        "O desempenho recente apresenta oscilações, alternando jogos de bom nível "
+                        "com quedas técnicas."
                     )
 
+                # ➡️ ESTÁVEL
+                else:
+                    tendencia_label = "➡️ Estável"
+                    tendencia_cor = "#9E9E9E"
+                    tendencia_interpretacao = (
+                        "O atleta mantém um padrão técnico consistente, sem variações relevantes "
+                        "no desempenho recente."
+                    )
+
+                # 🧱 CARD VISUAL
                 st.markdown(
                     f"""
                     <div style="
@@ -3428,7 +3474,7 @@ with tab[5]:
                 )
 
             else:
-                st.info("Dados insuficientes para análise de tendência recente.")
+                st.info("Dados insuficientes para análise de tendência recente (mínimo 5 jogos).")
 
             st.markdown("<br><br>", unsafe_allow_html=True)
 
