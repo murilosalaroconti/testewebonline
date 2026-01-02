@@ -3562,7 +3562,7 @@ with tab[5]:
                 paper_bgcolor="#0E1117",
                 font=dict(color="white", size=12),
                 yaxis=dict(
-                    range=[0, 10],
+                    range=[0, 10.5],
                     showgrid=True,
                     gridcolor="rgba(255,255,255,0.1)",
                     title="Nota"
