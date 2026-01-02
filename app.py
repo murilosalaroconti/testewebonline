@@ -1,7 +1,7 @@
 # app.py - Versão Streamlit do sistema do Murilo
 import streamlit as st
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 import matplotlib.pyplot as plt
 from PIL import Image
 import io
@@ -653,9 +653,10 @@ with tab[0]:
 
             horario = st.time_input(
                 "Horário",
-                value=datetime.time(20, 0),
+                value=time(20, 0),
                 key="horario"
             )
+
             horario_str = horario.strftime("%H:%M")
 
             quadro = st.selectbox("Quadro Jogado", OPCOES_QUADRO, key="quadro")
