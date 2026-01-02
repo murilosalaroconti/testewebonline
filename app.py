@@ -3346,11 +3346,19 @@ with tab[5]:
             # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
             # ======================================================
 
-            st.markdown("### 📈 Tendência Recente (Últimos 5 Jogos)")
+            st.markdown(
+                f"### 📈 Tendência Recente — {modalidade_jogo} (Últimos 5 Jogos)"
+            )
 
-            if not df_jogos.empty and len(df_jogos) >= 5:
+            if not df_tend.empty and len(df_tend) >= 5:
 
-                df_tend = df.copy()
+                # Modalidade do jogo selecionado
+                modalidade_jogo = jogo["Condição do Campo"]
+
+                # Filtra SOMENTE jogos da mesma modalidade
+                df_tend = df[
+                    df["Condição do Campo"] == modalidade_jogo
+                    ].copy()
 
                 df_tend["Data_DT"] = pd.to_datetime(
                     df_tend["Data"], dayfirst=True, errors="coerce"
@@ -3477,7 +3485,10 @@ with tab[5]:
                 )
 
             else:
-                st.info("Dados insuficientes para análise de tendência recente (mínimo 5 jogos).")
+                st.info(
+                    f"Dados insuficientes para análise de tendência em **{modalidade_jogo}** "
+                    "(mínimo 5 jogos)."
+                )
 
             st.markdown("<br><br>", unsafe_allow_html=True)
 
