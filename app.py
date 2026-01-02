@@ -3672,25 +3672,6 @@ with tab[5]:
                         mime="application/pdf"
                     )
 
-        # 🔹 SEPARADOR PREMIUM — FIM DO RELATÓRIO DO JOGO
-        st.markdown(
-            """
-            <div style="
-                height: 2px;
-                margin: 40px 0 40px 0;
-                background: linear-gradient(
-                    to right,
-                    rgba(0,229,255,0.05),
-                    rgba(0,229,255,0.9),
-                    rgba(0,229,255,0.05)
-                );
-                box-shadow: 0 0 14px rgba(0,229,255,0.6);
-                border-radius: 10px;
-            "></div>
-            """,
-            unsafe_allow_html=True
-        )
-
 
         # ======================================================
         # 📊 2️⃣ MÉDIA POR JOGO
@@ -3757,7 +3738,24 @@ with tab[5]:
 
                 st.plotly_chart(fig, use_container_width=True)
 
-
+                # 🔹 SEPARADOR PREMIUM — FIM DO RELATÓRIO DO JOGO
+            st.markdown(
+                """
+                <div style="
+                    height: 2px;
+                    margin: 40px 0 40px 0;
+                    background: linear-gradient(
+                        to right,
+                        rgba(0,229,255,0.05),
+                        rgba(0,229,255,0.9),
+                        rgba(0,229,255,0.05)
+                    );
+                    box-shadow: 0 0 14px rgba(0,229,255,0.6);
+                    border-radius: 10px;
+                "></div>
+                """,
+                unsafe_allow_html=True
+            )
 
         # =============================
         # 🌙 SONO DIÁRIO (COM FILTRO PRÓPRIO)
