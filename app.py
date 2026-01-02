@@ -28,6 +28,13 @@ IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
 
+# ------------------------------------------
+# 🔗 CONTROLE DE VISUALIZAÇÃO POR LINK (URL)
+# ------------------------------------------
+query_params = st.query_params
+modo_dashboard_publico = query_params.get("view", "") == "dashboard"
+
+
 # ----------------------
 # Configurações de arquivos
 # ----------------------
@@ -494,7 +501,11 @@ def criar_logo_link_alinhado(col, path, width):
 #----------------------------------------------
 
 # Abas principais
-tab = st.tabs(["Jogos", "Treinos", "Sono", "Análise Integrada", "Campeonatos", "Dashboard"])
+if modo_dashboard_publico:
+    tab = st.tabs(["📊 Dashboard"])
+else:
+    tab = st.tabs(["Jogos", "Treinos", "Sono", "Análise Integrada", "Campeonatos", "Dashboard"])
+
 
 # --------------------------
 # Aba Jogos
@@ -2309,9 +2320,14 @@ def gerar_radar_pdf(jogo, scout_cols, df):
 
     return caminho
 
-with tab[5]:
+dashboard_index = 0 if modo_dashboard_publico else 5
+
+with tab[dashboard_index]:
+    if not modo_dashboard_publico:
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
+    else:
+        st.info("🔗 Visualização pública do Dashboard")
 
         # --- 2. CARREGAR DADOS COMPLETOS ---
         df_jogos_full = load_registros()
