@@ -3045,7 +3045,7 @@ with tab[5]:
             )
 
             # ---------------- RADAR ----------------
-            st.markdown("### 🎮 Radar de Scouts (estilo FIFA)")
+            st.markdown("### 🎮 Radar de Scouts")
 
             radar_vals = []
             for scout in scout_cols:
