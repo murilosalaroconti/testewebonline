@@ -3360,9 +3360,23 @@ with tab[5]:
                     f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva."
                 )
 
-            for linha in analise:
-                st.write(linha)
+
             analise_texto_pdf = "\n".join(analise)
+            if analise_texto_pdf:
+                st.markdown(
+                    f"""
+                    <div style="
+                        background:#0B1220;
+                        padding:14px;
+                        border-radius:12px;
+                        border-left:4px solid #00E5FF;
+                        margin-bottom:14px;
+                    ">
+                        {analise_texto_pdf.replace("\n", "<br>")}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
             # ======================================================
             # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
@@ -3616,7 +3630,7 @@ with tab[5]:
                 }
             )
 
-            st.write("")
+
 
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
