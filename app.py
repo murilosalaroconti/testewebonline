@@ -2181,7 +2181,133 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
+def gerar_pdf_jogo(jogo, score_formatado, analise_texto, img_barra, img_radar):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        caminho_pdf = tmp.name
 
+    doc = SimpleDocTemplate(
+        caminho_pdf,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm
+    )
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    # 🔹 TÍTULO
+    story.append(Paragraph("<b>Relatório de Desempenho do Jogo</b>", styles["Title"]))
+    story.append(Spacer(1, 12))
+
+    # 🔹 DADOS DO JOGO
+    dados_jogo = f"""
+    <b>Data:</b> {jogo['Data']}<br/>
+    <b>Jogo:</b> {jogo['Casa']} x {jogo['Visitante']}<br/>
+    <b>Modalidade:</b> {jogo.get('Condição do Campo', '-')}<br/>
+    <b>Minutagem:</b> {jogo.get('Minutos', 0)} min
+    """
+    story.append(Paragraph(dados_jogo, styles["Normal"]))
+    story.append(Spacer(1, 14))
+
+    # 🔹 SCORE
+    story.append(Paragraph(f"<b>Score Geral do Jogo:</b> {score_formatado}", styles["Heading2"]))
+    story.append(Spacer(1, 14))
+
+    # 🔹 SCOUTS
+    tabela_dados = [
+        ["Scout", "Valor"],
+        ["Chutes Certos", jogo["Chutes"]],
+        ["Chutes Errados", jogo.get("Chutes Errados", 0)],
+        ["Passes-chave", jogo["Passes-chave"]],
+        ["Passes Errados", jogo.get("Passes Errados", 0)],
+        ["Desarmes", jogo["Desarmes"]],
+        ["Faltas Sofridas", jogo["Faltas Sofridas"]],
+        ["Participações", jogo["Participações Indiretas"]],
+    ]
+
+    tabela = Table(tabela_dados, colWidths=[9 * cm, 3 * cm])
+    tabela.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0E1117")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("GRID", (0, 0), (-1, -1), 0.5, white),
+        ("ALIGN", (1, 1), (-1, -1), "CENTER")
+    ]))
+
+    story.append(tabela)
+    story.append(Spacer(1, 16))
+
+    # 🔹 GRÁFICOS
+    story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
+    story.append(Image(img_barra, width=16 * cm, height=7 * cm))
+    story.append(Spacer(1, 16))
+
+    story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
+    story.append(Image(img_radar, width=14 * cm, height=14 * cm))
+    story.append(Spacer(1, 18))
+
+    # 🔹 ANÁLISE TÉCNICA
+    story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
+    story.append(Paragraph(analise_texto.replace("\n", "<br/>"), styles["Normal"]))
+
+    doc.build(story)
+
+    return caminho_pdf
+
+def gerar_barra_pdf(jogo, scout_cols):
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    valores = jogo[scout_cols].values
+    cores = [SCOUT_COLORS[s] for s in scout_cols]
+
+    ax.bar(scout_cols, valores, color=cores)
+
+    ax.set_facecolor("#0E1117")
+    fig.patch.set_facecolor("#0E1117")
+
+    ax.tick_params(colors="white", rotation=45)
+    ax.set_title("Distribuição de Scouts", color="white")
+    ax.grid(axis="y", linestyle=":", alpha=0.3)
+
+    for i, val in enumerate(valores):
+        ax.text(i, val + 0.1, str(int(val)), ha="center", color="white", fontsize=9)
+
+    caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plt.tight_layout()
+    plt.savefig(caminho, dpi=200)
+    plt.close(fig)
+
+    return caminho
+
+def gerar_radar_pdf(jogo, scout_cols, df):
+    radar_vals = []
+
+    for scout in scout_cols:
+        max_val = df[scout].max()
+        valor = jogo[scout]
+        radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+
+    radar_vals += radar_vals[:1]
+    labels = scout_cols + [scout_cols[0]]
+
+    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(6, 6))
+
+    ax.plot(labels, radar_vals, color="#00E5FF", linewidth=2)
+    ax.fill(labels, radar_vals, color="#00E5FF", alpha=0.35)
+
+    ax.set_facecolor("#0E1117")
+    fig.patch.set_facecolor("#0E1117")
+
+    ax.tick_params(colors="white")
+    ax.set_title("Radar de Scouts (estilo FIFA)", color="white", pad=20)
+
+    caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plt.tight_layout()
+    plt.savefig(caminho, dpi=200)
+    plt.close(fig)
+
+    return caminho
 
 with tab[5]:
         st.markdown("## 📊 Dashboard de Performance do Atleta")
@@ -2717,135 +2843,7 @@ with tab[5]:
         st.markdown("---")
 
 
-        def gerar_pdf_jogo(jogo, score_formatado, analise_texto, img_barra, img_radar):
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                caminho_pdf = tmp.name
 
-            doc = SimpleDocTemplate(
-                caminho_pdf,
-                pagesize=A4,
-                rightMargin=2 * cm,
-                leftMargin=2 * cm,
-                topMargin=2 * cm,
-                bottomMargin=2 * cm
-            )
-
-            styles = getSampleStyleSheet()
-            story = []
-
-            # 🔹 TÍTULO
-            story.append(Paragraph("<b>Relatório de Desempenho do Jogo</b>", styles["Title"]))
-            story.append(Spacer(1, 12))
-
-            # 🔹 DADOS DO JOGO
-            dados_jogo = f"""
-            <b>Data:</b> {jogo['Data']}<br/>
-            <b>Jogo:</b> {jogo['Casa']} x {jogo['Visitante']}<br/>
-            <b>Modalidade:</b> {jogo.get('Condição do Campo', '-')}<br/>
-            <b>Minutagem:</b> {jogo.get('Minutos', 0)} min
-            """
-            story.append(Paragraph(dados_jogo, styles["Normal"]))
-            story.append(Spacer(1, 14))
-
-            # 🔹 SCORE
-            story.append(Paragraph(f"<b>Score Geral do Jogo:</b> {score_formatado}", styles["Heading2"]))
-            story.append(Spacer(1, 14))
-
-            # 🔹 SCOUTS
-            tabela_dados = [
-                ["Scout", "Valor"],
-                ["Chutes Certos", jogo["Chutes"]],
-                ["Chutes Errados", jogo.get("Chutes Errados", 0)],
-                ["Passes-chave", jogo["Passes-chave"]],
-                ["Passes Errados", jogo.get("Passes Errados", 0)],
-                ["Desarmes", jogo["Desarmes"]],
-                ["Faltas Sofridas", jogo["Faltas Sofridas"]],
-                ["Participações", jogo["Participações Indiretas"]],
-            ]
-
-            tabela = Table(tabela_dados, colWidths=[9 * cm, 3 * cm])
-            tabela.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0E1117")),
-                ("TEXTCOLOR", (0, 0), (-1, 0), white),
-                ("GRID", (0, 0), (-1, -1), 0.5, white),
-                ("ALIGN", (1, 1), (-1, -1), "CENTER")
-            ]))
-
-            story.append(tabela)
-            story.append(Spacer(1, 16))
-
-            # 🔹 GRÁFICOS
-            story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
-            story.append(Image(img_barra, width=16 * cm, height=7 * cm))
-            story.append(Spacer(1, 16))
-
-            story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
-            story.append(Image(img_radar, width=14 * cm, height=14 * cm))
-            story.append(Spacer(1, 18))
-
-            # 🔹 ANÁLISE TÉCNICA
-            story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
-            story.append(Paragraph(analise_texto.replace("\n", "<br/>"), styles["Normal"]))
-
-            doc.build(story)
-
-            return caminho_pdf
-
-
-        def gerar_barra_pdf(jogo, scout_cols):
-            fig, ax = plt.subplots(figsize=(8, 4))
-
-            valores = jogo[scout_cols].values
-            cores = [SCOUT_COLORS[s] for s in scout_cols]
-
-            ax.bar(scout_cols, valores, color=cores)
-
-            ax.set_facecolor("#0E1117")
-            fig.patch.set_facecolor("#0E1117")
-
-            ax.tick_params(colors="white", rotation=45)
-            ax.set_title("Distribuição de Scouts", color="white")
-            ax.grid(axis="y", linestyle=":", alpha=0.3)
-
-            for i, val in enumerate(valores):
-                ax.text(i, val + 0.1, str(int(val)), ha="center", color="white", fontsize=9)
-
-            caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-            plt.tight_layout()
-            plt.savefig(caminho, dpi=200)
-            plt.close(fig)
-
-            return caminho
-
-
-        def gerar_radar_pdf(jogo, scout_cols, df):
-            radar_vals = []
-
-            for scout in scout_cols:
-                max_val = df[scout].max()
-                valor = jogo[scout]
-                radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
-
-            radar_vals += radar_vals[:1]
-            labels = scout_cols + [scout_cols[0]]
-
-            fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(6, 6))
-
-            ax.plot(labels, radar_vals, color="#00E5FF", linewidth=2)
-            ax.fill(labels, radar_vals, color="#00E5FF", alpha=0.35)
-
-            ax.set_facecolor("#0E1117")
-            fig.patch.set_facecolor("#0E1117")
-
-            ax.tick_params(colors="white")
-            ax.set_title("Radar de Scouts (estilo FIFA)", color="white", pad=20)
-
-            caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-            plt.tight_layout()
-            plt.savefig(caminho, dpi=200)
-            plt.close(fig)
-
-            return caminho
 
 
         #===============================================
