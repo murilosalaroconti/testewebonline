@@ -3801,9 +3801,11 @@ with tab[5]:
                     parse_duration_to_hours)
 
             # 🔹 Aplica SOMENTE o filtro de baixo
+            df_sono_periodo["Data_Date"] = df_sono_periodo["Data_DT"].dt.date
+
             df_sono_periodo = df_sono_periodo[
-                (df_sono_periodo["Data_DT"] >= pd.to_datetime(sono_data_inicio)) &
-                (df_sono_periodo["Data_DT"] <= pd.to_datetime(sono_data_fim))
+                (df_sono_periodo["Data_Date"] >= sono_data_inicio) &
+                (df_sono_periodo["Data_Date"] <= sono_data_fim)
                 ]
 
             if df_sono_periodo.empty:
