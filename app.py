@@ -604,47 +604,61 @@ with tab[0]:
         # ------------------------------------------------------------------
         # SCOUT AO VIVO (ADICIONADO – NÃO AFETA O FORMULÁRIO)
         # ------------------------------------------------------------------
-        st.markdown("### 📊 Scout ao vivo")
+        st.markdown("### 📊 Scout da Partida")
 
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            st.button("🥅 Chute +1",
-                      on_click=lambda: st.session_state.update(
-                          {"chutes": st.session_state.chutes + 1}))
-            st.button("❌ Chute Errado +1",
-                      on_click=lambda: st.session_state.update(
-                          {"chutes_errados": st.session_state.chutes_errados + 1}))
-            st.button("🛡️ Desarme +1",
-                      on_click=lambda: st.session_state.update(
-                          {"desarmes": st.session_state.desarmes + 1}))
+            st.session_state.chutes = st.number_input(
+                "🥅 Chutes",
+                min_value=0,
+                step=1,
+                key="chutes"
+            )
+
+            st.session_state.chutes_errados = st.number_input(
+                "❌ Chutes Errados",
+                min_value=0,
+                step=1,
+                key="chutes_errados"
+            )
+
+            st.session_state.desarmes = st.number_input(
+                "🛡️ Desarmes",
+                min_value=0,
+                step=1,
+                key="desarmes"
+            )
 
         with c2:
-            st.button("🎯 Passe-chave +1",
-                      on_click=lambda: st.session_state.update(
-                          {"passes_chave": st.session_state.passes_chave + 1}))
-            st.button("❌ Passe Errado +1",
-                      on_click=lambda: st.session_state.update(
-                          {"passes_errados": st.session_state.passes_errados + 1}))
-            st.button("⚡ Falta sofrida +1",
-                      on_click=lambda: st.session_state.update(
-                          {"faltas_sofridas": st.session_state.faltas_sofridas + 1}))
+            st.session_state.passes_chave = st.number_input(
+                "🎯 Passes-chave",
+                min_value=0,
+                step=1,
+                key="passes_chave"
+            )
+
+            st.session_state.passes_errados = st.number_input(
+                "❌ Passes Errados",
+                min_value=0,
+                step=1,
+                key="passes_errados"
+            )
+
+            st.session_state.faltas_sofridas = st.number_input(
+                "⚡ Faltas Sofridas",
+                min_value=0,
+                step=1,
+                key="faltas_sofridas"
+            )
 
         with c3:
-            st.button("🔁 Part. Indireta +1",
-                      on_click=lambda: st.session_state.update(
-                          {"part_indireta": st.session_state.part_indireta + 1}))
-
-        st.markdown("#### 🔢 Contagem atual")
-        st.write(f"🥅 Chutes: {st.session_state.chutes}")
-        st.write(f"❌ Chutes Errados: {st.session_state.chutes_errados}")
-        st.write(f"🛡️ Desarmes: {st.session_state.desarmes}")
-        st.write(f"🎯 Passes-chave: {st.session_state.passes_chave}")
-        st.write(f"❌ Passes Errados: {st.session_state.passes_errados}")
-        st.write(f"⚡ Faltas sofridas: {st.session_state.faltas_sofridas}")
-        st.write(f"🔁 Part. Indireta: {st.session_state.part_indireta}")
-
-        st.markdown("---")
+            st.session_state.part_indireta = st.number_input(
+                "🔁 Participações Indiretas",
+                min_value=0,
+                step=1,
+                key="part_indireta"
+            )
 
         # ------------------ FORMULÁRIO ------------------
         with st.form("form_jogo", clear_on_submit=True):
