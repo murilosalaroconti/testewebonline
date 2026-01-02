@@ -3360,7 +3360,7 @@ with tab[5]:
             analise_texto_pdf = "\n".join(analise)
 
             # ======================================================
-            # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS)
+            # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — BASE SCORE
             # ======================================================
 
             st.markdown("### 📈 Tendência Recente (Últimos 5 Jogos)")
@@ -3375,6 +3375,7 @@ with tab[5]:
 
                 df_tend = df_tend.sort_values("Data_DT")
 
+                # 👉 Score técnico por jogo
                 df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
 
                 ultimos = df_tend.tail(5)["Score_Jogo"].mean()
@@ -3390,19 +3391,6 @@ with tab[5]:
                     tendencia_label = "⬆️ Em evolução técnica"
                     tendencia_cor = "#00E676"
                 elif anteriores - ultimos >= 0.4:
-                    tendencia_label = "⬇️ Atenção"
-                    tendencia_cor = "#FF1744"
-
-                ultimos = df_tend.tail(5)["Impacto"].mean()
-                anteriores = df_tend.iloc[:-5]["Impacto"].mean() if len(df_tend) > 5 else ultimos
-
-                tendencia_label = "➡️ Estável"
-                tendencia_cor = "#9E9E9E"
-
-                if ultimos > anteriores:
-                    tendencia_label = "⬆️ Em evolução ofensiva"
-                    tendencia_cor = "#00E676"
-                elif ultimos < anteriores:
                     tendencia_label = "⬇️ Atenção"
                     tendencia_cor = "#FF1744"
 
