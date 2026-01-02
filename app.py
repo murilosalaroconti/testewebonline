@@ -3004,21 +3004,9 @@ with tab[5]:
         # ======================================================
         if modo_scout == "🎯 Scout por jogo":
 
-            if modo_scout == "🎯 Scout por jogo":
-                df_jogos = df.copy()
+            container_scout_jogo = st.container()
 
-                # 🔽 CONVERTE DATA E ORDENA DO MAIS RECENTE PARA O MAIS ANTIGO
-                df_jogos["Data_DT"] = pd.to_datetime(
-                    df_jogos["Data"], dayfirst=True, errors="coerce"
-                )
-                df_jogos = df_jogos.sort_values("Data_DT", ascending=False)
-
-                # 🔤 LABEL DO JOGO
-                df_jogos["Jogo"] = (
-                        df_jogos["Data"].astype(str) + " | " +
-                        df_jogos["Casa"] + " x " +
-                        df_jogos["Visitante"]
-                )
+            with container_scout_jogo:
 
                 jogo_sel = st.selectbox(
                     "Selecione o jogo:",
@@ -3515,7 +3503,8 @@ with tab[5]:
                     "(mínimo 5 jogos)."
                 )
 
-            st.markdown("<br><br>", unsafe_allow_html=True)
+            st.write("")
+
 
             # ======================================================
             # 📋 VISUALIZAÇÃO DOS ÚLTIMOS 5 JOGOS (SUPORTE À TENDÊNCIA)
