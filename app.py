@@ -2619,7 +2619,7 @@ with tab[5]:
 
             # Jogos com gol + assistência
             jogos_impacto = df_insight[
-                (df_insight["Gols Marcados"] > 0) &
+                (df_insight["Gols Marcados"] > 0) |
                 (df_insight["Assistências"] > 0)
                 ]
 
@@ -2632,7 +2632,8 @@ with tab[5]:
                 perc_vitoria = int((vitorias_impacto / total_impacto) * 100)
 
                 insight_texto = (
-                    f"📌 Quando o atleta **marcou e deu assistência**, "
+                    f"📌 Quando o atleta teve **participação ofensiva** "
+                    f"(marcou **ou** deu assistência), "
                     f"o time venceu **{perc_vitoria}%** das partidas "
                     f"({vitorias_impacto} de {total_impacto} jogos)."
                 )
@@ -2685,6 +2686,40 @@ with tab[5]:
                     <label>Média Diária</label>
                 </div>''', unsafe_allow_html=True)
 
+        # ======================================================
+        # 📈 TENDÊNCIA RECENTE (ÚLTIMOS JOGOS)
+        # ======================================================
+
+        tendencia_label = "➡️ Estável"
+        tendencia_cor = "#9E9E9E"
+
+        if not df_jogos_f.empty and len(df_jogos_f) >= 3:
+
+            df_tend = df_jogos_f.copy()
+
+            df_tend["Data_DT"] = pd.to_datetime(
+                df_tend["Data"], dayfirst=True, errors="coerce"
+            )
+
+            df_tend = df_tend.sort_values("Data_DT")
+
+            # Usamos gols + assistências como proxy simples de forma
+            df_tend["Impacto"] = (
+                    pd.to_numeric(df_tend["Gols Marcados"], errors="coerce").fillna(0) +
+                    pd.to_numeric(df_tend["Assistências"], errors="coerce").fillna(0)
+            )
+
+            ultimos = df_tend.tail(3)["Impacto"].mean()
+            anteriores = df_tend.iloc[:-3]["Impacto"].mean() if len(df_tend) > 3 else ultimos
+
+            if ultimos > anteriores:
+                tendencia_label = "⬆️ Em evolução"
+                tendencia_cor = "#00E676"
+            elif ultimos < anteriores:
+                tendencia_label = "⬇️ Atenção"
+                tendencia_cor = "#FF1744"
+#------------------------------------------------------------------
+
         # --- 3.3. SEGUNDA LINHA DE CARDS ---
         col7, col8, col9, col10, col11, col12 = st.columns(6)
 
@@ -2730,8 +2765,8 @@ with tab[5]:
         with col12:
             st.markdown(f'''
                 <div class="card-minutos">
-                    🧠 ENGAJAMENTO<p>{engajamento}</p>
-                    <label>Sono e Disciplina</label>
+                    📈 TENDÊNCIA<p style="color:{tendencia_cor};">{tendencia_label}</p>
+                    <label>Forma Recente</label>
                 </div>''', unsafe_allow_html=True)
 
         if insight_texto:
