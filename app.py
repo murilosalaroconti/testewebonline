@@ -3516,6 +3516,73 @@ with tab[5]:
                 hide_index=True
             )
 
+            # ======================================================
+            # 📈 GRÁFICO DE EVOLUÇÃO DAS NOTAS (ÚLTIMOS 5 JOGOS)
+            # ======================================================
+
+            st.markdown("#### 📈 Evolução das notas (últimos 5 jogos)")
+
+            # Dados já ordenados cronologicamente
+            df_chart = df_ultimos_5.copy()
+
+            df_chart["Rotulo"] = (
+                    df_chart["Data_DT"].dt.strftime("%d/%m") +
+                    " | " +
+                    df_chart["Casa"] +
+                    " x " +
+                    df_chart["Visitante"]
+            )
+
+            fig_notas = go.Figure()
+
+            fig_notas.add_trace(
+                go.Scatter(
+                    x=df_chart["Rotulo"],
+                    y=df_chart["Score_Jogo"],
+                    mode="lines+markers",
+                    line=dict(
+                        color="#00E5FF",
+                        width=3
+                    ),
+                    marker=dict(
+                        size=10,
+                        color=df_chart["Score_Jogo"],
+                        colorscale="RdYlGn",
+                        cmin=0,
+                        cmax=10
+                    ),
+                    hovertemplate="Nota: %{y:.1f}<extra></extra>"
+                )
+            )
+
+            fig_notas.update_layout(
+                height=230,
+                margin=dict(l=20, r=20, t=10, b=20),
+                plot_bgcolor="#0E1117",
+                paper_bgcolor="#0E1117",
+                font=dict(color="white", size=12),
+                yaxis=dict(
+                    range=[0, 10],
+                    showgrid=True,
+                    gridcolor="rgba(255,255,255,0.1)",
+                    title="Nota"
+                ),
+                xaxis=dict(
+                    showgrid=False,
+                    title=""
+                ),
+                showlegend=False
+            )
+
+            st.plotly_chart(
+                fig_notas,
+                use_container_width=True,
+                config={
+                    "displayModeBar": False,
+                    "scrollZoom": False
+                }
+            )
+
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
                 img_radar = gerar_radar_pdf(jogo, scout_cols, df)
