@@ -3353,12 +3353,12 @@ with tab[5]:
                 f"### 📈 Tendência Recente — {modalidade_jogo} (Últimos 5 Jogos)"
             )
 
-                # Filtra SOMENTE jogos da mesma modalidade
-                df_tend = df[
-                    df["Condição do Campo"] == modalidade_jogo
-                    ].copy()
+            # Filtra SOMENTE jogos da mesma modalidade
+            df_tend = df[
+                df["Condição do Campo"] == modalidade_jogo
+                ].copy()
 
-                if not df_tend.empty and len(df_tend) >= 5:
+            if not df_tend.empty and len(df_tend) >= 5:
 
                 df_tend["Data_DT"] = pd.to_datetime(
                     df_tend["Data"], dayfirst=True, errors="coerce"
@@ -3388,7 +3388,6 @@ with tab[5]:
                         and not subida_continua
                         and not queda_continua
                 )
-
                 # ===============================
                 # 🎯 CLASSIFICAÇÃO DE NÍVEL TÉCNICO
                 # ===============================
