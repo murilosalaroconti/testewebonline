@@ -3377,6 +3377,8 @@ with tab[5]:
             else:
                 st.info("Dados insuficientes para análise de tendência recente.")
 
+            st.markdown("<br><br>", unsafe_allow_html=True)
+
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
                 img_radar = gerar_radar_pdf(jogo, scout_cols, df)
