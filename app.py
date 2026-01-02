@@ -2324,20 +2324,22 @@ def gerar_radar_pdf(jogo, scout_cols, df):
     return caminho
 
 def calcular_score_jogo(row):
-    gols = int(row.get("Gols Marcados", 0))
-    assistencias = int(row.get("Assistências", 0))
-    passes_chave = int(row.get("Passes-chave", 0))
-    desarmes = int(row.get("Desarmes", 0))
-    faltas = int(row.get("Faltas Sofridas", 0))
-    participacoes = int(row.get("Participações Indiretas", 0))
+    # 🔢 Garante valores numéricos seguros
+    gols = pd.to_numeric(row.get("Gols Marcados", 0), errors="coerce") or 0
+    assistencias = pd.to_numeric(row.get("Assistências", 0), errors="coerce") or 0
+    passes_chave = pd.to_numeric(row.get("Passes-chave", 0), errors="coerce") or 0
+    desarmes = pd.to_numeric(row.get("Desarmes", 0), errors="coerce") or 0
+    faltas = pd.to_numeric(row.get("Faltas Sofridas", 0), errors="coerce") or 0
+    participacoes = pd.to_numeric(row.get("Participações Indiretas", 0), errors="coerce") or 0
 
-    chutes = int(row.get("Chutes", 0))
-    chutes_errados = int(row.get("Chutes Errados", 0))
-    passes_errados = int(row.get("Passes Errados", 0))
+    chutes = pd.to_numeric(row.get("Chutes", 0), errors="coerce") or 0
+    chutes_errados = pd.to_numeric(row.get("Chutes Errados", 0), errors="coerce") or 0
+    passes_errados = pd.to_numeric(row.get("Passes Errados", 0), errors="coerce") or 0
 
     finalizacoes = chutes + chutes_errados
     erros_total = chutes_errados + passes_errados
 
+    # ⭐ SCORE BASE
     score = (
         gols * 2.2 +
         assistencias * 1.8 +
@@ -2347,13 +2349,24 @@ def calcular_score_jogo(row):
         desarmes * 0.5
     )
 
+    # ⚡ Eficiência
     if finalizacoes > 0:
-        eficiencia = gols / finalizacoes
-        score += eficiencia * 1.5
+        score += (gols / finalizacoes) * 1.5
 
+    # ❌ Penalidade
     score -= erros_total * 0.35
 
+    # ⚖️ AJUSTE POR MODALIDADE
+    fator = {
+        "Futsal": 1.0,
+        "Society": 0.9,
+        "Campo": 0.8
+    }.get(row.get("Condição do Campo"), 1.0)
+
+    score = score / fator
+
     return max(0, min(10, score))
+
 
 
 with tab[5]:
