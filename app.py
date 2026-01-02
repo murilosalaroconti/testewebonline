@@ -719,7 +719,7 @@ with tab[0]:
                 # ✅ TOAST FLUTUANTE
                 st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
 
-               
+
 
 
     # ----------------------------------------------------------------------
@@ -3480,6 +3480,41 @@ with tab[5]:
                 st.info("Dados insuficientes para análise de tendência recente (mínimo 5 jogos).")
 
             st.markdown("<br><br>", unsafe_allow_html=True)
+
+            # ======================================================
+            # 📋 VISUALIZAÇÃO DOS ÚLTIMOS 5 JOGOS (SUPORTE À TENDÊNCIA)
+            # ======================================================
+
+            st.markdown("#### 📋 Jogos considerados na análise")
+
+            df_ultimos_5 = df_tend.tail(5).copy()
+
+            df_ultimos_5["Jogo"] = (
+                    df_ultimos_5["Casa"].astype(str) +
+                    " x " +
+                    df_ultimos_5["Visitante"].astype(str)
+            )
+
+            df_ultimos_5["Data_fmt"] = df_ultimos_5["Data_DT"].dt.strftime("%d/%m")
+
+            df_visual = df_ultimos_5[[
+                "Data_fmt",
+                "Jogo",
+                "Condição do Campo",
+                "Score_Jogo"
+            ]].rename(columns={
+                "Data_fmt": "Data",
+                "Condição do Campo": "Modalidade",
+                "Score_Jogo": "Nota"
+            })
+
+            df_visual["Nota"] = df_visual["Nota"].round(1)
+
+            st.dataframe(
+                df_visual,
+                use_container_width=True,
+                hide_index=True
+            )
 
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
