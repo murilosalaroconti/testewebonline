@@ -3326,6 +3326,57 @@ with tab[5]:
                 st.write(linha)
             analise_texto_pdf = "\n".join(analise)
 
+            # ======================================================
+            # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS)
+            # ======================================================
+
+            st.markdown("### 📈 Tendência Recente (Últimos 5 Jogos)")
+
+            if not df_jogos.empty and len(df_jogos) >= 3:
+
+                df_tend = df.copy()
+
+                df_tend["Data_DT"] = pd.to_datetime(
+                    df_tend["Data"], dayfirst=True, errors="coerce"
+                )
+
+                df_tend = df_tend.sort_values("Data_DT")
+
+                df_tend["Impacto"] = (
+                        pd.to_numeric(df_tend["Gols Marcados"], errors="coerce").fillna(0) +
+                        pd.to_numeric(df_tend["Assistências"], errors="coerce").fillna(0)
+                )
+
+                ultimos = df_tend.tail(5)["Impacto"].mean()
+                anteriores = df_tend.iloc[:-5]["Impacto"].mean() if len(df_tend) > 5 else ultimos
+
+                tendencia_label = "➡️ Estável"
+                tendencia_cor = "#9E9E9E"
+
+                if ultimos > anteriores:
+                    tendencia_label = "⬆️ Em evolução ofensiva"
+                    tendencia_cor = "#00E676"
+                elif ultimos < anteriores:
+                    tendencia_label = "⬇️ Atenção"
+                    tendencia_cor = "#FF1744"
+
+                st.markdown(
+                    f"""
+                    <div style="
+                        padding:14px;
+                        border-radius:12px;
+                        background:#111827;
+                        border-left:6px solid {tendencia_cor};
+                        font-size:18px;
+                    ">
+                        {tendencia_label}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+            else:
+                st.info("Dados insuficientes para análise de tendência recente.")
+
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
                 img_radar = gerar_radar_pdf(jogo, scout_cols, df)
