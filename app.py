@@ -609,56 +609,17 @@ with tab[0]:
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            st.session_state.chutes = st.number_input(
-                "🥅 Chutes",
-                min_value=0,
-                step=1,
-                key="chutes"
-            )
-
-            st.session_state.chutes_errados = st.number_input(
-                "❌ Chutes Errados",
-                min_value=0,
-                step=1,
-                key="chutes_errados"
-            )
-
-            st.session_state.desarmes = st.number_input(
-                "🛡️ Desarmes",
-                min_value=0,
-                step=1,
-                key="desarmes"
-            )
+            st.number_input("🥅 Chutes", min_value=0, step=1, key="chutes")
+            st.number_input("❌ Chutes Errados", min_value=0, step=1, key="chutes_errados")
+            st.number_input("🛡️ Desarmes", min_value=0, step=1, key="desarmes")
 
         with c2:
-            st.session_state.passes_chave = st.number_input(
-                "🎯 Passes-chave",
-                min_value=0,
-                step=1,
-                key="passes_chave"
-            )
-
-            st.session_state.passes_errados = st.number_input(
-                "❌ Passes Errados",
-                min_value=0,
-                step=1,
-                key="passes_errados"
-            )
-
-            st.session_state.faltas_sofridas = st.number_input(
-                "⚡ Faltas Sofridas",
-                min_value=0,
-                step=1,
-                key="faltas_sofridas"
-            )
+            st.number_input("🎯 Passes-chave", min_value=0, step=1, key="passes_chave")
+            st.number_input("❌ Passes Errados", min_value=0, step=1, key="passes_errados")
+            st.number_input("⚡ Faltas Sofridas", min_value=0, step=1, key="faltas_sofridas")
 
         with c3:
-            st.session_state.part_indireta = st.number_input(
-                "🔁 Participações Indiretas",
-                min_value=0,
-                step=1,
-                key="part_indireta"
-            )
+            st.number_input("🔁 Participações Indiretas", min_value=0, step=1, key="part_indireta")
 
         # ------------------ FORMULÁRIO ------------------
         with st.form("form_jogo", clear_on_submit=True):
