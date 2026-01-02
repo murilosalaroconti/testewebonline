@@ -505,22 +505,6 @@ with tab[0]:
     st.header("⚽ Registrar Jogos")
     col1, col2 = st.columns([2, 1])
 
-    # ----------------------------------------------------------------------
-    # SCOUT AO VIVO - inicialização (NÃO MEXE NO RESTO)
-    # ----------------------------------------------------------------------
-    scouts = [
-        "chutes",
-        "chutes_errados",
-        "desarmes",
-        "passes_chave",
-        "passes_errados",
-        "faltas_sofridas",
-        "part_indireta"
-    ]
-
-    for s in scouts:
-        if s not in st.session_state:
-            st.session_state[s] = 0
 
     # ----------------------------------------------------------------------
     # Pré-carregar opções dinâmicas antes do formulário
@@ -604,25 +588,26 @@ with tab[0]:
         # ------------------------------------------------------------------
         # SCOUT AO VIVO (ADICIONADO – NÃO AFETA O FORMULÁRIO)
         # ------------------------------------------------------------------
-        st.markdown("### 📊 Scout da Partida")
-
-        c1, c2, c3 = st.columns(3)
-
-        with c1:
-            st.number_input("🥅 Chutes", min_value=0, step=1, key="chutes")
-            st.number_input("❌ Chutes Errados", min_value=0, step=1, key="chutes_errados")
-            st.number_input("🛡️ Desarmes", min_value=0, step=1, key="desarmes")
-
-        with c2:
-            st.number_input("🎯 Passes-chave", min_value=0, step=1, key="passes_chave")
-            st.number_input("❌ Passes Errados", min_value=0, step=1, key="passes_errados")
-            st.number_input("⚡ Faltas Sofridas", min_value=0, step=1, key="faltas_sofridas")
-
-        with c3:
-            st.number_input("🔁 Participações Indiretas", min_value=0, step=1, key="part_indireta")
 
         # ------------------ FORMULÁRIO ------------------
         with st.form("form_jogo", clear_on_submit=True):
+
+            st.markdown("### 📊 Scout da Partida")
+
+            c1, c2, c3 = st.columns(3)
+
+            with c1:
+                chutes = st.number_input("🥅 Chutes", min_value=0)
+                chutes_errados = st.number_input("❌ Chutes Errados", min_value=0)
+                desarmes = st.number_input("🛡️ Desarmes", min_value=0)
+
+            with c2:
+                passes_chave = st.number_input("🎯 Passes-chave", min_value=0)
+                passes_errados = st.number_input("❌ Passes Errados", min_value=0)
+                faltas_sofridas = st.number_input("⚡ Faltas Sofridas", min_value=0)
+
+            with c3:
+                part_indireta = st.number_input("🔁 Participações Indiretas", min_value=0)
 
             data = st.date_input("Data do Jogo", format="DD/MM/YYYY", key="data")
 
@@ -716,13 +701,14 @@ with tab[0]:
                     "Condição do Campo": modalidade,
 
                     # SCOUT AO VIVO
-                    "Chutes": st.session_state.chutes,
-                    "Chutes Errados": st.session_state.chutes_errados,
-                    "Desarmes": st.session_state.desarmes,
-                    "Passes-chave": st.session_state.passes_chave,
-                    "Passes Errados": st.session_state.passes_errados,
-                    "Faltas Sofridas": st.session_state.faltas_sofridas,
-                    "Participações Indiretas": st.session_state.part_indireta
+                    "Chutes": chutes,
+                    "Chutes Errados": chutes_errados,
+                    "Desarmes": desarmes,
+                    "Passes-chave": passes_chave,
+                    "Passes Errados": passes_errados,
+                    "Faltas Sofridas": faltas_sofridas,
+                    "Participações Indiretas": part_indireta
+
                 }
 
                 # 🔄 FEEDBACK VISUAL (NÃO GASTA API)
