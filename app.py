@@ -3386,28 +3386,47 @@ with tab[5]:
 
                 tendencia_label = "➡️ Estável"
                 tendencia_cor = "#9E9E9E"
+                tendencia_interpretacao = (
+                    "O desempenho técnico do atleta manteve um padrão semelhante "
+                    "aos jogos anteriores."
+                )
 
                 if ultimos - anteriores >= 0.4:
                     tendencia_label = "⬆️ Em evolução técnica"
                     tendencia_cor = "#00E676"
+                    tendencia_interpretacao = (
+                        "Apesar de oscilações recentes, o atleta apresentou um forte "
+                        "desempenho no último jogo, elevando sua média técnica."
+                    )
+
                 elif anteriores - ultimos >= 0.4:
                     tendencia_label = "⬇️ Atenção"
                     tendencia_cor = "#FF1744"
+                    tendencia_interpretacao = (
+                        "Houve queda no rendimento técnico recente, indicando "
+                        "necessidade de atenção e ajustes."
+                    )
 
                 st.markdown(
                     f"""
                     <div style="
-                        padding:14px;
-                        border-radius:12px;
-                        background:#111827;
+                        padding:16px;
+                        border-radius:14px;
+                        background:#0B1220;
                         border-left:6px solid {tendencia_cor};
-                        font-size:18px;
+                        box-shadow: 0 6px 18px rgba(0,0,0,0.4);
                     ">
-                        {tendencia_label}
+                        <div style="font-size:18px; font-weight:bold;">
+                            {tendencia_label}
+                        </div>
+                        <div style="font-size:15px; opacity:0.9; margin-top:6px;">
+                            {tendencia_interpretacao}
+                        </div>
                     </div>
                     """,
                     unsafe_allow_html=True
                 )
+
             else:
                 st.info("Dados insuficientes para análise de tendência recente.")
 
