@@ -2604,7 +2604,38 @@ with tab[5]:
             modalidade_exibida = "N/A"
             modalidade_subtexto = "Tipo de Jogo"
 
-        # Valores Titulares (Removido - Variável total_minutos_titular não é mais usada)
+        # ======================================================
+        # 🧠 INSIGHT AUTOMÁTICO DE IMPACTO OFENSIVO
+        # ======================================================
+
+        insight_texto = None
+
+        if not df_jogos_f.empty:
+            df_insight = df_jogos_f.copy()
+
+            # Garante valores numéricos
+            df_insight["Gols Marcados"] = pd.to_numeric(df_insight["Gols Marcados"], errors="coerce").fillna(0)
+            df_insight["Assistências"] = pd.to_numeric(df_insight["Assistências"], errors="coerce").fillna(0)
+
+            # Jogos com gol + assistência
+            jogos_impacto = df_insight[
+                (df_insight["Gols Marcados"] > 0) &
+                (df_insight["Assistências"] > 0)
+                ]
+
+            if not jogos_impacto.empty:
+                total_impacto = len(jogos_impacto)
+
+                # Calcula vitórias nesses jogos
+                vitorias_impacto = jogos_impacto["Resultado"].apply(calcular_vitoria).sum()
+
+                perc_vitoria = int((vitorias_impacto / total_impacto) * 100)
+
+                insight_texto = (
+                    f"📌 Quando o atleta **marcou e deu assistência**, "
+                    f"o time venceu **{perc_vitoria}%** das partidas "
+                    f"({vitorias_impacto} de {total_impacto} jogos)."
+                )
 
         # --- 3.2. PRIMEIRA LINHA DE CARDS (6 COLUNAS) ---
         col1, col2, col3, col4, col5, col6 = st.columns(6)
@@ -2702,6 +2733,9 @@ with tab[5]:
                     🧠 ENGAJAMENTO<p>{engajamento}</p>
                     <label>Sono e Disciplina</label>
                 </div>''', unsafe_allow_html=True)
+
+        if insight_texto:
+            st.success(insight_texto)
 
         # --- 3.4. CONCLUSÃO DA AVALIAÇÃO TÉCNICA ---
         # Adicione este bloco para exibir o texto explicativo
