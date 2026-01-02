@@ -3378,7 +3378,7 @@ with tab[5]:
                 # 👉 Score técnico por jogo
                 df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
 
-                # 🔍 Últimos 5 jogos (do mais antigo para o mais recente)
+                # 🔍 Últimos 5 jogos (ordem cronológica)
                 scores = df_tend.tail(5)["Score_Jogo"].values.tolist()
 
                 ultimo = scores[-1]
@@ -3399,74 +3399,94 @@ with tab[5]:
                 )
 
                 # ===============================
-                # 🧭 DECISÃO DE TENDÊNCIA
+                # 🎯 CLASSIFICAÇÃO DE NÍVEL TÉCNICO
+                # ===============================
+
+                if media_5 >= 8:
+                    nivel_label = "🔵 Rendimento altíssimo"
+                elif media_5 >= 6:
+                    nivel_label = "🟢 Rendimento bom"
+                elif media_5 >= 4.5:
+                    nivel_label = "🟠 Rendimento regular"
+                else:
+                    nivel_label = "🔴 Rendimento baixo"
+
+                # ===============================
+                # 🧭 CLASSIFICAÇÃO DE FORMA
                 # ===============================
 
                 # 🟢 ALTA PERFORMANCE
-                if (
-                        media_5 >= 7
-                        and jogos_bons >= 3
-                        and ultimo >= 6
-                        and not queda_continua
-                ):
-                    tendencia_label = "🟢 Alta performance"
-                    tendencia_cor = "#2E7D32"
-                    tendencia_interpretacao = (
-                        "O atleta apresenta desempenho técnico elevado de forma consistente, "
-                        "com impacto positivo recorrente nas partidas recentes."
+                if media_5 >= 8 and jogos_bons >= 3 and ultimo >= 7:
+                    forma_label = "🟢 Alta performance"
+                    forma_cor = "#2E7D32"
+                    forma_texto = (
+                        "O atleta vive um momento de alto rendimento técnico, "
+                        "com atuações consistentes e impacto elevado nas partidas recentes."
                     )
 
                 # 🔴 QUEDA TÉCNICA
-                elif jogos_ruins >= 3 and ultimo < 4.5 and queda_continua:
-                    tendencia_label = "⬇️ Atenção — Queda técnica"
-                    tendencia_cor = "#FF1744"
-                    tendencia_interpretacao = (
+                elif media_5 < 4.5 and jogos_ruins >= 3 and queda_continua:
+                    forma_label = "🔴 Queda técnica"
+                    forma_cor = "#C62828"
+                    forma_texto = (
                         "O desempenho técnico apresenta queda progressiva nos jogos mais recentes, "
-                        "indicando redução consistente de impacto em campo."
+                        "indicando uma fase de baixo rendimento."
                     )
 
                 # 📈 EVOLUÇÃO
-                elif subida_continua and ultimo >= media_5:
-                    tendencia_label = "⬆️ Em evolução técnica"
-                    tendencia_cor = "#00E676"
-                    tendencia_interpretacao = (
-                        "O atleta vem demonstrando evolução técnica contínua, com melhora consistente "
-                        "nas partidas mais recentes."
+                elif subida_continua and ultimo >= media_5 and media_5 >= 4.5:
+                    forma_label = "⬆️ Em evolução técnica"
+                    forma_cor = "#00E676"
+                    forma_texto = (
+                        "Apesar de oscilações anteriores, o atleta demonstra melhora contínua "
+                        "no desempenho técnico recente."
                     )
 
                 # 🎢 OSCILAÇÃO
                 elif oscilacao:
-                    tendencia_label = "➡️ Oscilação técnica"
-                    tendencia_cor = "#FFC107"
-                    tendencia_interpretacao = (
-                        "O desempenho recente apresenta oscilações, alternando jogos de bom nível "
-                        "com quedas técnicas."
+                    forma_label = "➡️ Oscilação técnica"
+                    forma_cor = "#FFC107"
+                    forma_texto = (
+                        "O desempenho recente apresenta variações significativas, "
+                        "alternando jogos de bom nível com quedas técnicas."
                     )
 
-                # ➡️ ESTÁVEL
+                # ➡️ ESTÁVEL (SOMENTE SE NÃO FOR RUIM)
+                elif media_5 >= 4.5:
+                    forma_label = "➡️ Estável"
+                    forma_cor = "#9E9E9E"
+                    forma_texto = (
+                        "O atleta mantém um padrão técnico relativamente constante, "
+                        "sem grandes variações no desempenho recente."
+                    )
+
+                # 🔴 RUIM SEM QUEDA CONTÍNUA
                 else:
-                    tendencia_label = "➡️ Estável"
-                    tendencia_cor = "#9E9E9E"
-                    tendencia_interpretacao = (
-                        "O atleta mantém um padrão técnico consistente, sem variações relevantes "
-                        "no desempenho recente."
+                    forma_label = "🔴 Baixo rendimento"
+                    forma_cor = "#B71C1C"
+                    forma_texto = (
+                        "O atleta apresenta desempenho técnico abaixo do esperado nos jogos recentes, "
+                        "mesmo sem uma tendência clara de recuperação."
                     )
 
-                # 🧱 CARD VISUAL
+                # 🧱 CARD VISUAL FINAL
                 st.markdown(
                     f"""
                     <div style="
                         padding:16px;
                         border-radius:14px;
                         background:#0B1220;
-                        border-left:6px solid {tendencia_cor};
+                        border-left:6px solid {forma_cor};
                         box-shadow: 0 6px 18px rgba(0,0,0,0.4);
                     ">
                         <div style="font-size:18px; font-weight:bold;">
-                            {tendencia_label}
+                            {forma_label}
                         </div>
-                        <div style="font-size:15px; opacity:0.9; margin-top:6px;">
-                            {tendencia_interpretacao}
+                        <div style="font-size:15px; margin-top:6px;">
+                            <strong>{nivel_label}</strong>
+                        </div>
+                        <div style="font-size:14px; opacity:0.9; margin-top:6px;">
+                            {forma_texto}
                         </div>
                     </div>
                     """,
