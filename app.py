@@ -2367,8 +2367,6 @@ def calcular_score_jogo(row):
 
     return max(0, min(10, score))
 
-
-
 with tab[5]:
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
@@ -3017,17 +3015,13 @@ with tab[5]:
                     df_jogos["Visitante"]
             )
 
-            container_scout_jogo = st.container()
+            jogo_sel = st.selectbox(
+                "Selecione o jogo:",
+                df_jogos["Jogo"].unique(),
+                key="select_jogo_scout"
+            )
 
-            with container_scout_jogo:
-
-                jogo_sel = st.selectbox(
-                    "Selecione o jogo:",
-                    df_jogos["Jogo"].unique()
-                )
-
-                jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
-
+            jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
 
             # ---------------- MÉTRICAS ----------------
             col1, col2, col3, col4 = st.columns(4)
