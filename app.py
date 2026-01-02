@@ -3004,6 +3004,19 @@ with tab[5]:
         # ======================================================
         if modo_scout == "🎯 Scout por jogo":
 
+            df_jogos = df.copy()
+
+            df_jogos["Data_DT"] = pd.to_datetime(
+                df_jogos["Data"], dayfirst=True, errors="coerce"
+            )
+            df_jogos = df_jogos.sort_values("Data_DT", ascending=False)
+
+            df_jogos["Jogo"] = (
+                    df_jogos["Data"].astype(str) + " | " +
+                    df_jogos["Casa"] + " x " +
+                    df_jogos["Visitante"]
+            )
+
             container_scout_jogo = st.container()
 
             with container_scout_jogo:
@@ -3014,6 +3027,7 @@ with tab[5]:
                 )
 
                 jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
+
 
             # ---------------- MÉTRICAS ----------------
             col1, col2, col3, col4 = st.columns(4)
