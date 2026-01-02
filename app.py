@@ -2908,19 +2908,28 @@ with tab[5]:
         # ======================================================
         if modo_scout == "🎯 Scout por jogo":
 
-            df_jogos = df.copy()
-            df_jogos["Jogo"] = (
-                    df_jogos["Data"].astype(str) + " | " +
-                    df_jogos["Casa"] + " x " +
-                    df_jogos["Visitante"]
-            )
+            if modo_scout == "🎯 Scout por jogo":
+                df_jogos = df.copy()
 
-            jogo_sel = st.selectbox(
-                "Selecione o jogo:",
-                df_jogos["Jogo"].unique()
-            )
+                # 🔽 CONVERTE DATA E ORDENA DO MAIS RECENTE PARA O MAIS ANTIGO
+                df_jogos["Data_DT"] = pd.to_datetime(
+                    df_jogos["Data"], dayfirst=True, errors="coerce"
+                )
+                df_jogos = df_jogos.sort_values("Data_DT", ascending=False)
 
-            jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
+                # 🔤 LABEL DO JOGO
+                df_jogos["Jogo"] = (
+                        df_jogos["Data"].astype(str) + " | " +
+                        df_jogos["Casa"] + " x " +
+                        df_jogos["Visitante"]
+                )
+
+                jogo_sel = st.selectbox(
+                    "Selecione o jogo:",
+                    df_jogos["Jogo"].unique()
+                )
+
+                jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
 
             # ---------------- MÉTRICAS ----------------
             col1, col2, col3, col4 = st.columns(4)
