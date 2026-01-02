@@ -3616,6 +3616,8 @@ with tab[5]:
                 }
             )
 
+            st.write("")
+
             if st.button("📄 Gerar PDF do Jogo"):
                 img_barra = gerar_barra_pdf(jogo, scout_cols)
                 img_radar = gerar_radar_pdf(jogo, scout_cols, df)
