@@ -3378,6 +3378,25 @@ with tab[5]:
                     unsafe_allow_html=True
                 )
 
+            # 🔹 SEPARADOR PREMIUM ENTRE ANÁLISE DO JOGO E TENDÊNCIA
+            st.markdown(
+                """
+                <div style="
+                    height: 2px;
+                    margin: 28px 0 32px 0;
+                    background: linear-gradient(
+                        to right,
+                        rgba(0,229,255,0.05),
+                        rgba(0,229,255,0.9),
+                        rgba(0,229,255,0.05)
+                    );
+                    box-shadow: 0 0 12px rgba(0,229,255,0.6);
+                    border-radius: 10px;
+                "></div>
+                """,
+                unsafe_allow_html=True
+            )
+
             # ======================================================
             # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
             # ======================================================
