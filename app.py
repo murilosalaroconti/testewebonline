@@ -719,10 +719,7 @@ with tab[0]:
                 # ✅ TOAST FLUTUANTE
                 st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
 
-                # 🔁 RESET SCOUT
-                for s in scouts:
-                    st.session_state[s] = 0
-
+               
 
 
     # ----------------------------------------------------------------------
