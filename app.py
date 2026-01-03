@@ -1221,6 +1221,24 @@ with tab[3]:
         unsafe_allow_html=True
     )
 
+    st.markdown("---")
+    st.subheader("📄 Documentos de Saúde")
+    st.markdown(
+        "Aqui você pode anexar relatórios da nutricionista, exames ou avaliações físicas."
+    )
+
+    pdf_nutri = st.file_uploader(
+        "📎 Anexar PDF da Nutricionista",
+        type=["pdf"]
+    )
+
+    descricao_pdf = st.text_input(
+        "📝 Descrição do documento",
+        placeholder="Ex: Avaliação nutricional - Janeiro 2025"
+    )
+
+    salvar_pdf = st.button("💾 Salvar Documento")
+
     # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
     # st.markdown(
     #     "Use esta seção para correlacionar o desempenho em jogos com a frequência de treinos e qualidade do sono.")
