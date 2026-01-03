@@ -496,7 +496,7 @@ def criar_logo_link_alinhado(col, path, width):
 #----------------------------------------------
 
 # Abas principais
-tab = st.tabs(["Jogos", "Treinos", "Sono", "Análise Integrada", "Campeonatos", "Dashboard"])
+tab = st.tabs(["Jogos", "Treinos", "Sono", "Saúde", "Campeonatos", "Dashboard"])
 
 # --------------------------
 # Aba Jogos
@@ -1170,574 +1170,625 @@ with tab[2]:
 # Aba Análises (resumo / gráficos rápidos)
 # --------------------------
 with tab[3]:
-    st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
+    st.header("🩺 Saúde & Preparação do Atleta")
+    st.caption(
+        "Registro diário de sono, alimentação e acompanhamento físico. "
+        "Esses dados ajudam a entender o impacto da preparação no desempenho."
+    )
+
+    st.markdown("---")
+
+    st.subheader("📝 Registro Diário de Saúde")
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        data_saude = st.date_input("📅 Data", datetime.now().date())
+        alimentacao = st.selectbox(
+            "🍽️ Alimentação do dia",
+            ["Boa", "Regular", "Ruim"]
+        )
+        hidratacao = st.selectbox(
+            "💧 Hidratação",
+            ["Boa", "Regular", "Ruim"]
+        )
+
+    with col2:
+        cansaco = st.selectbox(
+            "🥵 Cansaço físico",
+            ["Baixo", "Moderado", "Alto"]
+        )
+        observacao = st.text_area(
+            "🗒️ Observações (opcional)",
+            placeholder="Ex: pouco apetite, jogo intenso, dor muscular..."
+        )
+
+    salvar_saude = st.button("💾 Salvar Registro de Saúde")
+
     st.markdown(
-        "Use esta seção para correlacionar o desempenho em jogos com a frequência de treinos e qualidade do sono.")
-
-
-    # --- FUNÇÕES HELPER (ASSUMINDO QUE ESTÃO NO ESCOPO GERAL) ---
-    def get_date_obj(date_val):
-        """Converte a data para objeto datetime, priorizando o formato DD/MM/YYYY."""
-        return pd.to_datetime(date_val, errors='coerce', dayfirst=True)
-
-
-    def get_sleep_date_obj(row):
         """
-        REGRA SIMPLES: Atribui o sono EXATAMENTE à data de despertar ('Data' na planilha).
-        """
-        try:
-            data_acordar = pd.to_datetime(row['Data'], format='%d/%m/%Y', errors='coerce')
-            if pd.isna(data_acordar):
-                return pd.NaT
-            return data_acordar
-        except:
-            return pd.NaT
-
-
-    # --- FILTRO POR PERÍODO ---
-    periodo_opcoes = {
-        "Últimos 7 dias": 7,
-        "Últimas 2 semanas": 14,
-        "Últimas 4 semanas": 28,
-        "Últimos 90 dias": 90,
-        "Todos os Dados": 9999
-    }
-
-    # --- NOVO: OPÇÕES DE MODALIDADE ---
-    # *AVISO: A linha abaixo pode dar erro se 'load_registros' não estiver no escopo global
-    df_temp_modality = load_registros()
-    modalidades_disponiveis = sorted(
-        [m for m in df_temp_modality['Condição do Campo'].astype(str).unique()
-         if m and m.strip() != "" and m.lower() != "nan"])
-    modalidades_opcoes = ["Todas as Modalidades"] + modalidades_disponiveis
-
-    # --- LAYOUT DOS FILTROS ---
-    col_analise1, col_analise2 = st.columns(2)
-    with col_analise1:
-        periodo_sel = st.selectbox("Selecione o Período de Análise:", list(periodo_opcoes.keys()))
-    with col_analise2:
-        modalidade_filter = st.selectbox("Filtrar por Modalidade:", modalidades_opcoes)  # NOVO FILTRO
-
-    dias_atras = periodo_opcoes[periodo_sel]
-    data_inicial = (datetime.now() - timedelta(days=dias_atras)).replace(hour=0, minute=0, second=0, microsecond=0)
-
-    st.markdown(f"**Analisando dados desde:** _{data_inicial.strftime('%d/%m/%Y')}_")
-
-    if st.button("Gerar Análise Integrada"):
-
-        # ----------------------------------------------------
-        # 1. PROCESSAR DADOS DE JOGOS (Gols e Assistências)
-        # ----------------------------------------------------
-        df_jogos = load_registros()
-        # Remove treinos (mantendo apenas jogos)
-        df_jogos = df_jogos[df_jogos["Treino"].isna() | (df_jogos["Treino"] == "")]
-
-        # FILTRA JOGOS USANDO 'Condição do Campo' (CORRETO)
-        if modalidade_filter != "Todas as Modalidades":
-            df_jogos = df_jogos[df_jogos["Condição do Campo"].astype(str) == modalidade_filter]
-
-        df_jogos["Date_Obj"] = df_jogos["Data"].apply(get_date_obj)
-        df_jogos_filtrado = df_jogos[df_jogos["Date_Obj"] >= data_inicial].copy()
-
-        if df_jogos_filtrado.empty:
-            df_jogos_group = pd.DataFrame(columns=['Date_Obj', 'Gols Marcados', 'Assistências'])
-
-        else:
-            # Garante que Gols e Assistências são numéricos
-            def to_int_safe(x):
-                try:
-                    return int(x)
-                except:
-                    return 0
-
-
-            df_jogos_filtrado["Gols Marcados"] = df_jogos_filtrado["Gols Marcados"].apply(to_int_safe)
-            df_jogos_filtrado["Assistências"] = df_jogos_filtrado["Assistências"].apply(to_int_safe)
-
-            df_jogos_group = df_jogos_filtrado.groupby("Date_Obj")[
-                ["Gols Marcados", "Assistências"]].sum().reset_index()
-
-        # ----------------------------------------------------
-        # 2. PROCESSAR DADOS DE TREINOS (Contagem Filtrada para Resumo e Geral para Gráfico)
-        # ----------------------------------------------------
-        df_treinos = load_treinos_df()
-        df_treinos["Date_Obj"] = df_treinos["Date"].apply(get_date_obj)
-        df_treinos_filtrado_geral = df_treinos[df_treinos["Date_Obj"] >= data_inicial].copy()
-
-        # Para o Gráfico 2 (Contagem GERAL de treinos no período).
-        df_treinos_group = df_treinos_filtrado_geral.groupby("Date_Obj").size().reset_index(name='Contagem Treinos')
-
-        # --- Lógica de Filtro para o RESUMO Analítico ---
-        TREINO_MODALIDADE_COL = 'Tipo'  # <<< CORREÇÃO AQUI: USA A COLUNA 'Tipo'
-        df_treinos_para_resumo = df_treinos_filtrado_geral.copy()
-
-        # O filtro de treino só é aplicado se a coluna 'Tipo' existir e o filtro de modalidade estiver ativo
-        if modalidade_filter != "Todas as Modalidades":
-            if TREINO_MODALIDADE_COL in df_treinos_para_resumo.columns:
-                # FILTRA PELA MODALIDADE ESPECÍFICA usando a coluna 'Tipo'
-                df_treinos_para_resumo = df_treinos_para_resumo[
-                    df_treinos_para_resumo[TREINO_MODALIDADE_COL].astype(str) == modalidade_filter
-                    ]
-                total_treinos_resumo = df_treinos_para_resumo.shape[0]
-                modalidade_label = modalidade_filter
-
-                if total_treinos_resumo == 0:
-                    # Alerta apenas se o filtro estiver ativo e não houver dados.
-                    st.warning(
-                        f"⚠️ **{modalidade_filter}:** Nenhum treino do tipo **{modalidade_filter}** registrado no período. A contagem de treino no resumo será zero.")
-
-            else:
-                # Caso a coluna 'Tipo' não exista na planilha de treinos, o que geraria um KeyError.
-                total_treinos_resumo = df_treinos_filtrado_geral.shape[0]
-                modalidade_label = "Total (Coluna Tipo não encontrada no Treino)"
-                st.error(
-                    f"❌ **ERRO CRÍTICO:** O DataFrame de Treinos não tem a coluna '{TREINO_MODALIDADE_COL}'. A contagem será GERAL. Revise sua planilha de treinos.")
-        else:
-            # Se o filtro é 'Todas as Modalidades', usa a contagem geral.
-            total_treinos_resumo = df_treinos_filtrado_geral.shape[0]
-            modalidade_label = "Total Geral"
-
-        # Fim da Seção 2
-        # ----------------------------------------------------
-
-        # ----------------------------------------------------
-        # 3. PROCESSAR DADOS DE SONO (Média de Horas)
-        # ----------------------------------------------------
-        df_sono = load_sono_df()
-        df_sono["Date_Obj"] = df_sono.apply(get_sleep_date_obj, axis=1)
-        df_sono["Horas Sono"] = df_sono["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
-        df_sono_filtrado = df_sono[df_sono["Date_Obj"] >= data_inicial].copy()
-        df_sono_group = df_sono_filtrado.groupby("Date_Obj")['Horas Sono'].mean().reset_index(name='Horas Sono')
-
-        # ----------------------------------------------------
-        # 4. CONSOLIDAR E GERAR GRÁFICO
-        # ----------------------------------------------------
-        if (('df_jogos_group' not in locals() or df_jogos_group.empty) and
-                ('df_treinos_group' not in locals() or df_treinos_group.empty) and
-                ('df_sono_group' not in locals() or df_sono_group.empty)):
-            st.warning("Não há dados de Jogo, Treino ou Sono no período selecionado.")
-        else:
-
-            # --- CORREÇÃO CRÍTICA DE NORMALIZAÇÃO DE DATAS ---
-            # Garante que todas as datas têm hora 00:00:00 para o merge funcionar corretamente
-            if 'df_jogos_group' in locals() and not df_jogos_group.empty:
-                df_jogos_group['Date_Obj'] = pd.to_datetime(df_jogos_group['Date_Obj']).dt.normalize()
-            if 'df_treinos_group' in locals() and not df_treinos_group.empty:
-                df_treinos_group['Date_Obj'] = pd.to_datetime(df_treinos_group['Date_Obj']).dt.normalize()
-            if 'df_sono_group' in locals() and not df_sono_group.empty:
-                df_sono_group['Date_Obj'] = pd.to_datetime(df_sono_group['Date_Obj']).dt.normalize()
-
-            # Garante que a coluna Date_Obj usada para merge está normalizada no df_jogos_filtrado
-            if not df_jogos_filtrado.empty:
-                df_jogos_filtrado['Date_Obj'] = pd.to_datetime(df_jogos_filtrado['Date_Obj']).dt.normalize()
-
-            # Reúne todas as datas disponíveis
-            all_dates = pd.to_datetime(pd.Series(
-                (df_jogos_group['Date_Obj'].tolist() if 'df_jogos_group' in locals() else []) +
-                (df_treinos_group['Date_Obj'].tolist() if 'df_treinos_group' in locals() else []) +
-                (df_sono_group['Date_Obj'].tolist() if 'df_sono_group' in locals() else [])
-            ).unique())
-
-            if len(all_dates) == 0:
-                st.warning("Não há dados para plotar.")
-            else:
-                # Cria o DataFrame final, AGORA ORDENADO POR DATA CRONOLÓGICA
-                df_final = pd.DataFrame({'Date_Obj': pd.Series(all_dates).sort_values()})
-
-                # FAZ A CONVERSÃO EXPLÍCITA E NOVA ORDENAÇÃO
-                df_final['Date_Obj'] = pd.to_datetime(df_final['Date_Obj']).dt.normalize()
-                df_final = df_final.sort_values(by='Date_Obj').reset_index(drop=True)
-
-                # Faz a junção (merge) dos 3 datasets
-                df_final = pd.merge(df_final, df_jogos_group if 'df_jogos_group' in locals() else pd.DataFrame(),
-                                    on='Date_Obj', how='left')
-                df_final = pd.merge(df_final, df_treinos_group if 'df_treinos_group' in locals() else pd.DataFrame(),
-                                    on='Date_Obj', how='left')
-                df_final = pd.merge(df_final, df_sono_group if 'df_sono_group' in locals() else pd.DataFrame(),
-                                    on='Date_Obj', how='left')
-                df_final = df_final.fillna(0)
-
-                # REORDENAÇÃO EXPLÍCITA FINAL PÓS-MERGE
-                df_final = df_final.sort_values(by='Date_Obj').reset_index(drop=True)
-
-                # Reagrupar o df_jogos_filtrado por data para obter a contagem de jogos (linhas)
-                df_contagem_jogos = df_jogos_filtrado.groupby(
-                    "Date_Obj"
-                ).size().reset_index(name='Contagem Jogos')
-
-                # Merge com df_final para trazer a contagem de jogos para CADA DIA
-                df_plot = pd.merge(df_final, df_contagem_jogos, on='Date_Obj', how='left').fillna({'Contagem Jogos': 0})
-                df_plot['Contagem Jogos'] = df_plot['Contagem Jogos'].astype(int)
-
-                # GARANTE A ORDEM DO DF_PLOT PELA DATA CORRETA
-                df_plot = df_plot.sort_values(by='Date_Obj').reset_index(drop=True)
-
-                # ----------------------------------------------------------------------
-                # GRÁFICO 1: DESEMPENHO (Gols e Assistências) - ALTAIR (FINAL FIX)
-                # ----------------------------------------------------------------------
-                st.subheader("Gráfico 1: Desempenho (Gols e Assistências)")
-
-                # Preparar os dados para o Altair
-                df_plot['Gols Marcados'] = pd.to_numeric(df_plot['Gols Marcados'], errors='coerce').fillna(0)
-                df_plot['Assistências'] = pd.to_numeric(df_plot['Assistências'], errors='coerce').fillna(0)
-
-                # Filtrar APENAS os dias que tiveram jogos (Contagem Jogos > 0)
-                df_desempenho_altair = df_plot[df_plot['Contagem Jogos'] > 0].copy()
-
-                if df_desempenho_altair.empty:
-                    st.info("Não há dados de Jogos registrados no período selecionado.")
-                else:
-                    # --- PREPARAÇÃO ALTAIR PARA EMPILHAMENTO ---
-                    df_desempenho_altair['Date_Obj'] = pd.to_datetime(df_desempenho_altair['Date_Obj']).dt.normalize()
-                    df_desempenho_altair['Data Jogo Formatada'] = df_desempenho_altair['Date_Obj'].dt.strftime('%d/%m')
-                    df_desempenho_altair = df_desempenho_altair.sort_values(by='Date_Obj').reset_index(drop=True)
-                    ordered_dates_domain = df_desempenho_altair['Data Jogo Formatada'].unique().tolist()
-
-                    # NOVO: Calcula o total de contribuições para a altura da barra e o limite Y
-                    df_desempenho_altair['Total Contribuicoes'] = df_desempenho_altair['Gols Marcados'] + \
-                                                                  df_desempenho_altair['Assistências']
-
-                    # 1. Definição robusta do limite Y
-                    y_max_data = df_desempenho_altair['Total Contribuicoes'].max() if not df_desempenho_altair[
-                        'Total Contribuicoes'].empty else 0
-                    y_max_limit = max(y_max_data + 1.5,
-                                      3)  # Garante espaço para o rótulo (Nx) e um limite Y mínimo de 3
-
-                    # 2. Derreter o DataFrame (Formato longo necessário para barras empilhadas)
-                    df_melted = df_desempenho_altair.melt(
-                        id_vars=['Date_Obj', 'Contagem Jogos', 'Data Jogo Formatada', 'Total Contribuicoes'],
-                        value_vars=['Gols Marcados', 'Assistências'],
-                        var_name='Métrica',
-                        value_name='Valor'
-                    )
-                    df_melted['Contagem Jogos'] = df_melted['Contagem Jogos'].astype(int)
-                    chart_title = f"Desempenho em Jogos: Gols e Assistências ({modalidade_filter})"
-
-                    # --- CAMADAS DE VISUALIZAÇÃO ---
-
-                    # 3. GRÁFICO PRINCIPAL DE BARRAS EMPILHADAS
-                    chart_bars = alt.Chart(df_melted).mark_bar().encode(
-                        x=alt.X('Data Jogo Formatada:O',
-                                axis=alt.Axis(title='Data do Jogo', labelAngle=-45),
-                                scale=alt.Scale(domain=ordered_dates_domain)),
-
-                        # CHAVE PARA EMPILHAMENTO: Usa stack='zero' no Y e configura o eixo
-                        y=alt.Y('Valor:Q',
-                                title='Gols / Assistências',
-                                axis=alt.Axis(format='d', grid=False),  # Sem grade Y para um visual mais limpo
-                                scale=alt.Scale(domain=[0, y_max_limit]),
-                                stack="zero"),  # <-- EMPILHADO
-
-                        color=alt.Color('Métrica:N',
-                                        legend=alt.Legend(title="Métrica"),
-                                        scale=alt.Scale(domain=['Gols Marcados', 'Assistências'],
-                                                        range=['#E45757', '#FF8C00'])),
-                        order=alt.Order('Métrica', sort='descending'),
-                        # Gols (vermelho) no topo, Assistências (laranja) na base
-                        tooltip=[
-                            alt.Tooltip('Date_Obj:T', title='Data Completa', format='%d/%m/%Y'),
-                            alt.Tooltip('Métrica:N', title='Métrica'),
-                            alt.Tooltip('Valor:Q', title='Quantidade', format='.0f'),
-                            alt.Tooltip('Contagem Jogos:Q', title='Nº de Jogos no Dia')
-                        ]
-                    ).properties(
-                        title=chart_title
-                    )
-
-                    # 4. RÓTULOS DE TEXTO (Gols e Assistências) - Centralização Otimizada
-
-                    # Camada de Texto para GOLS (Vermelho - Topo)
-                    text_gols_layer = alt.Chart(df_melted).mark_text(
-                        align='center',
-                        baseline='middle',
-                        color='white',  # COR BRANCA (Contraste)
-                        fontWeight='bold',
-                        dy=15  # AUMENTADO: Move para baixo no segmento vermelho (centralização)
-                    ).encode(
-                        x='Data Jogo Formatada:O',
-                        y=alt.Y('Valor:Q', stack='zero'),
-                        text=alt.Text('Valor:Q', format='.0f'),
-                        # Só mostra se for Gol e o Valor for >= 1
-                        opacity=alt.condition((alt.datum.Métrica == 'Gols Marcados') & (alt.datum.Valor >= 1),
-                                              alt.value(1), alt.value(0))
-                    )
-
-                    # Camada de Texto para ASSISTÊNCIAS (Laranja - Base)
-                    text_assistencias_layer = alt.Chart(df_melted).mark_text(
-                        align='center',
-                        baseline='middle',
-                        color='white',  # COR BRANCA (Contraste)
-                        fontWeight='bold',
-                        dy=14  # AUMENTADO: Move para cima no segmento laranja (centralização)
-                    ).encode(
-                        x='Data Jogo Formatada:O',
-                        y=alt.Y('Valor:Q', stack='zero'),
-                        text=alt.Text('Valor:Q', format='.0f'),
-                        # Só mostra se for Assistência e o Valor for >= 1
-                        opacity=alt.condition((alt.datum.Métrica == 'Assistências') & (alt.datum.Valor >= 1),
-                                              alt.value(1), alt.value(0))
-                    )
-
-                    # 5. RÓTULOS (Nx) - Contagem de Jogos (Acima da Barra)
-                    df_multi_jogos_labels = df_desempenho_altair.copy()
-                    df_multi_jogos_labels['Label'] = '(' + df_multi_jogos_labels['Contagem Jogos'].astype(str) + 'x)'
-                    # Agora ValorMax usa o Total Contribuicoes (topo da barra empilhada)
-                    df_multi_jogos_labels['ValorMax'] = df_multi_jogos_labels['Total Contribuicoes']
-
-                    text_layer_nx = alt.Chart(df_multi_jogos_labels).mark_text(
-                        align='center',
-                        baseline='bottom',
-                        dy=-5,  # Pouco acima do topo da barra
-                        color='blue',
-                        fontWeight='bold'
-                    ).encode(
-                        x='Data Jogo Formatada:O',
-                        y=alt.Y('ValorMax:Q', stack=None, axis=None),
-                        text=alt.Text('Label:N'),
-                        order=alt.Order('Date_Obj', sort='ascending'),
-                        opacity=alt.condition(alt.datum['Contagem Jogos'] > 0, alt.value(1), alt.value(0))
-                    )
-
-                    # 6. COMBINAÇÃO FINAL
-                    final_chart = chart_bars + text_gols_layer + text_assistencias_layer + text_layer_nx
-
-                    st.markdown("<p style='font-size:12px; color:blue; margin-bottom: 0;'>\
-                                                                        🟦 indica o número de jogos disputados no dia.<br>\
-                                                                        **Rótulos brancos:** Não consta Gols/Assistencias.</p>",
-                                unsafe_allow_html=True)
-
-                    st.altair_chart(final_chart, use_container_width=True)
-                # ----------------------------------------------------
-                # GRÁFICO 2: RECUPERAÇÃO E FREQUÊNCIA (SONO E TREINOS) - MATPLOTLIB
-                # ----------------------------------------------------
-
-                st.subheader("Gráfico 2: Recuperação e Frequência (Sono e Treinos)")
-
-                # O df_final já está ordenado nesta etapa (na Seção 4)
-                x_labels_full = df_final['Date_Obj'].dt.strftime('%d/%m')
-                x_indices_full = np.arange(len(x_labels_full))
-
-                # O restante do Gráfico 2 segue inalterado.
-                # ...
-
-                # --- GRÁFICO 2: SONO (Eixo 1) E TREINOS (Eixo 2) ---
-                fig2, ax2 = plt.subplots(figsize=(14, 5))
-
-                # Eixo 1: SONO
-                ax2.plot(x_indices_full, df_final['Horas Sono'], label='Média Horas Sono', color='tab:green',
-                         marker='o',
-                         linestyle='-', linewidth=2)
-                ax2.set_ylabel('Horas de Sono', color='tab:green')
-                ax2.tick_params(axis='y', labelcolor='tab:green')
-                ax2.set_ylim(0, 12)  # CORREÇÃO: Aumenta o limite para evitar corte no valor máximo (10.0)
-
-                # Eixo 2: TREINOS
-                ax3 = ax2.twinx()
-                ax3.plot(x_indices_full, df_final['Contagem Treinos'], label='Contagem Treinos', color='tab:blue',
-                         marker='o', linestyle='-', linewidth=2)
-                ax3.set_ylabel('Contagem Treinos', color='tab:blue')
-                ax3.tick_params(axis='y', labelcolor='tab:blue')
-                ax3.set_ylim(bottom=0, top=df_final['Contagem Treinos'].max() * 1.5 + 1)
-
-                # Rótulos de Sono e Treinos
-                for i, txt in enumerate(df_final['Horas Sono']):
-                    if txt > 0:
-                        ax2.annotate(f'{txt:.1f}', (x_indices_full[i], df_final['Horas Sono'][i]),
-                                     textcoords="offset points", xytext=(0, 10), ha='center', fontsize=10,
-                                     color='tab:green', fontweight='bold')
-                for i, txt in enumerate(df_final['Contagem Treinos']):
-                    if txt > 0:
-                        ax3.annotate(f'{int(txt)}', (x_indices_full[i], df_final['Contagem Treinos'][i]),
-                                     textcoords="offset points", xytext=(0, -15), ha='center', fontsize=10,
-                                     color='tab:blue', fontweight='bold')
-
-                # Configuração do Eixo X
-                ax2.set_xticks(x_indices_full)
-                ax2.set_xticklabels(x_labels_full, rotation=45, ha='right')
-                ax2.set_xlabel("Data")
-                plt.grid(axis='y', linestyle='--', alpha=0.6)
-
-                lines, labels = ax2.get_legend_handles_labels()
-                lines3, labels3 = ax3.get_legend_handles_labels()
-                ax2.legend(lines + lines3, labels + labels3, loc='upper left')
-
-                st.pyplot(fig2)
-
-                #----------------------------------------------------------------
-
-
-
-                # ----------------------------------------------------
-                # 5. RESUMO E DIAGNÓSTICO DE FOCO
-                # ----------------------------------------------------
-                st.subheader("📊 Resumo Analítico e Foco da Semana")
-
-                # CÁLCULOS CHAVE
-                total_gols = df_final['Gols Marcados'].sum()
-                total_assistencias = df_final['Assistências'].sum()
-                # A contagem de dias_com_jogo (registros) foi corrigida no código anterior, mantida aqui.
-                dias_com_jogo = df_jogos_filtrado.shape[0]
-                dias_unicos_com_jogo = df_final[
-                    (df_final['Gols Marcados'] > 0) | (df_final['Assistências'] > 0)
-                    ].shape[0]
-
-                if dias_unicos_com_jogo == 0 and 'df_jogos_group' in locals() and not df_jogos_group.empty:
-                    dias_unicos_com_jogo = df_jogos_group.shape[0]
-
-                divisor_media = dias_unicos_com_jogo if dias_unicos_com_jogo > 0 else 1
-
-                media_gols_por_jogo = total_gols / divisor_media
-                media_assistencias_por_jogo = total_assistencias / divisor_media
-
-                # Média Geral de Recuperação
-                media_sono = df_final[df_final['Horas Sono'] > 0]['Horas Sono'].mean()
-
-                # total_treinos_resumo e modalidade_label já foram calculados corretamente na Seção 2.
-
-                # PARÂMETROS DE REFERÊNCIA
-                REF_SONO_MINIMO = 8.0
-                REF_TREINO_MINIMO = 2
-
-                # --------------------------------------------------------
-                # LÓGICA DE TEXTO PARA O RESUMO
-                # --------------------------------------------------------
-
-                # Gera o texto de análise da frequência
-                if total_treinos_resumo > 0:
-                    frequencia_analise_texto = (
-                        f"A frequência de treino (**{modalidade_label}**) foi **{'alta' if total_treinos_resumo >= REF_TREINO_MINIMO else 'baixa'}**, "
-                        f"com **{total_treinos_resumo} sessões** no período. Foco em manter a consistência."
-                    )
-                else:
-                    frequencia_analise_texto = f"Nenhum treino de **{modalidade_label}** registrado no período."
-
-                # --- ANÁLISE GERAL ---
-                analise_texto = []
-
-                # 1. ANÁLISE DE DESEMPENHO (GOLS E ASSISTÊNCIAS)
-                if total_gols > 0 or total_assistencias > 0:
-                    analise_texto.append(
-                        f"1. ANÁLISE DE DESEMPENHO: O desempenho em jogos ({modalidade_filter}) foi de **{total_gols} Gols** e **{total_assistencias} Assistências** no total, "
-                        f"com média de **{media_gols_por_jogo:.1f} Gols/Jogo** e **{media_assistencias_por_jogo:.1f} Assis./Jogo** nos {dias_com_jogo} jogos registrados.")
-                else:
-                    analise_texto.append(
-                        f"1. ANÁLISE DE DESEMPENHO: Não houve Gols ou Assistências registradas nos jogos ({modalidade_filter}) do período.")
-
-                # 2. ANÁLISE DE SONO/RECUPERAÇÃO (Mantida)
-                if pd.notna(media_sono):
-                    if media_sono >= REF_SONO_MINIMO:
-                        analise_texto.append(
-                            f"2. ANÁLISE DE SONO: A recuperação foi **excelente**: média de **{media_sono:.1f} horas de sono**, acima da meta de {REF_SONO_MINIMO}h. Isso sugere boa base de energia.")
-                    elif media_sono >= (REF_SONO_MINIMO - 0.5):
-                        analise_texto.append(
-                            f"2. ANÁLISE DE SONO: A recuperação foi **boa**: média de **{media_sono:.1f} horas de sono**. Manteve-se próximo do ideal ({REF_SONO_MINIMO}h).")
-                    else:
-                        analise_texto.append(
-                            f"2. ANÁLISE DE SONO: 🚨 **ALERTA DE FADIGA:** A média de sono foi de apenas **{media_sono:.1f} horas**. Esse déficit pode impactar negativamente a performance e o risco de lesões.")
-                else:
-                    analise_texto.append("2. ANÁLISE DE SONO: Dados de sono insuficientes para análise de recuperação.")
-
-                # 3. ANÁLISE DE FREQUÊNCIA DE TREINO (USA O TEXTO CORRIGIDO)
-                analise_texto.append(f"3. ANÁLISE DE FREQUÊNCIA DE TREINO: {frequencia_analise_texto}")
-
-                # --- CONCLUSÃO E FOCO ---
-                st.markdown("---")
-                st.markdown("#### Conclusão da Semana:")
-
-                # ATUALIZAÇÃO DO RESUMO: Usa total_treinos_resumo e modalidade_label
-                resumo_texto = f"""
-                                                                           **Resumo do Período Pesquisado:**
-
-                                                                           - **Jogos Registrados ({modalidade_filter}):** {dias_com_jogo}
-                                                                           - **Gols Marcados:** {int(total_gols)}
-                                                                           - **Assistências:** {int(total_assistencias)}
-                                                                           - **Sessões de Treino ({modalidade_label}):** {int(total_treinos_resumo)}
-                                                                           - **Média de Sono:** {media_sono:.1f} horas
-                                                                           """
-                st.info(resumo_texto)
-
-                # Lógica para conclusão (usando GOLS/ASSISTENCIAS > 0)
-                desempenho_positivo = total_gols > 0 or total_assistencias > 0
-
-                # A lógica de conclusão também deve usar o total_treinos_resumo
-                if desempenho_positivo and media_sono >= REF_SONO_MINIMO and total_treinos_resumo > 0:
-                    st.success(
-                        "✅ **Ótimo Equilíbrio!** O alto desempenho (Gols e Assistências) está correlacionado com a excelente recuperação (Sono) e boa frequência de treino. FOCO: Manter este padrão.")
-
-                elif media_sono < REF_SONO_MINIMO and desempenho_positivo:
-                    st.warning(
-                        "⚠️ **Rendimento em Risco!** Apesar do desempenho ofensivo (Gols/Assistências), a baixa média de sono pode indicar que o corpo está sendo exigido além da conta. FOCO: Priorizar o descanso imediatamente.")
-
-                elif media_sono < REF_SONO_MINIMO and not desempenho_positivo:
-                    media_sono_formatada = f"{media_sono:.1f}"
-                    st.error(
-                        f"❌ **Alerta Geral!** Baixo rendimento (sem Gols/Assistências) combinado com sono insuficiente (média de **{media_sono_formatada} horas**). O foco principal deve ser a **Recuperação e o Sono** para restaurar a energia.")
-
-                # ----------------------------------------------------
-                # 5.1. TABELA DE DETALHES DE GOLS POR ADVERSÁRIO (AJUSTADA E REORDENADA)
-                # ----------------------------------------------------
-                if total_gols > 0 or total_assistencias > 0:
-                    st.subheader("🎯 Detalhe do Desempenho Ofensivo")
-
-                    df_gols_filtrado = df_jogos_filtrado[
-                        (df_jogos_filtrado['Gols Marcados'] > 0) |
-                        (df_jogos_filtrado['Assistências'] > 0)
-                        ].copy()
-
-                    if not df_gols_filtrado.empty:
-
-                        # 2. Agrupa e calcula as colunas (Sintaxe de agg MAIS COMPATÍVEL)
-                        df_resumo_adversario = df_gols_filtrado.groupby('Visitante').agg(
-                            Gols=('Gols Marcados', 'sum'),
-                            Assistencias=('Assistências', 'sum'),
-                            Jogos=('Visitante', 'size'),
-                            # Pega a Data mais recente como um objeto DATETIME para ordenação correta
-                            Ultimo_Jogo_Raw=('Date_Obj', 'max')
-                        ).reset_index()
-
-                        # 3. Formata e Renomeia para exibição
-                        df_resumo_adversario = df_resumo_adversario.rename(columns={
-                            'Visitante': 'Adversário',
-                            'Gols': 'Total Gols',
-                            'Assistencias': 'Total Assistências',
-                            'Jogos': 'Nº de Jogos',
-                        })
-
-                        # 4. ORDENAÇÃO: ORDENA APENAS PELA DATA (MAIS RECENTE PARA MAIS ANTIGA)
-                        df_resumo_adversario = df_resumo_adversario.sort_values(
-                            by=['Ultimo_Jogo_Raw'],  # Lista contém APENAS a coluna de Data (objeto datetime)
-                            # False = Decrescente (do mais recente para o mais antigo)
-                            ascending=[False]
-                        )
-
-                        # 5. FORMATAÇÃO FINAL: Mapeia o objeto de data para a coluna final e formata para string (somente para exibição)
-                        df_resumo_adversario['Último Jogo'] = pd.to_datetime(
-                            df_resumo_adversario['Ultimo_Jogo_Raw']
-                        ).dt.strftime('%d/%m/%Y')
-
-                        # Remove a coluna temporária usada na ordenação
-                        df_resumo_adversario = df_resumo_adversario.drop(columns=['Ultimo_Jogo_Raw'])
-
-                        st.markdown(f"#### Gols e Assistências Contra Adversários ({modalidade_filter})")
-
-                        # NOVO: Define a ORDEM DAS COLUNAS SOLICITADA
-                        colunas_ordenadas = [
-                            'Último Jogo',
-                            'Adversário',
-                            'Total Gols',
-                            'Total Assistências',
-                            'Nº de Jogos'
-                        ]
-
-                        # Exibe apenas as colunas solicitadas
-                        st.dataframe(
-                            df_resumo_adversario[colunas_ordenadas],
-                            hide_index=True,
-                            use_container_width=True
-                        )
-                    else:
-                        st.info(
-                            f"Nenhum Adversário resultou em Gols ou Assistências em {modalidade_filter} neste período.")
+        <div style="
+            margin-top:20px;
+            padding:16px;
+            border-radius:14px;
+            background:#0B1220;
+            border-left:6px solid #03A9F4;
+        ">
+            <strong>💡 Dica:</strong><br>
+            Registrar sua saúde ajuda a entender <b>por que você foi bem ou mal</b> em campo.
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
+    # st.markdown(
+    #     "Use esta seção para correlacionar o desempenho em jogos com a frequência de treinos e qualidade do sono.")
+    #
+    #
+    # # --- FUNÇÕES HELPER (ASSUMINDO QUE ESTÃO NO ESCOPO GERAL) ---
+    # def get_date_obj(date_val):
+    #     """Converte a data para objeto datetime, priorizando o formato DD/MM/YYYY."""
+    #     return pd.to_datetime(date_val, errors='coerce', dayfirst=True)
+    #
+    #
+    # def get_sleep_date_obj(row):
+    #     """
+    #     REGRA SIMPLES: Atribui o sono EXATAMENTE à data de despertar ('Data' na planilha).
+    #     """
+    #     try:
+    #         data_acordar = pd.to_datetime(row['Data'], format='%d/%m/%Y', errors='coerce')
+    #         if pd.isna(data_acordar):
+    #             return pd.NaT
+    #         return data_acordar
+    #     except:
+    #         return pd.NaT
+    #
+    #
+    # # --- FILTRO POR PERÍODO ---
+    # periodo_opcoes = {
+    #     "Últimos 7 dias": 7,
+    #     "Últimas 2 semanas": 14,
+    #     "Últimas 4 semanas": 28,
+    #     "Últimos 90 dias": 90,
+    #     "Todos os Dados": 9999
+    # }
+    #
+    # # --- NOVO: OPÇÕES DE MODALIDADE ---
+    # # *AVISO: A linha abaixo pode dar erro se 'load_registros' não estiver no escopo global
+    # df_temp_modality = load_registros()
+    # modalidades_disponiveis = sorted(
+    #     [m for m in df_temp_modality['Condição do Campo'].astype(str).unique()
+    #      if m and m.strip() != "" and m.lower() != "nan"])
+    # modalidades_opcoes = ["Todas as Modalidades"] + modalidades_disponiveis
+    #
+    # # --- LAYOUT DOS FILTROS ---
+    # col_analise1, col_analise2 = st.columns(2)
+    # with col_analise1:
+    #     periodo_sel = st.selectbox("Selecione o Período de Análise:", list(periodo_opcoes.keys()))
+    # with col_analise2:
+    #     modalidade_filter = st.selectbox("Filtrar por Modalidade:", modalidades_opcoes)  # NOVO FILTRO
+    #
+    # dias_atras = periodo_opcoes[periodo_sel]
+    # data_inicial = (datetime.now() - timedelta(days=dias_atras)).replace(hour=0, minute=0, second=0, microsecond=0)
+    #
+    # st.markdown(f"**Analisando dados desde:** _{data_inicial.strftime('%d/%m/%Y')}_")
+    #
+    # if st.button("Gerar Análise Integrada"):
+    #
+    #     # ----------------------------------------------------
+    #     # 1. PROCESSAR DADOS DE JOGOS (Gols e Assistências)
+    #     # ----------------------------------------------------
+    #     df_jogos = load_registros()
+    #     # Remove treinos (mantendo apenas jogos)
+    #     df_jogos = df_jogos[df_jogos["Treino"].isna() | (df_jogos["Treino"] == "")]
+    #
+    #     # FILTRA JOGOS USANDO 'Condição do Campo' (CORRETO)
+    #     if modalidade_filter != "Todas as Modalidades":
+    #         df_jogos = df_jogos[df_jogos["Condição do Campo"].astype(str) == modalidade_filter]
+    #
+    #     df_jogos["Date_Obj"] = df_jogos["Data"].apply(get_date_obj)
+    #     df_jogos_filtrado = df_jogos[df_jogos["Date_Obj"] >= data_inicial].copy()
+    #
+    #     if df_jogos_filtrado.empty:
+    #         df_jogos_group = pd.DataFrame(columns=['Date_Obj', 'Gols Marcados', 'Assistências'])
+    #
+    #     else:
+    #         # Garante que Gols e Assistências são numéricos
+    #         def to_int_safe(x):
+    #             try:
+    #                 return int(x)
+    #             except:
+    #                 return 0
+    #
+    #
+    #         df_jogos_filtrado["Gols Marcados"] = df_jogos_filtrado["Gols Marcados"].apply(to_int_safe)
+    #         df_jogos_filtrado["Assistências"] = df_jogos_filtrado["Assistências"].apply(to_int_safe)
+    #
+    #         df_jogos_group = df_jogos_filtrado.groupby("Date_Obj")[
+    #             ["Gols Marcados", "Assistências"]].sum().reset_index()
+    #
+    #     # ----------------------------------------------------
+    #     # 2. PROCESSAR DADOS DE TREINOS (Contagem Filtrada para Resumo e Geral para Gráfico)
+    #     # ----------------------------------------------------
+    #     df_treinos = load_treinos_df()
+    #     df_treinos["Date_Obj"] = df_treinos["Date"].apply(get_date_obj)
+    #     df_treinos_filtrado_geral = df_treinos[df_treinos["Date_Obj"] >= data_inicial].copy()
+    #
+    #     # Para o Gráfico 2 (Contagem GERAL de treinos no período).
+    #     df_treinos_group = df_treinos_filtrado_geral.groupby("Date_Obj").size().reset_index(name='Contagem Treinos')
+    #
+    #     # --- Lógica de Filtro para o RESUMO Analítico ---
+    #     TREINO_MODALIDADE_COL = 'Tipo'  # <<< CORREÇÃO AQUI: USA A COLUNA 'Tipo'
+    #     df_treinos_para_resumo = df_treinos_filtrado_geral.copy()
+    #
+    #     # O filtro de treino só é aplicado se a coluna 'Tipo' existir e o filtro de modalidade estiver ativo
+    #     if modalidade_filter != "Todas as Modalidades":
+    #         if TREINO_MODALIDADE_COL in df_treinos_para_resumo.columns:
+    #             # FILTRA PELA MODALIDADE ESPECÍFICA usando a coluna 'Tipo'
+    #             df_treinos_para_resumo = df_treinos_para_resumo[
+    #                 df_treinos_para_resumo[TREINO_MODALIDADE_COL].astype(str) == modalidade_filter
+    #                 ]
+    #             total_treinos_resumo = df_treinos_para_resumo.shape[0]
+    #             modalidade_label = modalidade_filter
+    #
+    #             if total_treinos_resumo == 0:
+    #                 # Alerta apenas se o filtro estiver ativo e não houver dados.
+    #                 st.warning(
+    #                     f"⚠️ **{modalidade_filter}:** Nenhum treino do tipo **{modalidade_filter}** registrado no período. A contagem de treino no resumo será zero.")
+    #
+    #         else:
+    #             # Caso a coluna 'Tipo' não exista na planilha de treinos, o que geraria um KeyError.
+    #             total_treinos_resumo = df_treinos_filtrado_geral.shape[0]
+    #             modalidade_label = "Total (Coluna Tipo não encontrada no Treino)"
+    #             st.error(
+    #                 f"❌ **ERRO CRÍTICO:** O DataFrame de Treinos não tem a coluna '{TREINO_MODALIDADE_COL}'. A contagem será GERAL. Revise sua planilha de treinos.")
+    #     else:
+    #         # Se o filtro é 'Todas as Modalidades', usa a contagem geral.
+    #         total_treinos_resumo = df_treinos_filtrado_geral.shape[0]
+    #         modalidade_label = "Total Geral"
+    #
+    #     # Fim da Seção 2
+    #     # ----------------------------------------------------
+    #
+    #     # ----------------------------------------------------
+    #     # 3. PROCESSAR DADOS DE SONO (Média de Horas)
+    #     # ----------------------------------------------------
+    #     df_sono = load_sono_df()
+    #     df_sono["Date_Obj"] = df_sono.apply(get_sleep_date_obj, axis=1)
+    #     df_sono["Horas Sono"] = df_sono["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
+    #     df_sono_filtrado = df_sono[df_sono["Date_Obj"] >= data_inicial].copy()
+    #     df_sono_group = df_sono_filtrado.groupby("Date_Obj")['Horas Sono'].mean().reset_index(name='Horas Sono')
+    #
+    #     # ----------------------------------------------------
+    #     # 4. CONSOLIDAR E GERAR GRÁFICO
+    #     # ----------------------------------------------------
+    #     if (('df_jogos_group' not in locals() or df_jogos_group.empty) and
+    #             ('df_treinos_group' not in locals() or df_treinos_group.empty) and
+    #             ('df_sono_group' not in locals() or df_sono_group.empty)):
+    #         st.warning("Não há dados de Jogo, Treino ou Sono no período selecionado.")
+    #     else:
+    #
+    #         # --- CORREÇÃO CRÍTICA DE NORMALIZAÇÃO DE DATAS ---
+    #         # Garante que todas as datas têm hora 00:00:00 para o merge funcionar corretamente
+    #         if 'df_jogos_group' in locals() and not df_jogos_group.empty:
+    #             df_jogos_group['Date_Obj'] = pd.to_datetime(df_jogos_group['Date_Obj']).dt.normalize()
+    #         if 'df_treinos_group' in locals() and not df_treinos_group.empty:
+    #             df_treinos_group['Date_Obj'] = pd.to_datetime(df_treinos_group['Date_Obj']).dt.normalize()
+    #         if 'df_sono_group' in locals() and not df_sono_group.empty:
+    #             df_sono_group['Date_Obj'] = pd.to_datetime(df_sono_group['Date_Obj']).dt.normalize()
+    #
+    #         # Garante que a coluna Date_Obj usada para merge está normalizada no df_jogos_filtrado
+    #         if not df_jogos_filtrado.empty:
+    #             df_jogos_filtrado['Date_Obj'] = pd.to_datetime(df_jogos_filtrado['Date_Obj']).dt.normalize()
+    #
+    #         # Reúne todas as datas disponíveis
+    #         all_dates = pd.to_datetime(pd.Series(
+    #             (df_jogos_group['Date_Obj'].tolist() if 'df_jogos_group' in locals() else []) +
+    #             (df_treinos_group['Date_Obj'].tolist() if 'df_treinos_group' in locals() else []) +
+    #             (df_sono_group['Date_Obj'].tolist() if 'df_sono_group' in locals() else [])
+    #         ).unique())
+    #
+    #         if len(all_dates) == 0:
+    #             st.warning("Não há dados para plotar.")
+    #         else:
+    #             # Cria o DataFrame final, AGORA ORDENADO POR DATA CRONOLÓGICA
+    #             df_final = pd.DataFrame({'Date_Obj': pd.Series(all_dates).sort_values()})
+    #
+    #             # FAZ A CONVERSÃO EXPLÍCITA E NOVA ORDENAÇÃO
+    #             df_final['Date_Obj'] = pd.to_datetime(df_final['Date_Obj']).dt.normalize()
+    #             df_final = df_final.sort_values(by='Date_Obj').reset_index(drop=True)
+    #
+    #             # Faz a junção (merge) dos 3 datasets
+    #             df_final = pd.merge(df_final, df_jogos_group if 'df_jogos_group' in locals() else pd.DataFrame(),
+    #                                 on='Date_Obj', how='left')
+    #             df_final = pd.merge(df_final, df_treinos_group if 'df_treinos_group' in locals() else pd.DataFrame(),
+    #                                 on='Date_Obj', how='left')
+    #             df_final = pd.merge(df_final, df_sono_group if 'df_sono_group' in locals() else pd.DataFrame(),
+    #                                 on='Date_Obj', how='left')
+    #             df_final = df_final.fillna(0)
+    #
+    #             # REORDENAÇÃO EXPLÍCITA FINAL PÓS-MERGE
+    #             df_final = df_final.sort_values(by='Date_Obj').reset_index(drop=True)
+    #
+    #             # Reagrupar o df_jogos_filtrado por data para obter a contagem de jogos (linhas)
+    #             df_contagem_jogos = df_jogos_filtrado.groupby(
+    #                 "Date_Obj"
+    #             ).size().reset_index(name='Contagem Jogos')
+    #
+    #             # Merge com df_final para trazer a contagem de jogos para CADA DIA
+    #             df_plot = pd.merge(df_final, df_contagem_jogos, on='Date_Obj', how='left').fillna({'Contagem Jogos': 0})
+    #             df_plot['Contagem Jogos'] = df_plot['Contagem Jogos'].astype(int)
+    #
+    #             # GARANTE A ORDEM DO DF_PLOT PELA DATA CORRETA
+    #             df_plot = df_plot.sort_values(by='Date_Obj').reset_index(drop=True)
+    #
+    #             # ----------------------------------------------------------------------
+    #             # GRÁFICO 1: DESEMPENHO (Gols e Assistências) - ALTAIR (FINAL FIX)
+    #             # ----------------------------------------------------------------------
+    #             st.subheader("Gráfico 1: Desempenho (Gols e Assistências)")
+    #
+    #             # Preparar os dados para o Altair
+    #             df_plot['Gols Marcados'] = pd.to_numeric(df_plot['Gols Marcados'], errors='coerce').fillna(0)
+    #             df_plot['Assistências'] = pd.to_numeric(df_plot['Assistências'], errors='coerce').fillna(0)
+    #
+    #             # Filtrar APENAS os dias que tiveram jogos (Contagem Jogos > 0)
+    #             df_desempenho_altair = df_plot[df_plot['Contagem Jogos'] > 0].copy()
+    #
+    #             if df_desempenho_altair.empty:
+    #                 st.info("Não há dados de Jogos registrados no período selecionado.")
+    #             else:
+    #                 # --- PREPARAÇÃO ALTAIR PARA EMPILHAMENTO ---
+    #                 df_desempenho_altair['Date_Obj'] = pd.to_datetime(df_desempenho_altair['Date_Obj']).dt.normalize()
+    #                 df_desempenho_altair['Data Jogo Formatada'] = df_desempenho_altair['Date_Obj'].dt.strftime('%d/%m')
+    #                 df_desempenho_altair = df_desempenho_altair.sort_values(by='Date_Obj').reset_index(drop=True)
+    #                 ordered_dates_domain = df_desempenho_altair['Data Jogo Formatada'].unique().tolist()
+    #
+    #                 # NOVO: Calcula o total de contribuições para a altura da barra e o limite Y
+    #                 df_desempenho_altair['Total Contribuicoes'] = df_desempenho_altair['Gols Marcados'] + \
+    #                                                               df_desempenho_altair['Assistências']
+    #
+    #                 # 1. Definição robusta do limite Y
+    #                 y_max_data = df_desempenho_altair['Total Contribuicoes'].max() if not df_desempenho_altair[
+    #                     'Total Contribuicoes'].empty else 0
+    #                 y_max_limit = max(y_max_data + 1.5,
+    #                                   3)  # Garante espaço para o rótulo (Nx) e um limite Y mínimo de 3
+    #
+    #                 # 2. Derreter o DataFrame (Formato longo necessário para barras empilhadas)
+    #                 df_melted = df_desempenho_altair.melt(
+    #                     id_vars=['Date_Obj', 'Contagem Jogos', 'Data Jogo Formatada', 'Total Contribuicoes'],
+    #                     value_vars=['Gols Marcados', 'Assistências'],
+    #                     var_name='Métrica',
+    #                     value_name='Valor'
+    #                 )
+    #                 df_melted['Contagem Jogos'] = df_melted['Contagem Jogos'].astype(int)
+    #                 chart_title = f"Desempenho em Jogos: Gols e Assistências ({modalidade_filter})"
+    #
+    #                 # --- CAMADAS DE VISUALIZAÇÃO ---
+    #
+    #                 # 3. GRÁFICO PRINCIPAL DE BARRAS EMPILHADAS
+    #                 chart_bars = alt.Chart(df_melted).mark_bar().encode(
+    #                     x=alt.X('Data Jogo Formatada:O',
+    #                             axis=alt.Axis(title='Data do Jogo', labelAngle=-45),
+    #                             scale=alt.Scale(domain=ordered_dates_domain)),
+    #
+    #                     # CHAVE PARA EMPILHAMENTO: Usa stack='zero' no Y e configura o eixo
+    #                     y=alt.Y('Valor:Q',
+    #                             title='Gols / Assistências',
+    #                             axis=alt.Axis(format='d', grid=False),  # Sem grade Y para um visual mais limpo
+    #                             scale=alt.Scale(domain=[0, y_max_limit]),
+    #                             stack="zero"),  # <-- EMPILHADO
+    #
+    #                     color=alt.Color('Métrica:N',
+    #                                     legend=alt.Legend(title="Métrica"),
+    #                                     scale=alt.Scale(domain=['Gols Marcados', 'Assistências'],
+    #                                                     range=['#E45757', '#FF8C00'])),
+    #                     order=alt.Order('Métrica', sort='descending'),
+    #                     # Gols (vermelho) no topo, Assistências (laranja) na base
+    #                     tooltip=[
+    #                         alt.Tooltip('Date_Obj:T', title='Data Completa', format='%d/%m/%Y'),
+    #                         alt.Tooltip('Métrica:N', title='Métrica'),
+    #                         alt.Tooltip('Valor:Q', title='Quantidade', format='.0f'),
+    #                         alt.Tooltip('Contagem Jogos:Q', title='Nº de Jogos no Dia')
+    #                     ]
+    #                 ).properties(
+    #                     title=chart_title
+    #                 )
+    #
+    #                 # 4. RÓTULOS DE TEXTO (Gols e Assistências) - Centralização Otimizada
+    #
+    #                 # Camada de Texto para GOLS (Vermelho - Topo)
+    #                 text_gols_layer = alt.Chart(df_melted).mark_text(
+    #                     align='center',
+    #                     baseline='middle',
+    #                     color='white',  # COR BRANCA (Contraste)
+    #                     fontWeight='bold',
+    #                     dy=15  # AUMENTADO: Move para baixo no segmento vermelho (centralização)
+    #                 ).encode(
+    #                     x='Data Jogo Formatada:O',
+    #                     y=alt.Y('Valor:Q', stack='zero'),
+    #                     text=alt.Text('Valor:Q', format='.0f'),
+    #                     # Só mostra se for Gol e o Valor for >= 1
+    #                     opacity=alt.condition((alt.datum.Métrica == 'Gols Marcados') & (alt.datum.Valor >= 1),
+    #                                           alt.value(1), alt.value(0))
+    #                 )
+    #
+    #                 # Camada de Texto para ASSISTÊNCIAS (Laranja - Base)
+    #                 text_assistencias_layer = alt.Chart(df_melted).mark_text(
+    #                     align='center',
+    #                     baseline='middle',
+    #                     color='white',  # COR BRANCA (Contraste)
+    #                     fontWeight='bold',
+    #                     dy=14  # AUMENTADO: Move para cima no segmento laranja (centralização)
+    #                 ).encode(
+    #                     x='Data Jogo Formatada:O',
+    #                     y=alt.Y('Valor:Q', stack='zero'),
+    #                     text=alt.Text('Valor:Q', format='.0f'),
+    #                     # Só mostra se for Assistência e o Valor for >= 1
+    #                     opacity=alt.condition((alt.datum.Métrica == 'Assistências') & (alt.datum.Valor >= 1),
+    #                                           alt.value(1), alt.value(0))
+    #                 )
+    #
+    #                 # 5. RÓTULOS (Nx) - Contagem de Jogos (Acima da Barra)
+    #                 df_multi_jogos_labels = df_desempenho_altair.copy()
+    #                 df_multi_jogos_labels['Label'] = '(' + df_multi_jogos_labels['Contagem Jogos'].astype(str) + 'x)'
+    #                 # Agora ValorMax usa o Total Contribuicoes (topo da barra empilhada)
+    #                 df_multi_jogos_labels['ValorMax'] = df_multi_jogos_labels['Total Contribuicoes']
+    #
+    #                 text_layer_nx = alt.Chart(df_multi_jogos_labels).mark_text(
+    #                     align='center',
+    #                     baseline='bottom',
+    #                     dy=-5,  # Pouco acima do topo da barra
+    #                     color='blue',
+    #                     fontWeight='bold'
+    #                 ).encode(
+    #                     x='Data Jogo Formatada:O',
+    #                     y=alt.Y('ValorMax:Q', stack=None, axis=None),
+    #                     text=alt.Text('Label:N'),
+    #                     order=alt.Order('Date_Obj', sort='ascending'),
+    #                     opacity=alt.condition(alt.datum['Contagem Jogos'] > 0, alt.value(1), alt.value(0))
+    #                 )
+    #
+    #                 # 6. COMBINAÇÃO FINAL
+    #                 final_chart = chart_bars + text_gols_layer + text_assistencias_layer + text_layer_nx
+    #
+    #                 st.markdown("<p style='font-size:12px; color:blue; margin-bottom: 0;'>\
+    #                                                                     🟦 indica o número de jogos disputados no dia.<br>\
+    #                                                                     **Rótulos brancos:** Não consta Gols/Assistencias.</p>",
+    #                             unsafe_allow_html=True)
+    #
+    #                 st.altair_chart(final_chart, use_container_width=True)
+    #             # ----------------------------------------------------
+    #             # GRÁFICO 2: RECUPERAÇÃO E FREQUÊNCIA (SONO E TREINOS) - MATPLOTLIB
+    #             # ----------------------------------------------------
+    #
+    #             st.subheader("Gráfico 2: Recuperação e Frequência (Sono e Treinos)")
+    #
+    #             # O df_final já está ordenado nesta etapa (na Seção 4)
+    #             x_labels_full = df_final['Date_Obj'].dt.strftime('%d/%m')
+    #             x_indices_full = np.arange(len(x_labels_full))
+    #
+    #             # O restante do Gráfico 2 segue inalterado.
+    #             # ...
+    #
+    #             # --- GRÁFICO 2: SONO (Eixo 1) E TREINOS (Eixo 2) ---
+    #             fig2, ax2 = plt.subplots(figsize=(14, 5))
+    #
+    #             # Eixo 1: SONO
+    #             ax2.plot(x_indices_full, df_final['Horas Sono'], label='Média Horas Sono', color='tab:green',
+    #                      marker='o',
+    #                      linestyle='-', linewidth=2)
+    #             ax2.set_ylabel('Horas de Sono', color='tab:green')
+    #             ax2.tick_params(axis='y', labelcolor='tab:green')
+    #             ax2.set_ylim(0, 12)  # CORREÇÃO: Aumenta o limite para evitar corte no valor máximo (10.0)
+    #
+    #             # Eixo 2: TREINOS
+    #             ax3 = ax2.twinx()
+    #             ax3.plot(x_indices_full, df_final['Contagem Treinos'], label='Contagem Treinos', color='tab:blue',
+    #                      marker='o', linestyle='-', linewidth=2)
+    #             ax3.set_ylabel('Contagem Treinos', color='tab:blue')
+    #             ax3.tick_params(axis='y', labelcolor='tab:blue')
+    #             ax3.set_ylim(bottom=0, top=df_final['Contagem Treinos'].max() * 1.5 + 1)
+    #
+    #             # Rótulos de Sono e Treinos
+    #             for i, txt in enumerate(df_final['Horas Sono']):
+    #                 if txt > 0:
+    #                     ax2.annotate(f'{txt:.1f}', (x_indices_full[i], df_final['Horas Sono'][i]),
+    #                                  textcoords="offset points", xytext=(0, 10), ha='center', fontsize=10,
+    #                                  color='tab:green', fontweight='bold')
+    #             for i, txt in enumerate(df_final['Contagem Treinos']):
+    #                 if txt > 0:
+    #                     ax3.annotate(f'{int(txt)}', (x_indices_full[i], df_final['Contagem Treinos'][i]),
+    #                                  textcoords="offset points", xytext=(0, -15), ha='center', fontsize=10,
+    #                                  color='tab:blue', fontweight='bold')
+    #
+    #             # Configuração do Eixo X
+    #             ax2.set_xticks(x_indices_full)
+    #             ax2.set_xticklabels(x_labels_full, rotation=45, ha='right')
+    #             ax2.set_xlabel("Data")
+    #             plt.grid(axis='y', linestyle='--', alpha=0.6)
+    #
+    #             lines, labels = ax2.get_legend_handles_labels()
+    #             lines3, labels3 = ax3.get_legend_handles_labels()
+    #             ax2.legend(lines + lines3, labels + labels3, loc='upper left')
+    #
+    #             st.pyplot(fig2)
+    #
+    #             #----------------------------------------------------------------
+    #
+    #
+    #
+    #             # ----------------------------------------------------
+    #             # 5. RESUMO E DIAGNÓSTICO DE FOCO
+    #             # ----------------------------------------------------
+    #             st.subheader("📊 Resumo Analítico e Foco da Semana")
+    #
+    #             # CÁLCULOS CHAVE
+    #             total_gols = df_final['Gols Marcados'].sum()
+    #             total_assistencias = df_final['Assistências'].sum()
+    #             # A contagem de dias_com_jogo (registros) foi corrigida no código anterior, mantida aqui.
+    #             dias_com_jogo = df_jogos_filtrado.shape[0]
+    #             dias_unicos_com_jogo = df_final[
+    #                 (df_final['Gols Marcados'] > 0) | (df_final['Assistências'] > 0)
+    #                 ].shape[0]
+    #
+    #             if dias_unicos_com_jogo == 0 and 'df_jogos_group' in locals() and not df_jogos_group.empty:
+    #                 dias_unicos_com_jogo = df_jogos_group.shape[0]
+    #
+    #             divisor_media = dias_unicos_com_jogo if dias_unicos_com_jogo > 0 else 1
+    #
+    #             media_gols_por_jogo = total_gols / divisor_media
+    #             media_assistencias_por_jogo = total_assistencias / divisor_media
+    #
+    #             # Média Geral de Recuperação
+    #             media_sono = df_final[df_final['Horas Sono'] > 0]['Horas Sono'].mean()
+    #
+    #             # total_treinos_resumo e modalidade_label já foram calculados corretamente na Seção 2.
+    #
+    #             # PARÂMETROS DE REFERÊNCIA
+    #             REF_SONO_MINIMO = 8.0
+    #             REF_TREINO_MINIMO = 2
+    #
+    #             # --------------------------------------------------------
+    #             # LÓGICA DE TEXTO PARA O RESUMO
+    #             # --------------------------------------------------------
+    #
+    #             # Gera o texto de análise da frequência
+    #             if total_treinos_resumo > 0:
+    #                 frequencia_analise_texto = (
+    #                     f"A frequência de treino (**{modalidade_label}**) foi **{'alta' if total_treinos_resumo >= REF_TREINO_MINIMO else 'baixa'}**, "
+    #                     f"com **{total_treinos_resumo} sessões** no período. Foco em manter a consistência."
+    #                 )
+    #             else:
+    #                 frequencia_analise_texto = f"Nenhum treino de **{modalidade_label}** registrado no período."
+    #
+    #             # --- ANÁLISE GERAL ---
+    #             analise_texto = []
+    #
+    #             # 1. ANÁLISE DE DESEMPENHO (GOLS E ASSISTÊNCIAS)
+    #             if total_gols > 0 or total_assistencias > 0:
+    #                 analise_texto.append(
+    #                     f"1. ANÁLISE DE DESEMPENHO: O desempenho em jogos ({modalidade_filter}) foi de **{total_gols} Gols** e **{total_assistencias} Assistências** no total, "
+    #                     f"com média de **{media_gols_por_jogo:.1f} Gols/Jogo** e **{media_assistencias_por_jogo:.1f} Assis./Jogo** nos {dias_com_jogo} jogos registrados.")
+    #             else:
+    #                 analise_texto.append(
+    #                     f"1. ANÁLISE DE DESEMPENHO: Não houve Gols ou Assistências registradas nos jogos ({modalidade_filter}) do período.")
+    #
+    #             # 2. ANÁLISE DE SONO/RECUPERAÇÃO (Mantida)
+    #             if pd.notna(media_sono):
+    #                 if media_sono >= REF_SONO_MINIMO:
+    #                     analise_texto.append(
+    #                         f"2. ANÁLISE DE SONO: A recuperação foi **excelente**: média de **{media_sono:.1f} horas de sono**, acima da meta de {REF_SONO_MINIMO}h. Isso sugere boa base de energia.")
+    #                 elif media_sono >= (REF_SONO_MINIMO - 0.5):
+    #                     analise_texto.append(
+    #                         f"2. ANÁLISE DE SONO: A recuperação foi **boa**: média de **{media_sono:.1f} horas de sono**. Manteve-se próximo do ideal ({REF_SONO_MINIMO}h).")
+    #                 else:
+    #                     analise_texto.append(
+    #                         f"2. ANÁLISE DE SONO: 🚨 **ALERTA DE FADIGA:** A média de sono foi de apenas **{media_sono:.1f} horas**. Esse déficit pode impactar negativamente a performance e o risco de lesões.")
+    #             else:
+    #                 analise_texto.append("2. ANÁLISE DE SONO: Dados de sono insuficientes para análise de recuperação.")
+    #
+    #             # 3. ANÁLISE DE FREQUÊNCIA DE TREINO (USA O TEXTO CORRIGIDO)
+    #             analise_texto.append(f"3. ANÁLISE DE FREQUÊNCIA DE TREINO: {frequencia_analise_texto}")
+    #
+    #             # --- CONCLUSÃO E FOCO ---
+    #             st.markdown("---")
+    #             st.markdown("#### Conclusão da Semana:")
+    #
+    #             # ATUALIZAÇÃO DO RESUMO: Usa total_treinos_resumo e modalidade_label
+    #             resumo_texto = f"""
+    #                                                                        **Resumo do Período Pesquisado:**
+    #
+    #                                                                        - **Jogos Registrados ({modalidade_filter}):** {dias_com_jogo}
+    #                                                                        - **Gols Marcados:** {int(total_gols)}
+    #                                                                        - **Assistências:** {int(total_assistencias)}
+    #                                                                        - **Sessões de Treino ({modalidade_label}):** {int(total_treinos_resumo)}
+    #                                                                        - **Média de Sono:** {media_sono:.1f} horas
+    #                                                                        """
+    #             st.info(resumo_texto)
+    #
+    #             # Lógica para conclusão (usando GOLS/ASSISTENCIAS > 0)
+    #             desempenho_positivo = total_gols > 0 or total_assistencias > 0
+    #
+    #             # A lógica de conclusão também deve usar o total_treinos_resumo
+    #             if desempenho_positivo and media_sono >= REF_SONO_MINIMO and total_treinos_resumo > 0:
+    #                 st.success(
+    #                     "✅ **Ótimo Equilíbrio!** O alto desempenho (Gols e Assistências) está correlacionado com a excelente recuperação (Sono) e boa frequência de treino. FOCO: Manter este padrão.")
+    #
+    #             elif media_sono < REF_SONO_MINIMO and desempenho_positivo:
+    #                 st.warning(
+    #                     "⚠️ **Rendimento em Risco!** Apesar do desempenho ofensivo (Gols/Assistências), a baixa média de sono pode indicar que o corpo está sendo exigido além da conta. FOCO: Priorizar o descanso imediatamente.")
+    #
+    #             elif media_sono < REF_SONO_MINIMO and not desempenho_positivo:
+    #                 media_sono_formatada = f"{media_sono:.1f}"
+    #                 st.error(
+    #                     f"❌ **Alerta Geral!** Baixo rendimento (sem Gols/Assistências) combinado com sono insuficiente (média de **{media_sono_formatada} horas**). O foco principal deve ser a **Recuperação e o Sono** para restaurar a energia.")
+    #
+    #             # ----------------------------------------------------
+    #             # 5.1. TABELA DE DETALHES DE GOLS POR ADVERSÁRIO (AJUSTADA E REORDENADA)
+    #             # ----------------------------------------------------
+    #             if total_gols > 0 or total_assistencias > 0:
+    #                 st.subheader("🎯 Detalhe do Desempenho Ofensivo")
+    #
+    #                 df_gols_filtrado = df_jogos_filtrado[
+    #                     (df_jogos_filtrado['Gols Marcados'] > 0) |
+    #                     (df_jogos_filtrado['Assistências'] > 0)
+    #                     ].copy()
+    #
+    #                 if not df_gols_filtrado.empty:
+    #
+    #                     # 2. Agrupa e calcula as colunas (Sintaxe de agg MAIS COMPATÍVEL)
+    #                     df_resumo_adversario = df_gols_filtrado.groupby('Visitante').agg(
+    #                         Gols=('Gols Marcados', 'sum'),
+    #                         Assistencias=('Assistências', 'sum'),
+    #                         Jogos=('Visitante', 'size'),
+    #                         # Pega a Data mais recente como um objeto DATETIME para ordenação correta
+    #                         Ultimo_Jogo_Raw=('Date_Obj', 'max')
+    #                     ).reset_index()
+    #
+    #                     # 3. Formata e Renomeia para exibição
+    #                     df_resumo_adversario = df_resumo_adversario.rename(columns={
+    #                         'Visitante': 'Adversário',
+    #                         'Gols': 'Total Gols',
+    #                         'Assistencias': 'Total Assistências',
+    #                         'Jogos': 'Nº de Jogos',
+    #                     })
+    #
+    #                     # 4. ORDENAÇÃO: ORDENA APENAS PELA DATA (MAIS RECENTE PARA MAIS ANTIGA)
+    #                     df_resumo_adversario = df_resumo_adversario.sort_values(
+    #                         by=['Ultimo_Jogo_Raw'],  # Lista contém APENAS a coluna de Data (objeto datetime)
+    #                         # False = Decrescente (do mais recente para o mais antigo)
+    #                         ascending=[False]
+    #                     )
+    #
+    #                     # 5. FORMATAÇÃO FINAL: Mapeia o objeto de data para a coluna final e formata para string (somente para exibição)
+    #                     df_resumo_adversario['Último Jogo'] = pd.to_datetime(
+    #                         df_resumo_adversario['Ultimo_Jogo_Raw']
+    #                     ).dt.strftime('%d/%m/%Y')
+    #
+    #                     # Remove a coluna temporária usada na ordenação
+    #                     df_resumo_adversario = df_resumo_adversario.drop(columns=['Ultimo_Jogo_Raw'])
+    #
+    #                     st.markdown(f"#### Gols e Assistências Contra Adversários ({modalidade_filter})")
+    #
+    #                     # NOVO: Define a ORDEM DAS COLUNAS SOLICITADA
+    #                     colunas_ordenadas = [
+    #                         'Último Jogo',
+    #                         'Adversário',
+    #                         'Total Gols',
+    #                         'Total Assistências',
+    #                         'Nº de Jogos'
+    #                     ]
+    #
+    #                     # Exibe apenas as colunas solicitadas
+    #                     st.dataframe(
+    #                         df_resumo_adversario[colunas_ordenadas],
+    #                         hide_index=True,
+    #                         use_container_width=True
+    #                     )
+    #                 else:
+    #                     st.info(
+    #                         f"Nenhum Adversário resultou em Gols ou Assistências em {modalidade_filter} neste período.")
 
 #-------------------------------------
 # Aba Campeonatos BLOCO: LOGOS DOS CAMPEONATOS (AGORA DENTRO DA NOVA ABA)
