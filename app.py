@@ -1320,7 +1320,7 @@ with tab[3]:
         if pdf_nutri is None or descricao_pdf.strip() == "":
             st.warning("Anexe um PDF e informe a descrição.")
         else:
-            PASTA_ID = "SEU_ID_DA_PASTA_NO_DRIVE"
+            PASTA_ID = "1pKPc6M1nHWbPw3hzQIjXwg4lURb_NwEl?hl=pt-br"
 
             data_str = datetime.now().strftime("%d-%m-%Y")
             nome_arquivo = f"{data_str}_{descricao_pdf.replace(' ', '_')}.pdf"
