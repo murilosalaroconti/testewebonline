@@ -3788,6 +3788,14 @@ with tab[5]:
             # 🔹 USA O DATAFRAME COMPLETO (IGNORA FILTRO DE CIMA)
             df_sono_periodo = df_sono_full.copy()
 
+            # 🔧 LIMPEZA FORÇADA DA DATA (ESSENCIAL)
+            df_sono_periodo["Data"] = (
+                df_sono_periodo["Data"]
+                .astype(str)
+                .str.strip()  # remove espaços antes/depois
+                .str.replace(r"\s+", "", regex=True)  # remove espaços invisíveis
+            )
+
             # 🔹 Converte a data
             df_sono_periodo["Data_DT"] = pd.to_datetime(
                 df_sono_periodo["Data"],
@@ -3799,6 +3807,11 @@ with tab[5]:
             if "Duração do Sono (h:min)" in df_sono_periodo.columns:
                 df_sono_periodo["Duração_Horas"] = df_sono_periodo["Duração do Sono (h:min)"].apply(
                     parse_duration_to_hours)
+
+            # 🔒 REMOVE QUALQUER REGISTRO INVÁLIDO (PROTEÇÃO)
+            df_sono_periodo = df_sono_periodo.dropna(
+                subset=["Data_DT", "Duração_Horas"]
+            )
 
             # 🔹 Aplica SOMENTE o filtro de baixo
             df_sono_periodo["Data_Date"] = df_sono_periodo["Data_DT"].dt.date
