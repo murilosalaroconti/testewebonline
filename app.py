@@ -20,6 +20,9 @@ from reportlab.lib.colors import HexColor, white
 from reportlab.lib.units import cm
 import tempfile
 import os
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
+
 
 
 BASE_DIR = Path(__file__).parent
@@ -39,6 +42,14 @@ EXPECTED_REGISTROS_COLUMNS = [
     "Chutes","Chutes Errados", "Desarmes", "Passes-chave","Passes Errados", "Faltas Sofridas", "Participações Indiretas",
     "Resultado", "Local", "Condição do Campo",
     "Treino", "Date", "Hora"
+]
+
+EXPECTED_SAUDE_COLUMNS = [
+    "Data",
+    "Alimentação",
+    "Hidratação",
+    "Cansaço",
+    "Observação"
 ]
 
 
@@ -1169,6 +1180,52 @@ with tab[2]:
 # --------------------------
 # Aba Análises (resumo / gráficos rápidos)
 # --------------------------
+
+@st.cache_data(ttl=300)
+def load_saude_df():
+    client = get_client()
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
+    dados = sheet.get_all_records()
+    df = pd.DataFrame(dados)
+
+    for col in EXPECTED_SAUDE_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+
+    return df[EXPECTED_SAUDE_COLUMNS]
+
+def save_saude_df(df):
+    client = get_client()
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
+    sheet.clear()
+    sheet.update([df.columns.tolist()] + df.values.tolist())
+
+def upload_pdf_drive(file, filename, pasta_id):
+    creds = Credentials.from_service_account_info(
+        st.secrets["gcp_service_account"],
+        scopes=["https://www.googleapis.com/auth/drive"]
+    )
+
+    service = build("drive", "v3", credentials=creds)
+
+    media = MediaIoBaseUpload(
+        io.BytesIO(file.read()),
+        mimetype="application/pdf",
+        resumable=False
+    )
+
+    arquivo = service.files().create(
+        body={
+            "name": filename,
+            "parents": [pasta_id]
+        },
+        media_body=media,
+        fields="id, webViewLink"
+    ).execute()
+
+    return arquivo["webViewLink"]
+
+
 with tab[3]:
     st.header("🩺 Saúde & Preparação do Atleta")
     st.caption(
@@ -1205,6 +1262,26 @@ with tab[3]:
 
     salvar_saude = st.button("💾 Salvar Registro de Saúde")
 
+    if salvar_saude:
+        df_saude = load_saude_df()
+        data_str = data_saude.strftime("%d/%m/%Y")
+
+        # Remove registro antigo do mesmo dia (se existir)
+        df_saude = df_saude[df_saude["Data"] != data_str]
+
+        novo = {
+            "Data": data_str,
+            "Alimentação": alimentacao,
+            "Hidratação": hidratacao,
+            "Cansaço": cansaco,
+            "Observação": observacao
+        }
+
+        df_saude = pd.concat([df_saude, pd.DataFrame([novo])], ignore_index=True)
+        save_saude_df(df_saude)
+
+        st.success("Registro de saúde salvo com sucesso ✅")
+
     st.markdown(
         """
         <div style="
@@ -1238,6 +1315,35 @@ with tab[3]:
     )
 
     salvar_pdf = st.button("💾 Salvar Documento")
+
+    if salvar_pdf:
+        if pdf_nutri is None or descricao_pdf.strip() == "":
+            st.warning("Anexe um PDF e informe a descrição.")
+        else:
+            PASTA_ID = "SEU_ID_DA_PASTA_NO_DRIVE"
+
+            data_str = datetime.now().strftime("%d-%m-%Y")
+            nome_arquivo = f"{data_str}_{descricao_pdf.replace(' ', '_')}.pdf"
+
+            link = upload_pdf_drive(
+                pdf_nutri,
+                nome_arquivo,
+                PASTA_ID
+            )
+
+            client = get_client()
+            sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
+
+            hoje = datetime.now().strftime("%d/%m/%Y")
+
+            sheet.append_row([
+                hoje,
+                descricao_pdf,
+                nome_arquivo,
+                link
+            ])
+
+            st.success("Documento salvo com sucesso 📄✅")
 
     # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
     # st.markdown(
