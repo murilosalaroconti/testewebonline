@@ -1217,10 +1217,12 @@ def upload_pdf_drive(file, filename, pasta_id):
     arquivo = service.files().create(
         body={
             "name": filename,
-            "parents": [pasta_id]
+            "parents": [pasta_id],
+            "mimeType": "application/pdf"
         },
         media_body=media,
-        fields="id, webViewLink"
+        fields="id, webViewLink",
+        supportsAllDrives=True
     ).execute()
 
     return arquivo["webViewLink"]
