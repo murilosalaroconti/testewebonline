@@ -1283,19 +1283,15 @@ with tab[3]:
         placeholder="Ex: Avaliação nutricional - Janeiro 2025"
     )
 
-    salvar_pdf = st.button("💾 Salvar Documento")
-
     if salvar_pdf:
-        if descricao_pdf.strip() == "":
-            st.warning("Informe a descrição do documento.")
+        if descricao_pdf.strip() == "" or link_documento.strip() == "":
+            st.warning("Informe a descrição e o link do documento.")
         else:
             client = get_client()
             sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
 
             hoje = datetime.now().strftime("%d/%m/%Y")
             nome_arquivo = f"{hoje}_{descricao_pdf.replace(' ', '_')}"
-
-            link_documento = st.session_state.get("ultimo_link", "")
 
             sheet.append_row([
                 hoje,
