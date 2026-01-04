@@ -20,8 +20,6 @@ from reportlab.lib.colors import HexColor, white
 from reportlab.lib.units import cm
 import tempfile
 import os
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
 
 
 
@@ -1200,34 +1198,6 @@ def save_saude_df(df):
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
-def upload_pdf_drive(file, filename, pasta_id):
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=["https://www.googleapis.com/auth/drive"]
-    )
-
-    service = build("drive", "v3", credentials=creds)
-
-    media = MediaIoBaseUpload(
-        io.BytesIO(file.read()),
-        mimetype="application/pdf",
-        resumable=False
-    )
-
-    arquivo = service.files().create(
-        body={
-            "name": filename,
-            "parents": [pasta_id],
-            "mimeType": "application/pdf"
-        },
-        media_body=media,
-        fields="id, webViewLink",
-        supportsAllDrives=True
-    ).execute()
-
-    return arquivo["webViewLink"]
-
-
 with tab[3]:
     st.header("🩺 Saúde & Preparação do Atleta")
     st.caption(
@@ -1306,10 +1276,7 @@ with tab[3]:
         "Aqui você pode anexar relatórios da nutricionista, exames ou avaliações físicas."
     )
 
-    pdf_nutri = st.file_uploader(
-        "📎 Anexar PDF da Nutricionista",
-        type=["pdf"]
-    )
+
 
     descricao_pdf = st.text_input(
         "📝 Descrição do documento",
@@ -1319,33 +1286,24 @@ with tab[3]:
     salvar_pdf = st.button("💾 Salvar Documento")
 
     if salvar_pdf:
-        if pdf_nutri is None or descricao_pdf.strip() == "":
-            st.warning("Anexe um PDF e informe a descrição.")
+        if descricao_pdf.strip() == "":
+            st.warning("Informe a descrição do documento.")
         else:
-            PASTA_ID = "1pKPc6M1nHWbPw3hzQIjXwg4lURb_NwEl"
-
-            data_str = datetime.now().strftime("%d-%m-%Y")
-            nome_arquivo = f"{data_str}_{descricao_pdf.replace(' ', '_')}.pdf"
-
-            link = upload_pdf_drive(
-                pdf_nutri,
-                nome_arquivo,
-                PASTA_ID
-            )
-
             client = get_client()
             sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
 
             hoje = datetime.now().strftime("%d/%m/%Y")
+            nome_arquivo = f"{hoje}_{descricao_pdf.replace(' ', '_')}"
 
             sheet.append_row([
                 hoje,
                 descricao_pdf,
                 nome_arquivo,
-                link
+                "Documento externo / Drive"
             ])
 
-            st.success("Documento salvo com sucesso 📄✅")
+            st.success("Documento registrado com sucesso 📄✅")
+
 
     # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
     # st.markdown(
