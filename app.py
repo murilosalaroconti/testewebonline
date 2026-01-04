@@ -13,13 +13,20 @@ from google.oauth2.service_account import Credentials
 import gspread
 import plotly.express as px
 import plotly.graph_objects as go
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.colors import HexColor, white
 from reportlab.lib.units import cm
 import tempfile
 import os
+from reportlab.platypus import (
+    SimpleDocTemplate,
+    Paragraph,
+    Spacer,
+    Image as RLImage,
+    Table,
+    TableStyle
+)
 
 
 
