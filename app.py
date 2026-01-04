@@ -1295,11 +1295,13 @@ with tab[3]:
             hoje = datetime.now().strftime("%d/%m/%Y")
             nome_arquivo = f"{hoje}_{descricao_pdf.replace(' ', '_')}"
 
+            link_documento = st.session_state.get("ultimo_link", "")
+
             sheet.append_row([
                 hoje,
                 descricao_pdf,
                 nome_arquivo,
-                "Documento externo / Drive"
+                link_documento
             ])
 
             st.success("Documento registrado com sucesso 📄✅")
@@ -1317,17 +1319,15 @@ with tab[3]:
         df_docs = pd.DataFrame(dados_docs)
 
         # Garante ordem segura
-        df_docs = df_docs[["Data", "Descrição", "Link"]]
+        st.markdown("### 📄 Abrir documentos")
 
-        # Cria coluna de link clicável
-        df_docs["Abrir"] = df_docs["Link"].apply(
-            lambda x: f"[🔗 Abrir]({x})" if x else ""
-        )
-
-        st.markdown(
-            df_docs[["Data", "Descrição", "Abrir"]].to_markdown(index=False),
-            unsafe_allow_html=True
-        )
+        for _, row in df_docs.iterrows():
+            if row["Link"]:
+                st.markdown(
+                    f"🔗 **{row['Descrição']}**  \n"
+                    f"[Abrir PDF]({row['Link']})",
+                    unsafe_allow_html=True
+                )
 
     # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
     # st.markdown(
