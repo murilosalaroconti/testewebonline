@@ -1304,6 +1304,30 @@ with tab[3]:
 
             st.success("Documento registrado com sucesso 📄✅")
 
+    st.markdown("---")
+    st.subheader("📂 Documentos Registrados")
+
+    client = get_client()
+    sheet_docs = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
+    dados_docs = sheet_docs.get_all_records()
+
+    if not dados_docs:
+        st.info("Nenhum documento registrado ainda.")
+    else:
+        df_docs = pd.DataFrame(dados_docs)
+
+        # Garante ordem segura
+        df_docs = df_docs[["Data", "Descrição", "Link"]]
+
+        # Cria coluna de link clicável
+        df_docs["Abrir"] = df_docs["Link"].apply(
+            lambda x: f"[🔗 Abrir]({x})" if x else ""
+        )
+
+        st.markdown(
+            df_docs[["Data", "Descrição", "Abrir"]].to_markdown(index=False),
+            unsafe_allow_html=True
+        )
 
     # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
     # st.markdown(
