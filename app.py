@@ -1324,7 +1324,7 @@ with tab[3]:
             for _, row in df_docs.iterrows():
                 if row.get("Link"):
                     st.markdown(
-                        f"🔗 **{row['Descrição']}**  \n"
+                        f"🔗 **{row['Descricao']}**  \n"
                         f"[Abrir PDF]({row['Link']})",
                         unsafe_allow_html=True
                     )
