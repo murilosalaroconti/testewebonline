@@ -1276,12 +1276,17 @@ with tab[3]:
         "Aqui você pode anexar relatórios da nutricionista, exames ou avaliações físicas."
     )
 
-
-
     descricao_pdf = st.text_input(
         "📝 Descrição do documento",
         placeholder="Ex: Avaliação nutricional - Janeiro 2025"
     )
+
+    link_documento = st.text_input(
+        "🔗 Link do documento (Google Drive)",
+        placeholder="Cole aqui o link do PDF no Drive"
+    )
+
+    salvar_pdf = st.button("💾 Salvar Documento")
 
     if salvar_pdf:
         if descricao_pdf.strip() == "" or link_documento.strip() == "":
@@ -1302,28 +1307,27 @@ with tab[3]:
 
             st.success("Documento registrado com sucesso 📄✅")
 
-    st.markdown("---")
-    st.subheader("📂 Documentos Registrados")
+        st.markdown("---")
+        st.subheader("📂 Documentos Registrados")
 
-    client = get_client()
-    sheet_docs = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
-    dados_docs = sheet_docs.get_all_records()
+        client = get_client()
+        sheet_docs = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
+        dados_docs = sheet_docs.get_all_records()
 
-    if not dados_docs:
-        st.info("Nenhum documento registrado ainda.")
-    else:
-        df_docs = pd.DataFrame(dados_docs)
+        if not dados_docs:
+            st.info("Nenhum documento registrado ainda.")
+        else:
+            df_docs = pd.DataFrame(dados_docs)
 
-        # Garante ordem segura
-        st.markdown("### 📄 Abrir documentos")
+            st.markdown("### 📄 Abrir documentos")
 
-        for _, row in df_docs.iterrows():
-            if row["Link"]:
-                st.markdown(
-                    f"🔗 **{row['Descrição']}**  \n"
-                    f"[Abrir PDF]({row['Link']})",
-                    unsafe_allow_html=True
-                )
+            for _, row in df_docs.iterrows():
+                if row.get("Link"):
+                    st.markdown(
+                        f"🔗 **{row['Descrição']}**  \n"
+                        f"[Abrir PDF]({row['Link']})",
+                        unsafe_allow_html=True
+                    )
 
     # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
     # st.markdown(
