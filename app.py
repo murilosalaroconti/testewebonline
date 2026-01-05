@@ -29,13 +29,10 @@ from reportlab.platypus import (
 )
 
 
-
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
-
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
-
 
 
 # ----------------------
@@ -3562,6 +3559,107 @@ with tab[5]:
                     box-shadow: 0 0 12px rgba(0,229,255,0.6);
                     border-radius: 10px;
                 "></div>
+                """,
+                unsafe_allow_html=True
+            )
+
+            # ======================================================
+            # 🧠 ZONA 1 — CONTEXTO FÍSICO PRÉ-JOGO (7 DIAS ANTERIORES)
+            # ======================================================
+
+            st.markdown("### 🧠 Contexto Físico Pré-Jogo")
+
+            # Data do jogo selecionado
+            data_jogo = jogo["Data_DT"].date()
+
+            # Janela fixa: 7 dias antes do jogo
+            inicio_janela = data_jogo - pd.Timedelta(days=7)
+            fim_janela = data_jogo - pd.Timedelta(days=1)
+
+            # -------- SONO --------
+            sono_periodo = df_sono_full.copy()
+            sono_periodo["Data_DT"] = pd.to_datetime(
+                sono_periodo["Data"], dayfirst=True, errors="coerce"
+            )
+            sono_periodo = sono_periodo[
+                (sono_periodo["Data_DT"].dt.date >= inicio_janela) &
+                (sono_periodo["Data_DT"].dt.date <= fim_janela)
+                ]
+
+            media_sono = None
+            if not sono_periodo.empty and "Duração do Sono (h:min)" in sono_periodo.columns:
+                sono_periodo["Horas"] = sono_periodo["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
+                media_sono = sono_periodo["Horas"].mean()
+
+            # -------- TREINOS --------
+            treinos_periodo = df_treinos_full.copy()
+            treinos_periodo["Date_DT"] = pd.to_datetime(
+                treinos_periodo["Date"], dayfirst=True, errors="coerce"
+            )
+            treinos_periodo = treinos_periodo[
+                (treinos_periodo["Date_DT"].dt.date >= inicio_janela) &
+                (treinos_periodo["Date_DT"].dt.date <= fim_janela)
+                ]
+            qtde_treinos = len(treinos_periodo)
+
+            # -------- SAÚDE --------
+            df_saude = load_saude_df()
+            df_saude["Data_DT"] = pd.to_datetime(
+                df_saude["Data"], dayfirst=True, errors="coerce"
+            )
+            saude_periodo = df_saude[
+                (df_saude["Data_DT"].dt.date >= inicio_janela) &
+                (df_saude["Data_DT"].dt.date <= fim_janela)
+                ]
+
+            alimentacao = saude_periodo["Alimentação"].mode().iloc[0] if not saude_periodo.empty else "N/D"
+            cansaco = saude_periodo["Cansaço"].mode().iloc[0] if not saude_periodo.empty else "N/D"
+
+            # -------- INTERPRETAÇÃO --------
+            alertas = []
+
+            if media_sono is not None and media_sono < 6.5:
+                alertas.append("sono abaixo do ideal")
+
+            if qtde_treinos >= 5:
+                alertas.append("carga elevada de treinos")
+
+            if alimentacao in ["Ruim", "Regular"]:
+                alertas.append("alimentação inadequada")
+
+            if cansaco == "Alto":
+                alertas.append("fadiga relatada")
+
+            # -------- TEXTO FINAL --------
+            if alertas:
+                interpretacao = (
+                        "⚠️ O atleta entrou em campo com sinais de "
+                        + ", ".join(alertas)
+                        + ", o que pode ter impactado o desempenho."
+                )
+            else:
+                interpretacao = (
+                    "✅ O atleta apresentou um contexto físico equilibrado "
+                    "no período pré-jogo."
+                )
+
+            # -------- CARD VISUAL --------
+            st.markdown(
+                f"""
+                <div style="
+                    background:#0B1220;
+                    padding:16px;
+                    border-radius:14px;
+                    border-left:6px solid #FF9800;
+                    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+                ">
+                    <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
+                    😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
+                    💪 Treinos: <b>{qtde_treinos}</b><br>
+                    🍽️ Alimentação: <b>{alimentacao}</b><br>
+                    🥵 Cansaço: <b>{cansaco}</b><br><br>
+                    <em>{interpretacao}</em>
+                </div>
                 """,
                 unsafe_allow_html=True
             )
