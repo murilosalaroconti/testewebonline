@@ -2684,7 +2684,7 @@ def gerar_radar_pdf(jogo, scout_cols, df):
     radar_vals = []
 
     for scout in scout_cols:
-        max_val = df[scout].max()
+        max_val = df_jogos_full[scout].max()
         valor = jogo[scout]
         radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
@@ -4109,7 +4109,8 @@ if st.session_state["pagina"] == "dashboard":
 
         if st.button("📄 Gerar PDF do Jogo"):
             img_barra = gerar_barra_pdf(jogo, scout_cols)
-            img_radar = gerar_radar_pdf(jogo, scout_cols, df)
+            img_radar = gerar_radar_pdf(jogo, scout_cols, df_jogos_full)
+
 
             caminho_pdf = gerar_pdf_jogo(
                 jogo=jogo,
