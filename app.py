@@ -2250,7 +2250,7 @@ def calculate_metrics(df_jogos, df_treinos, df_sono):
 def analisar_resultado(df):
     """Calcula o total de Vitórias, Empates e Derrotas com base na coluna 'Resultado'."""
     vitorias, empates, derrotas = 0, 0, 0
-    total_jogos = len(df)
+    total_jogos = len(df_jogos_full)
 
     if total_jogos == 0 or 'Resultado' not in df.columns:
         return 0, 0, 0, 0
