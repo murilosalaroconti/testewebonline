@@ -147,6 +147,49 @@ if st.button("Atualizar planilha"):
     st.cache_data.clear()  # limpa o cache de todas as funções com @st.cache_data
     st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
 
+def calcular_score_jogo(row):
+    # 🔢 Garante valores numéricos seguros
+    gols = pd.to_numeric(row.get("Gols Marcados", 0), errors="coerce") or 0
+    assistencias = pd.to_numeric(row.get("Assistências", 0), errors="coerce") or 0
+    passes_chave = pd.to_numeric(row.get("Passes-chave", 0), errors="coerce") or 0
+    desarmes = pd.to_numeric(row.get("Desarmes", 0), errors="coerce") or 0
+    faltas = pd.to_numeric(row.get("Faltas Sofridas", 0), errors="coerce") or 0
+    participacoes = pd.to_numeric(row.get("Participações Indiretas", 0), errors="coerce") or 0
+
+    chutes = pd.to_numeric(row.get("Chutes", 0), errors="coerce") or 0
+    chutes_errados = pd.to_numeric(row.get("Chutes Errados", 0), errors="coerce") or 0
+    passes_errados = pd.to_numeric(row.get("Passes Errados", 0), errors="coerce") or 0
+
+    finalizacoes = chutes + chutes_errados
+    erros_total = chutes_errados + passes_errados
+
+    # ⭐ SCORE BASE
+    score = (
+        gols * 2.2 +
+        assistencias * 1.8 +
+        passes_chave * 0.6 +
+        participacoes * 0.4 +
+        faltas * 0.3 +
+        desarmes * 0.5
+    )
+
+    # ⚡ Eficiência
+    if finalizacoes > 0:
+        score += (gols / finalizacoes) * 1.5
+
+    # ❌ Penalidade
+    score -= erros_total * 0.35
+
+    # ⚖️ AJUSTE POR MODALIDADE
+    fator = {
+        "Futsal": 1.0,
+        "Society": 0.9,
+        "Campo": 0.8
+    }.get(row.get("Condição do Campo"), 1.0)
+
+    score = score / fator
+
+    return max(0, min(10, score))
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
@@ -2121,49 +2164,7 @@ with tab[5]:
     criar_logo_link_alinhado(col_logo7, LOGO_PATH_7, TAMANHO_LOGO)
     criar_logo_link_alinhado(col_logo8, LOGO_PATH_8, TAMANHO_LOGO)
 
-def calcular_score_jogo(row):
-    # 🔢 Garante valores numéricos seguros
-    gols = pd.to_numeric(row.get("Gols Marcados", 0), errors="coerce") or 0
-    assistencias = pd.to_numeric(row.get("Assistências", 0), errors="coerce") or 0
-    passes_chave = pd.to_numeric(row.get("Passes-chave", 0), errors="coerce") or 0
-    desarmes = pd.to_numeric(row.get("Desarmes", 0), errors="coerce") or 0
-    faltas = pd.to_numeric(row.get("Faltas Sofridas", 0), errors="coerce") or 0
-    participacoes = pd.to_numeric(row.get("Participações Indiretas", 0), errors="coerce") or 0
 
-    chutes = pd.to_numeric(row.get("Chutes", 0), errors="coerce") or 0
-    chutes_errados = pd.to_numeric(row.get("Chutes Errados", 0), errors="coerce") or 0
-    passes_errados = pd.to_numeric(row.get("Passes Errados", 0), errors="coerce") or 0
-
-    finalizacoes = chutes + chutes_errados
-    erros_total = chutes_errados + passes_errados
-
-    # ⭐ SCORE BASE
-    score = (
-        gols * 2.2 +
-        assistencias * 1.8 +
-        passes_chave * 0.6 +
-        participacoes * 0.4 +
-        faltas * 0.3 +
-        desarmes * 0.5
-    )
-
-    # ⚡ Eficiência
-    if finalizacoes > 0:
-        score += (gols / finalizacoes) * 1.5
-
-    # ❌ Penalidade
-    score -= erros_total * 0.35
-
-    # ⚖️ AJUSTE POR MODALIDADE
-    fator = {
-        "Futsal": 1.0,
-        "Society": 0.9,
-        "Campo": 0.8
-    }.get(row.get("Condição do Campo"), 1.0)
-
-    score = score / fator
-
-    return max(0, min(10, score))
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
