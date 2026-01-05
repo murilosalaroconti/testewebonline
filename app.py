@@ -2682,7 +2682,6 @@ def gerar_barra_pdf(jogo, scout_cols):
 
 def gerar_radar_pdf(jogo, scout_cols, df):
     radar_vals = []
-
     for scout in scout_cols:
         max_val = df_jogos_full[scout].max()
         valor = jogo[scout]
@@ -3868,8 +3867,8 @@ if st.session_state["pagina"] == "dashboard":
         )
 
         # Filtra SOMENTE jogos da mesma modalidade
-        df_tend = df[
-            df["Condição do Campo"] == modalidade_jogo
+        df_tend = df_jogos_full[
+            df_jogos_full["Condição do Campo"] == modalidade_jogo
             ].copy()
 
         if not df_tend.empty and len(df_tend) >= 5:
@@ -4134,8 +4133,8 @@ if st.session_state["pagina"] == "dashboard":
     # ======================================================
     elif modo_scout == "📊 Média por jogo":
 
-        total_jogos = len(df)
-        medias = df[scout_cols].sum() / total_jogos if total_jogos > 0 else 0
+        total_jogos = len(df_jogos_full)
+        medias = df_jogos_full[scout_cols].sum() / total_jogos if total_jogos > 0 else 0
 
         c1, c2, c3, c4, c5 = st.columns(5)
 
@@ -4168,11 +4167,11 @@ if st.session_state["pagina"] == "dashboard":
     # ======================================================
     elif modo_scout == "⚖️ Comparação por modalidade":
 
-        if "Condição do Campo" not in df.columns:
+        if "Condição do Campo" not in df_jogos_full.columns:
             st.warning("Modalidade não encontrada.")
         else:
             comp = (
-                df.groupby("Condição do Campo")[scout_cols]
+                df_jogos_full.groupby("Condição do Campo")[scout_cols]
                 .mean()
                 .reset_index()
             )
