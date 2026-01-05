@@ -509,12 +509,168 @@ def criar_logo_link_alinhado(col, path, width):
 #----------------------------------------------
 
 # Abas principais
-tab = st.tabs(["Jogos", "Treinos", "Sono", "Saúde", "Campeonatos", "Dashboard"])
+tabs = st.tabs([
+    "🏠 Início",
+    "⚽ Jogos",
+    "💪 Treinos",
+    "😴 Sono",
+    "🩺 Saúde",
+    "🏆 Campeonatos",
+    "📊 Dashboard"
+])
+
+#Pagina Home
+with tab[0]:
+    st.markdown("## 🧠 ScoutMind")
+    st.markdown("### Entenda seu jogo. Evolua com inteligência.")
+    st.markdown("---")
+
+    # =========================
+    # 📌 CARREGAR DADOS
+    # =========================
+    df_jogos = load_registros()
+    df_treinos = load_treinos_df()
+    df_sono = load_sono_df()
+
+    # Garantir datas
+    if "Data" in df_jogos.columns:
+        df_jogos["Data_DT"] = pd.to_datetime(df_jogos["Data"], dayfirst=True, errors="coerce")
+
+    if "Date" in df_treinos.columns:
+        df_treinos["Date_DT"] = pd.to_datetime(df_treinos["Date"], dayfirst=True, errors="coerce")
+
+    if "Data" in df_sono.columns:
+        df_sono["Data_DT"] = pd.to_datetime(df_sono["Data"], dayfirst=True, errors="coerce")
+
+    hoje = pd.to_datetime("today").date()
+
+    # =========================
+    # 🏟️ ÚLTIMO JOGO
+    # =========================
+    nota_ultimo_jogo = "—"
+    if not df_jogos.empty:
+        ultimo_jogo = (
+            df_jogos.dropna(subset=["Data_DT"])
+            .sort_values("Data_DT", ascending=False)
+            .iloc[0]
+        )
+        nota_ultimo_jogo = round(calcular_score_jogo(ultimo_jogo), 1)
+
+    # =========================
+    # 😴 SONO DE ONTEM
+    # =========================
+    sono_ontem_txt = "Sem registro"
+    if not df_sono.empty and "Duração do Sono (h:min)" in df_sono.columns:
+        df_sono["Data_Date"] = df_sono["Data_DT"].dt.date
+        sono_ontem = df_sono[df_sono["Data_Date"] == (hoje - pd.Timedelta(days=1))]
+        if not sono_ontem.empty:
+            horas = parse_duration_to_hours(sono_ontem.iloc[0]["Duração do Sono (h:min)"])
+            h = int(horas)
+            m = int((horas - h) * 60)
+            sono_ontem_txt = f"{h}h{m:02d}"
+
+    # =========================
+    # 💪 TREINOS (7 DIAS)
+    # =========================
+    treinos_7d = 0
+    if not df_treinos.empty:
+        df_treinos["Date_Date"] = df_treinos["Date_DT"].dt.date
+        treinos_7d = df_treinos[
+            df_treinos["Date_Date"] >= (hoje - pd.Timedelta(days=7))
+        ].shape[0]
+
+    # =========================
+    # 📈 TENDÊNCIA (5 JOGOS)
+    # =========================
+    tendencia = "Sem dados"
+    if len(df_jogos) >= 5:
+        df_jogos_ord = df_jogos.sort_values("Data_DT")
+        df_jogos_ord["Score"] = df_jogos_ord.apply(calcular_score_jogo, axis=1)
+        ultimos = df_jogos_ord.tail(5)["Score"].tolist()
+
+        if ultimos[-1] > ultimos[0]:
+            tendencia = "Em evolução 📈"
+        elif ultimos[-1] < ultimos[0]:
+            tendencia = "Queda 📉"
+        else:
+            tendencia = "Estável ➖"
+
+    # =========================
+    # 🎯 CARDS PRINCIPAIS
+    # =========================
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.markdown(f"""
+        <div class="card-jogos">
+            ⚽ Último jogo
+            <p>{nota_ultimo_jogo}</p>
+            <label>Nota</label>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="card-sono">
+            🌙 Sono ontem
+            <p>{sono_ontem_txt}</p>
+            <label>Duração</label>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="card-treinos">
+            💪 Treinos
+            <p>{treinos_7d}</p>
+            <label>Últimos 7 dias</label>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"""
+        <div class="card-minutos">
+            📈 Tendência
+            <p>{tendencia}</p>
+            <label>Últimos jogos</label>
+        </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # =========================
+    # 🚀 AÇÕES RÁPIDAS
+    # =========================
+    col_a, col_b, col_c, col_d, col_e = st.columns(5)
+
+    with col_a:
+        if st.button("⚽ Registrar Jogo"):
+            st.session_state["tab"] = 0
+
+    with col_b:
+        if st.button("💪 Registrar Treino"):
+            st.session_state["tab"] = 1
+
+    with col_c:
+        if st.button("🌙 Registrar Sono"):
+            st.session_state["tab"] = 2
+
+    with col_d:
+        if st.button("🍎 Registrar Saúde"):
+            st.session_state["tab"] = 3
+
+    with col_e:
+        if st.button("📊 Ver Análises"):
+            st.session_state["tab"] = 5
+
+    st.markdown("---")
+    st.info("💡 Disciplina hoje vira desempenho amanhã.")
+
 
 # --------------------------
 # Aba Jogos
 # --------------------------
-with tab[0]:
+with tab[1]:
     st.header("⚽ Registrar Jogos")
     col1, col2 = st.columns([2, 1])
 
@@ -771,7 +927,7 @@ with tab[0]:
 
 # Aba Treinos
 # --------------------------
-with tab[1]:
+with tab[2]:
     st.header("🎯Treinos")
     df_treinos = load_treinos_df()
 
@@ -998,7 +1154,7 @@ with tab[1]:
 
 # Aba Sono
 # --------------------------
-with tab[2]:
+with tab[3]:
     st.header("💤Controle de Sono")
 
     # AS CONSTANTES JÁ FORAM DEFINIDAS NO TOPO. USAMOS ELAS AQUI.
@@ -1202,7 +1358,7 @@ def save_saude_df(df):
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
-with tab[3]:
+with tab[4]:
     st.header("🩺 Saúde & Preparação do Atleta")
     st.caption(
         "Registro diário de sono, alimentação e acompanhamento físico. "
@@ -1908,7 +2064,7 @@ with tab[3]:
 #-------------------------------------
 # Aba Campeonatos BLOCO: LOGOS DOS CAMPEONATOS (AGORA DENTRO DA NOVA ABA)
 # ----------------------------------------------------------------------
-with tab[4]:
+with tab[5]:
 
     # --- NOVO BLOCO: CSS ESPECÍFICO PARA CENTRALIZAR O LOGO E O LINK ---
     st.markdown("""
@@ -2533,7 +2689,7 @@ def calcular_score_jogo(row):
 
     return max(0, min(10, score))
 
-with tab[5]:
+with tab[6]:
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
 
