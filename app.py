@@ -677,20 +677,32 @@ if st.session_state["pagina"] == "home":
     # =========================
     # 🚀 AÇÕES RÁPIDAS
     # =========================
-    if st.button("⚽ Registrar Jogo"):
-        st.session_state["pagina"] = "jogos"
+    col_a, col_b, col_c, col_d, col_e = st.columns(5)
 
-    if st.button("💪 Registrar Treino"):
-        st.session_state["pagina"] = "treinos"
+    with col_a:
+        if st.button("⚽ Registrar Jogo", use_container_width=True):
+            st.session_state["pagina"] = "jogos"
+            st.rerun()
 
-    if st.button("😴 Registrar Sono"):
-        st.session_state["pagina"] = "sono"
+    with col_b:
+        if st.button("💪 Registrar Treino", use_container_width=True):
+            st.session_state["pagina"] = "treinos"
+            st.rerun()
 
-    if st.button("🩺 Registrar Saúde"):
-        st.session_state["pagina"] = "saude"
+    with col_c:
+        if st.button("😴 Registrar Sono", use_container_width=True):
+            st.session_state["pagina"] = "sono"
+            st.rerun()
 
-    if st.button("📊 Dashboard"):
-        st.session_state["pagina"] = "dashboard"
+    with col_d:
+        if st.button("🍎 Registrar Saúde", use_container_width=True):
+            st.session_state["pagina"] = "saude"
+            st.rerun()
+
+    with col_e:
+        if st.button("📊 Ver Análises", use_container_width=True):
+            st.session_state["pagina"] = "dashboard"
+            st.rerun()
 
     st.markdown("---")
     st.info("💡 Disciplina hoje vira desempenho amanhã.")
@@ -700,6 +712,11 @@ if st.session_state["pagina"] == "home":
 # Aba Jogos
 # --------------------------
 if st.session_state["pagina"] == "jogos":
+    
+    if st.button("⬅️ Voltar para Início"):
+        st.session_state["pagina"] = "home"
+        st.rerun()
+
     st.header("⚽ Registrar Jogos")
     col1, col2 = st.columns([2, 1])
 
