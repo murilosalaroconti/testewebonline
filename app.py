@@ -2716,1457 +2716,1473 @@ if st.session_state["pagina"] == "dashboard":
         st.session_state["pagina"] = "home"
         st.rerun()
 
-        st.markdown("## 📊 Dashboard de Performance do Atleta")
-        st.markdown("---")
+    st.markdown("## 📊 Dashboard de Performance do Atleta")
+    st.markdown("---")
 
-        # --- 2. CARREGAR DADOS COMPLETOS ---
-        df_jogos_full = load_registros()
-        df_treinos_full = load_treinos_df()
-        df_sono_full = load_sono_df()
+    # --- 2. CARREGAR DADOS COMPLETOS ---
+    df_jogos_full = load_registros()
+    df_treinos_full = load_treinos_df()
+    df_sono_full = load_sono_df()
 
-        # ATENÇÃO: Tratamento para evitar ArrowTypeError devido a formatos de data mistos.
-        if 'Data' in df_jogos_full.columns:
-            df_jogos_full['Data'] = df_jogos_full['Data'].astype(str)
-        if 'Date' in df_treinos_full.columns:
-            df_treinos_full['Date'] = df_treinos_full['Date'].astype(str)
-        if 'Data' in df_sono_full.columns:
-            df_sono_full['Data_DT'] = pd.to_datetime(
-                df_sono_full['Data'],
-                dayfirst=True,
-                errors="coerce"
-            )
-
-        # --- NOVO BLOCO DE NORMALIZAÇÃO (Aplicar antes dos filtros de data) ---
-        NOME_COLUNA_TIME = 'Treino'  # Definindo aqui para uso em todo o bloco
-        NOME_COLUNA_TIPO = 'Tipo'
-
-        if NOME_COLUNA_TIME in df_treinos_full.columns:
-            # NORMALIZAÇÃO PARA TREINOS: Remove espaços, padroniza capitalização
-            df_treinos_full[NOME_COLUNA_TIME] = df_treinos_full[NOME_COLUNA_TIME].astype(str).str.strip().str.title()
-
-        if NOME_COLUNA_TIPO in df_treinos_full.columns:
-            # NORMALIZAÇÃO PARA TIPOS: Remove espaços, padroniza capitalização
-            df_treinos_full[NOME_COLUNA_TIPO] = df_treinos_full[NOME_COLUNA_TIPO].astype(str).str.strip().str.title()
-
-        if 'Casa' in df_jogos_full.columns:
-            # NORMALIZAÇÃO PARA TIMES/JOGOS (Para garantir consistência nos filtros)
-            df_jogos_full['Casa'] = df_jogos_full['Casa'].astype(str).str.strip().str.title()
-
-        # --- 1. FILTRO DE PERÍODO E NOVOS FILTROS ---
-
-        # Definindo datas padrão para o filtro (últimos 30 dias)
-        hoje = pd.to_datetime('today').date()
-        trinta_dias_atras = hoje - pd.Timedelta(days=30)
-
-        # 1.1. Filtros de Data
-        col_date1, col_date2, col_date3 = st.columns([1, 1, 3])
-
-        with col_date1:
-            data_inicio = st.date_input("🗓️ Data Inicial", trinta_dias_atras)
-        with col_date2:
-            data_fim = st.date_input("🗓️ Data Final", hoje)
-        with col_date3:
-            # Título de contexto
-            st.markdown(
-                f'<div style="text-align: right; padding-top: 15px;">**Visão Geral** (De {data_inicio.strftime("%d/%m/%Y")} a {data_fim.strftime("%d/%m/%Y")})</div>',
-                unsafe_allow_html=True)
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown("##### 🔍 Filtros Adicionais de Jogos")
-
-        # 1.2. Prepara as opções para os novos filtros
-        times_atleta_options = sorted([t for t in df_jogos_full['Casa'].astype(str).unique() if t and t.strip() != "nan"])
-        campeonatos_options = sorted(
-            [c for c in df_jogos_full['Campeonato'].astype(str).unique() if c and c.strip() != "nan"])
-        modalidades_options = sorted(
-            [m for m in df_jogos_full['Condição do Campo'].astype(str).unique() if m and m.strip() != "nan"])
-
-        # 1.3. Widgets dos Novos Filtros (3 Colunas)
-        col_filter_t, col_filter_c, col_filter_m = st.columns(3)
-
-        with col_filter_t:
-            time_filter = st.selectbox("Time do Atleta:", ["Todos"] + times_atleta_options, key="dash_time")
-        with col_filter_c:
-            campeonato_filter = st.selectbox("Campeonato:", ["Todos"] + campeonatos_options, key="dash_camp")
-        with col_filter_m:
-            modalidade_filter = st.selectbox("Modalidade:", ["Todos"] + modalidades_options, key="dash_modal")
-
-        st.markdown("---")
-
-        # --- 2. APLICAR FILTRO DE DATA EM TODOS OS DATAFRAMES ---
-
-        df_jogos_f = filter_df_by_date(df_jogos_full, 'Data', data_inicio, data_fim)
-        df_treinos_f = filter_df_by_date(df_treinos_full, 'Date', data_inicio, data_fim)
-        df_sono_f = filter_df_by_date(df_sono_full, 'Data', data_inicio, data_fim)
-
-        # --- PREPARAR DADOS DE SONO PARA USO IMEDIATO ---
-        if not df_sono_f.empty and 'Duração do Sono (h:min)' in df_sono_f.columns:
-            df_sono_f['Duração_Horas'] = df_sono_f['Duração do Sono (h:min)'].apply(parse_duration_to_hours)
-
-        # --- 3. APLICAR NOVOS FILTROS NO DATAFRAME DE JOGOS (df_jogos_f) ---
-
-        # Variável para armazenar o time filtrado (se for "Todos" será None)
-        time_filtrado_selecionado = None
-
-        if time_filter != "Todos":
-            df_jogos_f = df_jogos_f[df_jogos_f['Casa'].astype(str) == time_filter]
-            time_filtrado_selecionado = time_filter  # Armazena o nome do time para o card de Treinos
-
-        if campeonato_filter != "Todos":
-            df_jogos_f = df_jogos_f[df_jogos_f['Campeonato'].astype(str) == campeonato_filter]
-
-        if modalidade_filter != "Todos":
-            df_jogos_f = df_jogos_f[df_jogos_f['Condição do Campo'].astype(str) == modalidade_filter]
-
-        # --- FIM DOS FILTROS ---
-
-        # Cálculo das métricas básicas (agora retorna media_sono_decimal)
-        (total_jogos, total_gols, total_assistencias,
-         total_minutos, total_treinos, media_sono_formatada, media_sono_decimal) = calculate_metrics(
-            df_jogos_f, df_treinos_f, df_sono_f
+    # ATENÇÃO: Tratamento para evitar ArrowTypeError devido a formatos de data mistos.
+    if 'Data' in df_jogos_full.columns:
+        df_jogos_full['Data'] = df_jogos_full['Data'].astype(str)
+    if 'Date' in df_treinos_full.columns:
+        df_treinos_full['Date'] = df_treinos_full['Date'].astype(str)
+    if 'Data' in df_sono_full.columns:
+        df_sono_full['Data_DT'] = pd.to_datetime(
+            df_sono_full['Data'],
+            dayfirst=True,
+            errors="coerce"
         )
 
-        # CALCULA O TOTAL DE DIAS NO PERÍODO PARA O ENGAJAMENTO
-        total_dias_periodo = (pd.to_datetime(data_fim) - pd.to_datetime(data_inicio)).days + 1
+    # --- NOVO BLOCO DE NORMALIZAÇÃO (Aplicar antes dos filtros de data) ---
+    NOME_COLUNA_TIME = 'Treino'  # Definindo aqui para uso em todo o bloco
+    NOME_COLUNA_TIPO = 'Tipo'
 
-        # --- CÁLCULO PARA TREINOS BASEADO NO FILTRO DE TIME (Requisito) ---
+    if NOME_COLUNA_TIME in df_treinos_full.columns:
+        # NORMALIZAÇÃO PARA TREINOS: Remove espaços, padroniza capitalização
+        df_treinos_full[NOME_COLUNA_TIME] = df_treinos_full[NOME_COLUNA_TIME].astype(str).str.strip().str.title()
+
+    if NOME_COLUNA_TIPO in df_treinos_full.columns:
+        # NORMALIZAÇÃO PARA TIPOS: Remove espaços, padroniza capitalização
+        df_treinos_full[NOME_COLUNA_TIPO] = df_treinos_full[NOME_COLUNA_TIPO].astype(str).str.strip().str.title()
+
+    if 'Casa' in df_jogos_full.columns:
+        # NORMALIZAÇÃO PARA TIMES/JOGOS (Para garantir consistência nos filtros)
+        df_jogos_full['Casa'] = df_jogos_full['Casa'].astype(str).str.strip().str.title()
+
+    # --- 1. FILTRO DE PERÍODO E NOVOS FILTROS ---
+
+    # Definindo datas padrão para o filtro (últimos 30 dias)
+    hoje = pd.to_datetime('today').date()
+    trinta_dias_atras = hoje - pd.Timedelta(days=30)
+
+    # 1.1. Filtros de Data
+    col_date1, col_date2, col_date3 = st.columns([1, 1, 3])
+
+    with col_date1:
+        data_inicio = st.date_input("🗓️ Data Inicial", trinta_dias_atras)
+    with col_date2:
+        data_fim = st.date_input("🗓️ Data Final", hoje)
+    with col_date3:
+        # Título de contexto
+        st.markdown(
+            f'<div style="text-align: right; padding-top: 15px;">**Visão Geral** (De {data_inicio.strftime("%d/%m/%Y")} a {data_fim.strftime("%d/%m/%Y")})</div>',
+            unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("##### 🔍 Filtros Adicionais de Jogos")
+
+    # 1.2. Prepara as opções para os novos filtros
+    times_atleta_options = sorted([t for t in df_jogos_full['Casa'].astype(str).unique() if t and t.strip() != "nan"])
+    campeonatos_options = sorted(
+        [c for c in df_jogos_full['Campeonato'].astype(str).unique() if c and c.strip() != "nan"])
+    modalidades_options = sorted(
+        [m for m in df_jogos_full['Condição do Campo'].astype(str).unique() if m and m.strip() != "nan"])
+
+    # 1.3. Widgets dos Novos Filtros (3 Colunas)
+    col_filter_t, col_filter_c, col_filter_m = st.columns(3)
+
+    with col_filter_t:
+        time_filter = st.selectbox("Time do Atleta:", ["Todos"] + times_atleta_options, key="dash_time")
+    with col_filter_c:
+        campeonato_filter = st.selectbox("Campeonato:", ["Todos"] + campeonatos_options, key="dash_camp")
+    with col_filter_m:
+        modalidade_filter = st.selectbox("Modalidade:", ["Todos"] + modalidades_options, key="dash_modal")
+
+    st.markdown("---")
+
+    # --- 2. APLICAR FILTRO DE DATA EM TODOS OS DATAFRAMES ---
+
+    df_jogos_f = filter_df_by_date(df_jogos_full, 'Data', data_inicio, data_fim)
+    df_treinos_f = filter_df_by_date(df_treinos_full, 'Date', data_inicio, data_fim)
+    df_sono_f = filter_df_by_date(df_sono_full, 'Data', data_inicio, data_fim)
+
+    # --- PREPARAR DADOS DE SONO PARA USO IMEDIATO ---
+    if not df_sono_f.empty and 'Duração do Sono (h:min)' in df_sono_f.columns:
+        df_sono_f['Duração_Horas'] = df_sono_f['Duração do Sono (h:min)'].apply(parse_duration_to_hours)
+
+    # --- 3. APLICAR NOVOS FILTROS NO DATAFRAME DE JOGOS (df_jogos_f) ---
+
+    # Variável para armazenar o time filtrado (se for "Todos" será None)
+    time_filtrado_selecionado = None
+
+    if time_filter != "Todos":
+        df_jogos_f = df_jogos_f[df_jogos_f['Casa'].astype(str) == time_filter]
+        time_filtrado_selecionado = time_filter  # Armazena o nome do time para o card de Treinos
+
+    if campeonato_filter != "Todos":
+        df_jogos_f = df_jogos_f[df_jogos_f['Campeonato'].astype(str) == campeonato_filter]
+
+    if modalidade_filter != "Todos":
+        df_jogos_f = df_jogos_f[df_jogos_f['Condição do Campo'].astype(str) == modalidade_filter]
+
+    # --- FIM DOS FILTROS ---
+
+    # Cálculo das métricas básicas (agora retorna media_sono_decimal)
+    (total_jogos, total_gols, total_assistencias,
+     total_minutos, total_treinos, media_sono_formatada, media_sono_decimal) = calculate_metrics(
+        df_jogos_f, df_treinos_f, df_sono_f
+    )
+
+    # CALCULA O TOTAL DE DIAS NO PERÍODO PARA O ENGAJAMENTO
+    total_dias_periodo = (pd.to_datetime(data_fim) - pd.to_datetime(data_inicio)).days + 1
+
+    # --- CÁLCULO PARA TREINOS BASEADO NO FILTRO DE TIME (Requisito) ---
+    total_treinos_display = total_treinos
+    treino_label = "Sessões Concluídas"
+
+    # Nome da coluna que contem o time, exatamente como está na planilha
+    NOME_COLUNA_TIME = 'Treino'
+
+    # DataFrame para aplicar filtros adicionais (Time e Modalidade)
+    df_treinos_calculo = df_treinos_f.copy()
+
+    # Define se os filtros de Time ou Modalidade estão ativos (assumindo que modalidade_filter existe no escopo)
+    is_time_filter_active = (time_filtrado_selecionado and time_filtrado_selecionado != "Todos")
+    is_modalidade_filter_active = ('modalidade_filter' in locals() and modalidade_filter != "Todos")
+
+    # 1. FILTRO POR TIME
+    if is_time_filter_active and NOME_COLUNA_TIME in df_treinos_calculo.columns:
+        termo_pesquisa = time_filtrado_selecionado.strip().lower()
+        df_treinos_calculo = df_treinos_calculo[
+            df_treinos_calculo[NOME_COLUNA_TIME].astype(str).str.lower().str.contains(termo_pesquisa, na=False)
+        ]
+
+    # 2. FILTRO POR MODALIDADE
+    # Usamos a coluna 'Tipo' para filtrar por modalidade.
+    if is_modalidade_filter_active and 'Tipo' in df_treinos_calculo.columns:
+        modalidade_lower = modalidade_filter.strip().lower()
+        df_treinos_calculo = df_treinos_calculo[
+            df_treinos_calculo['Tipo'].astype(str).str.lower().str.contains(modalidade_lower, na=False)
+        ]
+
+    # 3. ATUALIZAÇÃO DO CARD (Se Time OU Modalidade estiver ativo)
+    if is_time_filter_active or is_modalidade_filter_active:
+
+        total_filtrado = df_treinos_calculo.shape[0]
+        total_treinos_display = total_filtrado  # FORÇA a exibição do valor filtrado
+
+        if total_filtrado > 0:
+            # Define um rótulo mais informativo baseado nos filtros ativos
+            if is_modalidade_filter_active and not is_time_filter_active:
+                treino_label = f"Treinos de '{modalidade_filter}'"
+            elif is_time_filter_active and not is_modalidade_filter_active:
+                treino_label = f"Treinos de '{time_filtrado_selecionado}'"
+            else:  # Ambos ativos ou outros cenários (Apenas o filtro de Time já garante isso)
+                treino_label = "Sessões Filtradas"
+        else:
+            treino_label = "Nenhum treino encontrado"
+
+    # Se 'Treino' estava ausente e o filtro de time estava ativo (caso de erro original)
+    elif time_filtrado_selecionado and NOME_COLUNA_TIME not in df_treinos_f.columns:
         total_treinos_display = total_treinos
-        treino_label = "Sessões Concluídas"
+        treino_label = f"Treino: Coluna '{NOME_COLUNA_TIME}' Ausente"
 
-        # Nome da coluna que contem o time, exatamente como está na planilha
-        NOME_COLUNA_TIME = 'Treino'
+    # --------------------------------------------------------------------------
+    # 3. CARDS DE INDICADORES (TOPO)
+    # --------------------------------------------------------------------------
 
-        # DataFrame para aplicar filtros adicionais (Time e Modalidade)
-        df_treinos_calculo = df_treinos_f.copy()
+    # --- 3.1. CÁLCULOS ADICIONAIS: AVALIAÇÃO TÉCNICA E ENGAJAMENTO ---
 
-        # Define se os filtros de Time ou Modalidade estão ativos (assumindo que modalidade_filter existe no escopo)
-        is_time_filter_active = (time_filtrado_selecionado and time_filtrado_selecionado != "Todos")
-        is_modalidade_filter_active = ('modalidade_filter' in locals() and modalidade_filter != "Todos")
+    # ** CÁLCULO DA AVALIAÇÃO TÉCNICA **
+    # ATENÇÃO: A função AGORA retorna a nota E a conclusão
+    avaliacao_tecnica, conclusao_avaliacao = calculate_avaliacao_tecnica(
+        df_jogos_f, modalidade_filter, time_filter  # Passando os filtros
+    )
 
-        # 1. FILTRO POR TIME
-        if is_time_filter_active and NOME_COLUNA_TIME in df_treinos_calculo.columns:
-            termo_pesquisa = time_filtrado_selecionado.strip().lower()
-            df_treinos_calculo = df_treinos_calculo[
-                df_treinos_calculo[NOME_COLUNA_TIME].astype(str).str.lower().str.contains(termo_pesquisa, na=False)
-            ]
-
-        # 2. FILTRO POR MODALIDADE
-        # Usamos a coluna 'Tipo' para filtrar por modalidade.
-        if is_modalidade_filter_active and 'Tipo' in df_treinos_calculo.columns:
-            modalidade_lower = modalidade_filter.strip().lower()
-            df_treinos_calculo = df_treinos_calculo[
-                df_treinos_calculo['Tipo'].astype(str).str.lower().str.contains(modalidade_lower, na=False)
-            ]
-
-        # 3. ATUALIZAÇÃO DO CARD (Se Time OU Modalidade estiver ativo)
-        if is_time_filter_active or is_modalidade_filter_active:
-
-            total_filtrado = df_treinos_calculo.shape[0]
-            total_treinos_display = total_filtrado  # FORÇA a exibição do valor filtrado
-
-            if total_filtrado > 0:
-                # Define um rótulo mais informativo baseado nos filtros ativos
-                if is_modalidade_filter_active and not is_time_filter_active:
-                    treino_label = f"Treinos de '{modalidade_filter}'"
-                elif is_time_filter_active and not is_modalidade_filter_active:
-                    treino_label = f"Treinos de '{time_filtrado_selecionado}'"
-                else:  # Ambos ativos ou outros cenários (Apenas o filtro de Time já garante isso)
-                    treino_label = "Sessões Filtradas"
-            else:
-                treino_label = "Nenhum treino encontrado"
-
-        # Se 'Treino' estava ausente e o filtro de time estava ativo (caso de erro original)
-        elif time_filtrado_selecionado and NOME_COLUNA_TIME not in df_treinos_f.columns:
-            total_treinos_display = total_treinos
-            treino_label = f"Treino: Coluna '{NOME_COLUNA_TIME}' Ausente"
-
-        # --------------------------------------------------------------------------
-        # 3. CARDS DE INDICADORES (TOPO)
-        # --------------------------------------------------------------------------
-
-        # --- 3.1. CÁLCULOS ADICIONAIS: AVALIAÇÃO TÉCNICA E ENGAJAMENTO ---
-
-        # ** CÁLCULO DA AVALIAÇÃO TÉCNICA **
-        # ATENÇÃO: A função AGORA retorna a nota E a conclusão
-        avaliacao_tecnica, conclusao_avaliacao = calculate_avaliacao_tecnica(
-            df_jogos_f, modalidade_filter, time_filter  # Passando os filtros
-        )
-
-        # ** CÁLCULO DO ENGAJAMENTO **
-        engajamento = calculate_engajamento(
-            df_treinos_f, df_sono_f, total_dias_periodo, media_sono_decimal
-        )
+    # ** CÁLCULO DO ENGAJAMENTO **
+    engajamento = calculate_engajamento(
+        df_treinos_f, df_sono_f, total_dias_periodo, media_sono_decimal
+    )
 
 
-        def calcular_vitoria(resultado_str):
-            if pd.isna(resultado_str): return 0
+    def calcular_vitoria(resultado_str):
+        if pd.isna(resultado_str): return 0
+        try:
+            partes = str(resultado_str).strip().split('x')
+            if len(partes) == 2:
+                gols_atleta = int(partes[0].strip())
+                gols_adversario = int(partes[1].strip())
+                return 1 if gols_atleta > gols_adversario else 0
+        except ValueError:
+            return 0
+        return 0
+
+
+    # Chamada para a função que também retorna os totais de V, E, D
+    def analisar_resultado(df):
+        if 'Resultado' not in df.columns or df.empty:
+            return 0, 0, 0, 0
+
+        df_temp = df.copy()
+        df_temp['Vitoria'] = df_temp['Resultado'].apply(lambda x: 1 if calcular_vitoria(x) == 1 else 0)
+        df_temp['Empate'] = df_temp['Resultado'].apply(
+            lambda x: 1 if str(x).strip().lower().replace(' ', '') in ['0x0', '1x1', '2x2', '3x3', '4x4', '5x5', '6x6',
+                                                                       '7x7', '8x8', '9x9'] else 0)
+
+        # Derrota = Não é vitória e não é empate
+        def calcular_derrota(row):
+            if row['Vitoria'] == 1 or row['Empate'] == 1:
+                return 0
+
+            # Recalcula a derrota com base no resultado (se a vitória for 0 e o empate 0)
             try:
-                partes = str(resultado_str).strip().split('x')
+                partes = str(row['Resultado']).strip().split('x')
                 if len(partes) == 2:
                     gols_atleta = int(partes[0].strip())
                     gols_adversario = int(partes[1].strip())
-                    return 1 if gols_atleta > gols_adversario else 0
+                    return 1 if gols_atleta < gols_adversario else 0
             except ValueError:
                 return 0
             return 0
 
+        df_temp['Derrota'] = df_temp.apply(calcular_derrota, axis=1)
 
-        # Chamada para a função que também retorna os totais de V, E, D
-        def analisar_resultado(df):
-            if 'Resultado' not in df.columns or df.empty:
-                return 0, 0, 0, 0
+        total_jogos_vd = df_temp.shape[0]
+        vitorias_vd = df_temp['Vitoria'].sum()
+        empates_vd = df_temp['Empate'].sum()
+        derrotas_vd = df_temp['Derrota'].sum()
 
-            df_temp = df.copy()
-            df_temp['Vitoria'] = df_temp['Resultado'].apply(lambda x: 1 if calcular_vitoria(x) == 1 else 0)
-            df_temp['Empate'] = df_temp['Resultado'].apply(
-                lambda x: 1 if str(x).strip().lower().replace(' ', '') in ['0x0', '1x1', '2x2', '3x3', '4x4', '5x5', '6x6',
-                                                                           '7x7', '8x8', '9x9'] else 0)
-
-            # Derrota = Não é vitória e não é empate
-            def calcular_derrota(row):
-                if row['Vitoria'] == 1 or row['Empate'] == 1:
-                    return 0
-
-                # Recalcula a derrota com base no resultado (se a vitória for 0 e o empate 0)
-                try:
-                    partes = str(row['Resultado']).strip().split('x')
-                    if len(partes) == 2:
-                        gols_atleta = int(partes[0].strip())
-                        gols_adversario = int(partes[1].strip())
-                        return 1 if gols_atleta < gols_adversario else 0
-                except ValueError:
-                    return 0
-                return 0
-
-            df_temp['Derrota'] = df_temp.apply(calcular_derrota, axis=1)
-
-            total_jogos_vd = df_temp.shape[0]
-            vitorias_vd = df_temp['Vitoria'].sum()
-            empates_vd = df_temp['Empate'].sum()
-            derrotas_vd = df_temp['Derrota'].sum()
-
-            return total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd
+        return total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd
 
 
-        # Chamada para obter os totais de V, E, D
-        total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd = analisar_resultado(df_jogos_f)
+    # Chamada para obter os totais de V, E, D
+    total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd = analisar_resultado(df_jogos_f)
 
-        # CÁLCULO DA PORCENTAGEM DE VITÓRIAS
-        vitorias = vitorias_vd
-        if total_jogos > 0:
-            vitorias_percent = f"{(vitorias / total_jogos * 100):.0f}%"
+    # CÁLCULO DA PORCENTAGEM DE VITÓRIAS
+    vitorias = vitorias_vd
+    if total_jogos > 0:
+        vitorias_percent = f"{(vitorias / total_jogos * 100):.0f}%"
+    else:
+        vitorias_percent = "0%"
+
+    # CÁLCULO DA PORCENTAGEM DE DERROTAS (NOVO REQUISITO)
+    derrotas_percent = "0%"
+    if total_jogos > 0:
+        derrotas_percent_val = (derrotas_vd / total_jogos * 100)
+        derrotas_percent = f"{derrotas_percent_val:.0f}%"
+
+    # CÁLCULO DA MÉDIA DE GOLS
+    media_gols = total_gols / total_jogos if total_jogos > 0 else 0.0
+    media_gols_formatada = f"{media_gols:.2f}"
+
+    # LOGICA DA MODALIDADE
+    if modalidade_filter != "Todos":
+        modalidade_exibida = modalidade_filter
+        modalidade_subtexto = "Modalidade Filtrada"
+    elif not df_jogos_f.empty and 'Condição do Campo' in df_jogos_f.columns:
+        modalidade_exibida = "Todas"
+        modalidade_subtexto = "Tipos de Jogo (Filtro Todos)"
+    else:
+        modalidade_exibida = "N/A"
+        modalidade_subtexto = "Tipo de Jogo"
+
+    # ======================================================
+    # 🧠 INSIGHT AUTOMÁTICO DE IMPACTO OFENSIVO
+    # ======================================================
+
+    insight_texto = None
+
+    if not df_jogos_f.empty:
+        df_insight = df_jogos_f.copy()
+
+        # Garante valores numéricos
+        df_insight["Gols Marcados"] = pd.to_numeric(df_insight["Gols Marcados"], errors="coerce").fillna(0)
+        df_insight["Assistências"] = pd.to_numeric(df_insight["Assistências"], errors="coerce").fillna(0)
+
+        # Jogos com gol + assistência
+        jogos_impacto = df_insight[
+            (df_insight["Gols Marcados"] > 0) |
+            (df_insight["Assistências"] > 0)
+            ]
+
+        if not jogos_impacto.empty:
+            total_impacto = len(jogos_impacto)
+
+            # Calcula vitórias nesses jogos
+            vitorias_impacto = jogos_impacto["Resultado"].apply(calcular_vitoria).sum()
+
+            perc_vitoria = int((vitorias_impacto / total_impacto) * 100)
+
+            insight_texto = (
+                f"📌 Em **{total_impacto} jogos** com participação ofensiva do atleta "
+                f"(gol ou assistência), "
+                f"o time venceu **{vitorias_impacto}**, "
+                f"resultando em **{perc_vitoria}%** de aproveitamento nesses jogos."
+            )
+
+    # --- 3.2. PRIMEIRA LINHA DE CARDS (6 COLUNAS) ---
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+    # Coluna 1: Total de Jogos (AZUL CLARO - Cor Jogos)
+    with col1:
+        st.markdown(f'''
+                    <div class="card-jogos">
+                        🏟️ JOGOS<p>{total_jogos}</p>
+                        <label>Minutos Jogados Total</label>
+                    </div>''', unsafe_allow_html=True)
+    # Coluna 2: Gols Total
+    with col2:
+        st.markdown(f'''
+                    <div class="card-gols">
+                        ⚽ GOLS<p>{total_gols}</p>
+                        <label>Total Marcados</label>
+                    </div>''', unsafe_allow_html=True)
+    # Coluna 3: Assistências Total
+    with col3:
+        st.markdown(f'''
+                    <div class="card-assistencias">
+                        🎯 ASSISTÊNCIAS<p>{total_assistencias}</p>
+                        <label>Total</label>
+                    </div>''', unsafe_allow_html=True)
+    # Coluna 4: Minutos Total
+    with col4:
+        st.markdown(f'''
+                    <div class="card-minutos">
+                        ⏱️ MINUTAGEM<p>{total_minutos}</p>
+                        <label>Total em Campo</label>
+                    </div>''', unsafe_allow_html=True)
+
+    # Coluna 5: Total de Treinos
+    with col5:
+        st.markdown(f'''
+                    <div class="card-treinos">
+                        💪 TREINOS<p>{total_treinos_display}</p>
+                        <label>{treino_label}</label>
+                    </div>''', unsafe_allow_html=True)
+
+    # Coluna 6: Média de Sono
+    with col6:
+        st.markdown(f'''
+                    <div class="card-sono">
+                        💤 MÉDIA SONO<p>{media_sono_formatada}</p>
+                        <label>Média Diária</label>
+                    </div>''', unsafe_allow_html=True)
+
+    # --- 3.3. SEGUNDA LINHA DE CARDS ---
+    col7, col8, col9, col10, col11, col12 = st.columns(6)
+
+    # Coluna 7: MODALIDADE (Requisito)
+    with col7:
+        st.markdown(f'''
+                    <div class="card-jogos">
+                        🥅 MODALIDADE<p>{modalidade_exibida}</p>
+                        <label>{modalidade_subtexto}</label>
+                    </div>''', unsafe_allow_html=True)
+
+    # Coluna 8: MÉDIA DE GOLS (Requisito)
+    with col8:
+        st.markdown(f'''
+                    <div class="card-gols">
+                        ⚽ MÉDIA GOLS<p>{media_gols_formatada}</p>
+                        <label>Gols por Jogo</label>
+                    </div>''', unsafe_allow_html=True)
+
+    # Coluna 9: PORCENTAGEM DE DERROTAS (NOVO CARD - Vermelho para Alerta)
+    with col9:
+        # Estilo inline para cor vermelha no valor
+        st.markdown(f'''
+                    <div class="card-derrotas">
+                        ❌ DERROTAS (%)<p style="color: #FF6347;">{derrotas_percent}</p>
+                        <label>No Período Selecionado</label>
+                    </div>''', unsafe_allow_html=True)
+    # Coluna 10: Vitórias %
+    with col10:
+        st.markdown(f'''
+                    <div class="card-sono">
+                        🏆 VITÓRIAS(%)<p>{vitorias_percent}</p>
+                        <label>No Período Selecionado</label>
+                    </div>''', unsafe_allow_html=True)
+    # Coluna 11: Avaliação Técnica (CALCULADO)
+    with col11:
+        st.markdown(f'''
+                    <div class="card-treinos">
+                        ⭐ AVALIAÇÃO TÉCNICA<p>{avaliacao_tecnica}</p>
+                        <label>Ficha Ajustada</label>
+                    </div>''', unsafe_allow_html=True)
+    # Coluna 12: Engajamento (CALCULADO)
+    with col12:
+        st.markdown(f'''
+                    <div class="card-minutos">
+                        🧠 ENGAJAMENTO<p>{engajamento}</p>
+                        <label>Sono e Disciplina</label>
+                    </div>''', unsafe_allow_html=True)
+
+    if insight_texto:
+        st.success(insight_texto)
+
+    # --- 3.4. CONCLUSÃO DA AVALIAÇÃO TÉCNICA ---
+    # Adicione este bloco para exibir o texto explicativo
+    if conclusao_avaliacao and conclusao_avaliacao != "Não há dados de jogos para o período/filtros selecionados.":
+        st.markdown("##### 📝 Conclusão da Avaliação Técnica")
+        # Usando st.info ou st.markdown com estilo para destaque
+        st.info(conclusao_avaliacao)
+
+    st.markdown("---")
+
+    # --- 4. GRÁFICOS (ABAIXO DOS CARDS) ---
+    col_g1, col_g2 = st.columns([2, 1])
+
+    # GRÁFICO 1: Gols por Campeonato / Adversário
+    with col_g1:
+        st.markdown("### 📊 Gols por Campeonato / Adversário")
+
+        if df_jogos_f.empty:
+            st.info("Não há registros de jogos no período/filtros selecionados para o gráfico.")
         else:
-            vitorias_percent = "0%"
+            # --- CÁLCULO E FORMATAÇÃO DE V/E/D ---
+            # Já temos total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd calculados acima
+            if total_jogos_vd > 0:
+                resumo_ved = f"({total_jogos_vd} J, {vitorias_vd} V, {empates_vd} E, {derrotas_vd} D)"
+            else:
+                resumo_ved = ""
+            # ---------------------------------------------
 
-        # CÁLCULO DA PORCENTAGEM DE DERROTAS (NOVO REQUISITO)
-        derrotas_percent = "0%"
-        if total_jogos > 0:
-            derrotas_percent_val = (derrotas_vd / total_jogos * 100)
-            derrotas_percent = f"{derrotas_percent_val:.0f}%"
+            # Preparação dos dados
+            df_jogos_f_g = df_jogos_f.copy()
+            df_jogos_f_g['Gols Marcados'] = pd.to_numeric(df_jogos_f_g['Gols Marcados'], errors='coerce').fillna(0)
+            df_jogos_f_g = df_jogos_f_g.sort_values(by='Data_DT', ascending=True)
+            group_gols = df_jogos_f_g.groupby(["Data_DT", "Visitante", "Campeonato"], dropna=False)[
+                "Gols Marcados"].sum().reset_index()
 
-        # CÁLCULO DA MÉDIA DE GOLS
-        media_gols = total_gols / total_jogos if total_jogos > 0 else 0.0
-        media_gols_formatada = f"{media_gols:.2f}"
+            group_gols['Rotulo'] = group_gols['Visitante'] + ' (' + group_gols['Data_DT'].dt.strftime('%d/%m') + ')'
 
-        # LOGICA DA MODALIDADE
-        if modalidade_filter != "Todos":
-            modalidade_exibida = modalidade_filter
-            modalidade_subtexto = "Modalidade Filtrada"
-        elif not df_jogos_f.empty and 'Condição do Campo' in df_jogos_f.columns:
-            modalidade_exibida = "Todas"
-            modalidade_subtexto = "Tipos de Jogo (Filtro Todos)"
+            # --- Plotagem (Matplotlib Dark Mode) ---
+
+            fig_gols, ax_gols = plt.subplots(figsize=(12, 6))
+
+            # Cores dinâmicas para Campeonatos
+            from matplotlib.patches import Patch
+
+            unique_camps = group_gols['Campeonato'].unique()
+            cores_campeonato = {camp: plt.cm.get_cmap('Dark2')(i % 8) for i, camp in enumerate(unique_camps)}
+            cores_barras = [cores_campeonato.get(c, 'gray') for c in group_gols["Campeonato"]]
+
+            x = range(len(group_gols))
+            ax_gols.bar(x, group_gols["Gols Marcados"].values, color=cores_barras, edgecolor='white', linewidth=0.5)
+
+            # Estilo Dark Mode para o Matplotlib
+            fig_gols.patch.set_facecolor('#0E1117')
+            ax_gols.set_facecolor('#0E1117')
+            plt.rcParams['text.color'] = 'white'
+            ax_gols.tick_params(axis='x', colors='white')
+            ax_gols.tick_params(axis='y', colors='white')
+            ax_gols.spines['bottom'].set_color('white')
+            ax_gols.spines['left'].set_color('white')
+            ax_gols.yaxis.label.set_color('white')
+            ax_gols.xaxis.label.set_color('white')
+
+            # Adiciona os filtros ativos ao título do gráfico
+            filtro_titulo = ""
+            if time_filter != "Todos": filtro_titulo += f" | Time: {time_filter}"
+            if campeonato_filter != "Todos": filtro_titulo += f" | Camp.: {campeonato_filter}"
+            if modalidade_filter != "Todos": filtro_titulo += f" | Modal.: {modalidade_filter}"
+
+            # ADICIONANDO O RESUMO V/E/D AO TÍTULO
+            titulo_final = f"Gols Marcados por Jogo/Campeonato{filtro_titulo} {resumo_ved}"
+            ax_gols.set_title(titulo_final, color='white', fontsize=14)
+
+            ax_gols.set_xticks(x)
+            ax_gols.set_xticklabels(group_gols["Rotulo"].values, rotation=60, ha='right', fontsize=8)
+            ax_gols.set_ylabel("Gols Marcados")
+
+            # Legenda
+            legend_handles = [Patch(facecolor=cores_campeonato[c], label=c) for c in unique_camps]
+            ax_gols.legend(handles=legend_handles, title="Campeonatos", loc='upper left', bbox_to_anchor=(1.05, 1),
+                           facecolor='#1F2430', edgecolor='white', labelcolor='white')
+
+            plt.tight_layout()
+            st.pyplot(fig_gols)
+            plt.close(fig_gols)
+
+    # GRÁFICO 2: Treinos por Tipo (Inalterado)
+    with col_g2:
+        st.markdown("### 📈 Treinos por Tipo")
+
+        # --- CÓDIGO DE FILTRAGEM ---
+        df_treinos_grafico = df_treinos_f.copy()  # Já filtrado por data ajustada
+
+        # 1. FILTRO POR TIME
+        # Esta filtragem só ocorrerá se um Time ESPECÍFICO for selecionado.
+        if time_filtrado_selecionado and 'Treino' in df_treinos_f.columns:
+            termo_pesquisa = time_filtrado_selecionado.strip().lower()
+            df_treinos_grafico = df_treinos_grafico[
+                df_treinos_grafico['Treino'].astype(str).str.lower().str.contains(termo_pesquisa, na=False)
+            ]
+
+        # 2. FILTRO POR MODALIDADE
+        if 'modalidade_filter' in locals() and modalidade_filter != "Todos" and 'Tipo' in df_treinos_f.columns:
+            modalidade_lower = modalidade_filter.strip().lower()
+            df_treinos_grafico = df_treinos_grafico[
+                df_treinos_grafico['Tipo'].astype(str).str.lower().str.contains(modalidade_lower, na=False)
+            ]
+        # -------------------------------------------------------------------------
+
+        if df_treinos_grafico.empty:
+            st.info("Não há registros de treinos no período ou para os filtros selecionados.")
         else:
-            modalidade_exibida = "N/A"
-            modalidade_subtexto = "Tipo de Jogo"
+            # *** LÓGICA DE AGRUPAMENTO DINÂMICO ***
 
-        # ======================================================
-        # 🧠 INSIGHT AUTOMÁTICO DE IMPACTO OFENSIVO
-        # ======================================================
-
-        insight_texto = None
-
-        if not df_jogos_f.empty:
-            df_insight = df_jogos_f.copy()
-
-            # Garante valores numéricos
-            df_insight["Gols Marcados"] = pd.to_numeric(df_insight["Gols Marcados"], errors="coerce").fillna(0)
-            df_insight["Assistências"] = pd.to_numeric(df_insight["Assistências"], errors="coerce").fillna(0)
-
-            # Jogos com gol + assistência
-            jogos_impacto = df_insight[
-                (df_insight["Gols Marcados"] > 0) |
-                (df_insight["Assistências"] > 0)
-                ]
-
-            if not jogos_impacto.empty:
-                total_impacto = len(jogos_impacto)
-
-                # Calcula vitórias nesses jogos
-                vitorias_impacto = jogos_impacto["Resultado"].apply(calcular_vitoria).sum()
-
-                perc_vitoria = int((vitorias_impacto / total_impacto) * 100)
-
-                insight_texto = (
-                    f"📌 Em **{total_impacto} jogos** com participação ofensiva do atleta "
-                    f"(gol ou assistência), "
-                    f"o time venceu **{vitorias_impacto}**, "
-                    f"resultando em **{perc_vitoria}%** de aproveitamento nesses jogos."
-                )
-
-        # --- 3.2. PRIMEIRA LINHA DE CARDS (6 COLUNAS) ---
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
-
-        # Coluna 1: Total de Jogos (AZUL CLARO - Cor Jogos)
-        with col1:
-            st.markdown(f'''
-                <div class="card-jogos">
-                    🏟️ JOGOS<p>{total_jogos}</p>
-                    <label>Minutos Jogados Total</label>
-                </div>''', unsafe_allow_html=True)
-        # Coluna 2: Gols Total
-        with col2:
-            st.markdown(f'''
-                <div class="card-gols">
-                    ⚽ GOLS<p>{total_gols}</p>
-                    <label>Total Marcados</label>
-                </div>''', unsafe_allow_html=True)
-        # Coluna 3: Assistências Total
-        with col3:
-            st.markdown(f'''
-                <div class="card-assistencias">
-                    🎯 ASSISTÊNCIAS<p>{total_assistencias}</p>
-                    <label>Total</label>
-                </div>''', unsafe_allow_html=True)
-        # Coluna 4: Minutos Total
-        with col4:
-            st.markdown(f'''
-                <div class="card-minutos">
-                    ⏱️ MINUTAGEM<p>{total_minutos}</p>
-                    <label>Total em Campo</label>
-                </div>''', unsafe_allow_html=True)
-
-        # Coluna 5: Total de Treinos
-        with col5:
-            st.markdown(f'''
-                <div class="card-treinos">
-                    💪 TREINOS<p>{total_treinos_display}</p>
-                    <label>{treino_label}</label>
-                </div>''', unsafe_allow_html=True)
-
-        # Coluna 6: Média de Sono
-        with col6:
-            st.markdown(f'''
-                <div class="card-sono">
-                    💤 MÉDIA SONO<p>{media_sono_formatada}</p>
-                    <label>Média Diária</label>
-                </div>''', unsafe_allow_html=True)
-
-
-
-
-        # --- 3.3. SEGUNDA LINHA DE CARDS ---
-        col7, col8, col9, col10, col11, col12 = st.columns(6)
-
-        # Coluna 7: MODALIDADE (Requisito)
-        with col7:
-            st.markdown(f'''
-                <div class="card-jogos">
-                    🥅 MODALIDADE<p>{modalidade_exibida}</p>
-                    <label>{modalidade_subtexto}</label>
-                </div>''', unsafe_allow_html=True)
-
-        # Coluna 8: MÉDIA DE GOLS (Requisito)
-        with col8:
-            st.markdown(f'''
-                <div class="card-gols">
-                    ⚽ MÉDIA GOLS<p>{media_gols_formatada}</p>
-                    <label>Gols por Jogo</label>
-                </div>''', unsafe_allow_html=True)
-
-        # Coluna 9: PORCENTAGEM DE DERROTAS (NOVO CARD - Vermelho para Alerta)
-        with col9:
-            # Estilo inline para cor vermelha no valor
-            st.markdown(f'''
-                <div class="card-derrotas">
-                    ❌ DERROTAS (%)<p style="color: #FF6347;">{derrotas_percent}</p>
-                    <label>No Período Selecionado</label>
-                </div>''', unsafe_allow_html=True)
-        # Coluna 10: Vitórias %
-        with col10:
-            st.markdown(f'''
-                <div class="card-sono">
-                    🏆 VITÓRIAS(%)<p>{vitorias_percent}</p>
-                    <label>No Período Selecionado</label>
-                </div>''', unsafe_allow_html=True)
-        # Coluna 11: Avaliação Técnica (CALCULADO)
-        with col11:
-            st.markdown(f'''
-                <div class="card-treinos">
-                    ⭐ AVALIAÇÃO TÉCNICA<p>{avaliacao_tecnica}</p>
-                    <label>Ficha Ajustada</label>
-                </div>''', unsafe_allow_html=True)
-        # Coluna 12: Engajamento (CALCULADO)
-        with col12:
-            st.markdown(f'''
-                <div class="card-minutos">
-                    🧠 ENGAJAMENTO<p>{engajamento}</p>
-                    <label>Sono e Disciplina</label>
-                </div>''', unsafe_allow_html=True)
-
-        if insight_texto:
-            st.success(insight_texto)
-
-        # --- 3.4. CONCLUSÃO DA AVALIAÇÃO TÉCNICA ---
-        # Adicione este bloco para exibir o texto explicativo
-        if conclusao_avaliacao and conclusao_avaliacao != "Não há dados de jogos para o período/filtros selecionados.":
-            st.markdown("##### 📝 Conclusão da Avaliação Técnica")
-            # Usando st.info ou st.markdown com estilo para destaque
-            st.info(conclusao_avaliacao)
-
-        st.markdown("---")
-
-        # --- 4. GRÁFICOS (ABAIXO DOS CARDS) ---
-        col_g1, col_g2 = st.columns([2, 1])
-
-        # GRÁFICO 1: Gols por Campeonato / Adversário
-        with col_g1:
-            st.markdown("### 📊 Gols por Campeonato / Adversário")
-
-            if df_jogos_f.empty:
-                st.info("Não há registros de jogos no período/filtros selecionados para o gráfico.")
+            # Se NENHUM time específico foi filtrado E a modalidade foi filtrada, agrupamos por TIME.
+            if time_filter == "Todos" and modalidade_filter != "Todos" and NOME_COLUNA_TIME in df_treinos_grafico.columns:
+                # Agrupar por Time (coluna 'Treino')
+                coluna_agrupamento = NOME_COLUNA_TIME
+                titulo_agrupamento = f"Treinos por Time (Modalidade: {modalidade_filter})"
             else:
-                # --- CÁLCULO E FORMATAÇÃO DE V/E/D ---
-                # Já temos total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd calculados acima
-                if total_jogos_vd > 0:
-                    resumo_ved = f"({total_jogos_vd} J, {vitorias_vd} V, {empates_vd} E, {derrotas_vd} D)"
-                else:
-                    resumo_ved = ""
-                # ---------------------------------------------
+                # Agrupar por Tipo de Treino (Padrão)
+                coluna_agrupamento = 'Tipo'
+                titulo_agrupamento = "Distribuição de Tipos de Treino"
 
-                # Preparação dos dados
-                df_jogos_f_g = df_jogos_f.copy()
-                df_jogos_f_g['Gols Marcados'] = pd.to_numeric(df_jogos_f_g['Gols Marcados'], errors='coerce').fillna(0)
-                df_jogos_f_g = df_jogos_f_g.sort_values(by='Data_DT', ascending=True)
-                group_gols = df_jogos_f_g.groupby(["Data_DT", "Visitante", "Campeonato"], dropna=False)[
-                    "Gols Marcados"].sum().reset_index()
+            # Se a coluna de agrupamento não existir, volta para o padrão "Tipo" (segurança)
+            if coluna_agrupamento not in df_treinos_grafico.columns:
+                coluna_agrupamento = 'Tipo'
+                titulo_agrupamento = "Distribuição de Tipos de Treino (Padrão)"
 
-                group_gols['Rotulo'] = group_gols['Visitante'] + ' (' + group_gols['Data_DT'].dt.strftime('%d/%m') + ')'
+            # Lógica de Agrupamento
+            contagem_grupo = df_treinos_grafico[coluna_agrupamento].value_counts()
+            df_plot = contagem_grupo.reset_index()
+            df_plot.columns = [coluna_agrupamento, 'Contagem']
+            total_treinos_grafico = len(df_treinos_grafico)
 
-                # --- Plotagem (Matplotlib Dark Mode) ---
+            # --- GRÁFICO DE BARRAS HORIZONTAIS (Matplotlib Dark Mode) ---
+            fig_treinos, ax_treinos = plt.subplots(figsize=(6, 6))
 
-                fig_gols, ax_gols = plt.subplots(figsize=(12, 6))
+            # Estilo Dark Mode para o Matplotlib
+            fig_treinos.patch.set_facecolor('#0E1117')
+            ax_treinos.set_facecolor('#0E1117')
+            ax_treinos.tick_params(axis='x', colors='white')
+            ax_treinos.tick_params(axis='y', colors='white')
+            ax_treinos.spines['bottom'].set_color('white')
+            ax_treinos.spines['left'].set_color('white')
+            ax_treinos.yaxis.label.set_color('white')
+            ax_treinos.xaxis.label.set_color('white')
 
-                # Cores dinâmicas para Campeonatos
-                from matplotlib.patches import Patch
+            # Cores e Plotagem
+            df_plot = df_plot.sort_values(by='Contagem', ascending=False)
+            cores = ['#9C27B0'] * len(df_plot)
 
-                unique_camps = group_gols['Campeonato'].unique()
-                cores_campeonato = {camp: plt.cm.get_cmap('Dark2')(i % 8) for i, camp in enumerate(unique_camps)}
-                cores_barras = [cores_campeonato.get(c, 'gray') for c in group_gols["Campeonato"]]
+            # Gráfico de Barras Horizontais
+            ax_treinos.barh(df_plot[coluna_agrupamento], df_plot['Contagem'], color=cores, height=0.7)
 
-                x = range(len(group_gols))
-                ax_gols.bar(x, group_gols["Gols Marcados"].values, color=cores_barras, edgecolor='white', linewidth=0.5)
+            # Adiciona o rótulo da contagem em cada barra
+            for index, value in enumerate(df_plot['Contagem']):
+                ax_treinos.text(value, index, f" {value}", color='white', va='center')
 
-                # Estilo Dark Mode para o Matplotlib
-                fig_gols.patch.set_facecolor('#0E1117')
-                ax_gols.set_facecolor('#0E1117')
-                plt.rcParams['text.color'] = 'white'
-                ax_gols.tick_params(axis='x', colors='white')
-                ax_gols.tick_params(axis='y', colors='white')
-                ax_gols.spines['bottom'].set_color('white')
-                ax_gols.spines['left'].set_color('white')
-                ax_gols.yaxis.label.set_color('white')
-                ax_gols.xaxis.label.set_color('white')
+            # Atualiza o título para refletir a contagem correta após o filtro
+            ax_treinos.set_title(f"{titulo_agrupamento} ({total_treinos_grafico} no total)", color='white')
+            ax_treinos.set_xlabel("Número de Sessões")
+            ax_treinos.grid(axis='x', linestyle=':', alpha=0.3)
 
-                # Adiciona os filtros ativos ao título do gráfico
-                filtro_titulo = ""
-                if time_filter != "Todos": filtro_titulo += f" | Time: {time_filter}"
-                if campeonato_filter != "Todos": filtro_titulo += f" | Camp.: {campeonato_filter}"
-                if modalidade_filter != "Todos": filtro_titulo += f" | Modal.: {modalidade_filter}"
+            ax_treinos.set_xlim(right=df_plot['Contagem'].max() * 1.2)
 
-                # ADICIONANDO O RESUMO V/E/D AO TÍTULO
-                titulo_final = f"Gols Marcados por Jogo/Campeonato{filtro_titulo} {resumo_ved}"
-                ax_gols.set_title(titulo_final, color='white', fontsize=14)
+            plt.tight_layout()
+            st.pyplot(fig_treinos)
+            plt.close(fig_treinos)
 
-                ax_gols.set_xticks(x)
-                ax_gols.set_xticklabels(group_gols["Rotulo"].values, rotation=60, ha='right', fontsize=8)
-                ax_gols.set_ylabel("Gols Marcados")
+    st.markdown("---")
 
-                # Legenda
-                legend_handles = [Patch(facecolor=cores_campeonato[c], label=c) for c in unique_camps]
-                ax_gols.legend(handles=legend_handles, title="Campeonatos", loc='upper left', bbox_to_anchor=(1.05, 1),
-                               facecolor='#1F2430', edgecolor='white', labelcolor='white')
+    # ===============================================
+    # 🎨 Paleta FIFA
+    SCOUT_COLORS = {
+        "Chutes": "#00E5FF",  # Ciano
+        "Chutes Errados": "#FF1744",  # vermelho forte
+        "Desarmes": "#7C4DFF",  # Roxo
+        "Passes-chave": "#00E676",  # Verde
+        "Passes Errados": "#9E9E9E",  # CINZA
+        "Faltas Sofridas": "#FF9100",  # Laranja
+        "Participações Indiretas": "#FF5252"  # Vermelho
 
-                plt.tight_layout()
-                st.pyplot(fig_gols)
-                plt.close(fig_gols)
-
-        # GRÁFICO 2: Treinos por Tipo (Inalterado)
-        with col_g2:
-            st.markdown("### 📈 Treinos por Tipo")
-
-            # --- CÓDIGO DE FILTRAGEM ---
-            df_treinos_grafico = df_treinos_f.copy()  # Já filtrado por data ajustada
-
-            # 1. FILTRO POR TIME
-            # Esta filtragem só ocorrerá se um Time ESPECÍFICO for selecionado.
-            if time_filtrado_selecionado and 'Treino' in df_treinos_f.columns:
-                termo_pesquisa = time_filtrado_selecionado.strip().lower()
-                df_treinos_grafico = df_treinos_grafico[
-                    df_treinos_grafico['Treino'].astype(str).str.lower().str.contains(termo_pesquisa, na=False)
-                ]
-
-            # 2. FILTRO POR MODALIDADE
-            if 'modalidade_filter' in locals() and modalidade_filter != "Todos" and 'Tipo' in df_treinos_f.columns:
-                modalidade_lower = modalidade_filter.strip().lower()
-                df_treinos_grafico = df_treinos_grafico[
-                    df_treinos_grafico['Tipo'].astype(str).str.lower().str.contains(modalidade_lower, na=False)
-                ]
-            # -------------------------------------------------------------------------
-
-            if df_treinos_grafico.empty:
-                st.info("Não há registros de treinos no período ou para os filtros selecionados.")
-            else:
-                # *** LÓGICA DE AGRUPAMENTO DINÂMICO ***
-
-                # Se NENHUM time específico foi filtrado E a modalidade foi filtrada, agrupamos por TIME.
-                if time_filter == "Todos" and modalidade_filter != "Todos" and NOME_COLUNA_TIME in df_treinos_grafico.columns:
-                    # Agrupar por Time (coluna 'Treino')
-                    coluna_agrupamento = NOME_COLUNA_TIME
-                    titulo_agrupamento = f"Treinos por Time (Modalidade: {modalidade_filter})"
-                else:
-                    # Agrupar por Tipo de Treino (Padrão)
-                    coluna_agrupamento = 'Tipo'
-                    titulo_agrupamento = "Distribuição de Tipos de Treino"
-
-                # Se a coluna de agrupamento não existir, volta para o padrão "Tipo" (segurança)
-                if coluna_agrupamento not in df_treinos_grafico.columns:
-                    coluna_agrupamento = 'Tipo'
-                    titulo_agrupamento = "Distribuição de Tipos de Treino (Padrão)"
-
-                # Lógica de Agrupamento
-                contagem_grupo = df_treinos_grafico[coluna_agrupamento].value_counts()
-                df_plot = contagem_grupo.reset_index()
-                df_plot.columns = [coluna_agrupamento, 'Contagem']
-                total_treinos_grafico = len(df_treinos_grafico)
-
-                # --- GRÁFICO DE BARRAS HORIZONTAIS (Matplotlib Dark Mode) ---
-                fig_treinos, ax_treinos = plt.subplots(figsize=(6, 6))
-
-                # Estilo Dark Mode para o Matplotlib
-                fig_treinos.patch.set_facecolor('#0E1117')
-                ax_treinos.set_facecolor('#0E1117')
-                ax_treinos.tick_params(axis='x', colors='white')
-                ax_treinos.tick_params(axis='y', colors='white')
-                ax_treinos.spines['bottom'].set_color('white')
-                ax_treinos.spines['left'].set_color('white')
-                ax_treinos.yaxis.label.set_color('white')
-                ax_treinos.xaxis.label.set_color('white')
-
-                # Cores e Plotagem
-                df_plot = df_plot.sort_values(by='Contagem', ascending=False)
-                cores = ['#9C27B0'] * len(df_plot)
-
-                # Gráfico de Barras Horizontais
-                ax_treinos.barh(df_plot[coluna_agrupamento], df_plot['Contagem'], color=cores, height=0.7)
-
-                # Adiciona o rótulo da contagem em cada barra
-                for index, value in enumerate(df_plot['Contagem']):
-                    ax_treinos.text(value, index, f" {value}", color='white', va='center')
-
-                # Atualiza o título para refletir a contagem correta após o filtro
-                ax_treinos.set_title(f"{titulo_agrupamento} ({total_treinos_grafico} no total)", color='white')
-                ax_treinos.set_xlabel("Número de Sessões")
-                ax_treinos.grid(axis='x', linestyle=':', alpha=0.3)
-
-                ax_treinos.set_xlim(right=df_plot['Contagem'].max() * 1.2)
-
-                plt.tight_layout()
-                st.pyplot(fig_treinos)
-                plt.close(fig_treinos)
-
-        st.markdown("---")
+    }
 
 
+    def hex_to_rgba(hex_color, alpha=0.35):
+        hex_color = hex_color.lstrip("#")
+        r, g, b = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+        return f"rgba({r},{g},{b},{alpha})"
 
 
+    # 📊 ANÁLISE DE SCOUTS
+    # ======================================================
 
-        #===============================================
-        # 🎨 Paleta FIFA
-        SCOUT_COLORS = {
-            "Chutes": "#00E5FF",  # Ciano
-            "Chutes Errados": "#FF1744", #vermelho forte
-            "Desarmes": "#7C4DFF",  # Roxo
-            "Passes-chave": "#00E676",  # Verde
-            "Passes Errados": "#9E9E9E", #CINZA
-            "Faltas Sofridas": "#FF9100",  # Laranja
-            "Participações Indiretas": "#FF5252"  # Vermelho
+    st.markdown("## 📊 Análise de Scouts")
 
-        }
+    # Garante colunas
+    scout_cols = [
+        "Chutes",
+        "Chutes Errados",
+        "Desarmes",
+        "Passes-chave",
+        "Passes Errados",
+        "Faltas Sofridas",
+        "Participações Indiretas"
+    ]
 
-        def hex_to_rgba(hex_color, alpha=0.35):
-            hex_color = hex_color.lstrip("#")
-            r, g, b = tuple(int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
-            return f"rgba({r},{g},{b},{alpha})"
+    for c in scout_cols:
+        if c not in df.columns:
+            df[c] = 0
+        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
 
+    # ---------------------------
+    # MODO DE VISUALIZAÇÃO
+    # ---------------------------
+    modo_scout = st.radio(
+        "Modo de análise:",
+        [
+            "🎯 Scout por jogo",
+            "📊 Média por jogo",
+            "⚖️ Comparação por modalidade"
+        ],
+        horizontal=True
+    )
 
+    # ======================================================
+    # 🎯 1️⃣ SCOUT POR JOGO
+    # ======================================================
+    if modo_scout == "🎯 Scout por jogo":
 
-        # 📊 ANÁLISE DE SCOUTS
-        # ======================================================
+        df_jogos = df.copy()
 
-        st.markdown("## 📊 Análise de Scouts")
+        df_jogos["Data_DT"] = pd.to_datetime(
+            df_jogos["Data"], dayfirst=True, errors="coerce"
+        )
+        df_jogos = df_jogos.sort_values("Data_DT", ascending=False)
 
-        # Garante colunas
-        scout_cols = [
-            "Chutes",
-            "Chutes Errados",
-            "Desarmes",
-            "Passes-chave",
-            "Passes Errados",
-            "Faltas Sofridas",
-            "Participações Indiretas"
-        ]
-
-        for c in scout_cols:
-            if c not in df.columns:
-                df[c] = 0
-            df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
-
-        # ---------------------------
-        # MODO DE VISUALIZAÇÃO
-        # ---------------------------
-        modo_scout = st.radio(
-            "Modo de análise:",
-            [
-                "🎯 Scout por jogo",
-                "📊 Média por jogo",
-                "⚖️ Comparação por modalidade"
-            ],
-            horizontal=True
+        df_jogos["Jogo"] = (
+                df_jogos["Data"].astype(str) + " | " +
+                df_jogos["Casa"] + " x " +
+                df_jogos["Visitante"]
         )
 
+        jogo_sel = st.selectbox(
+            "Selecione o jogo:",
+            df_jogos["Jogo"].unique(),
+            key="select_jogo_scout"
+        )
 
-        # ======================================================
-        # 🎯 1️⃣ SCOUT POR JOGO
-        # ======================================================
-        if modo_scout == "🎯 Scout por jogo":
+        jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
 
-            df_jogos = df.copy()
+        # ---------------- MÉTRICAS ----------------
+        col1, col2, col3, col4 = st.columns(4)
+        col5, col6, col7 = st.columns(3)
 
-            df_jogos["Data_DT"] = pd.to_datetime(
-                df_jogos["Data"], dayfirst=True, errors="coerce"
-            )
-            df_jogos = df_jogos.sort_values("Data_DT", ascending=False)
-
-            df_jogos["Jogo"] = (
-                    df_jogos["Data"].astype(str) + " | " +
-                    df_jogos["Casa"] + " x " +
-                    df_jogos["Visitante"]
-            )
-
-            jogo_sel = st.selectbox(
-                "Selecione o jogo:",
-                df_jogos["Jogo"].unique(),
-                key="select_jogo_scout"
-            )
-
-            jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
-
-            # ---------------- MÉTRICAS ----------------
-            col1, col2, col3, col4 = st.columns(4)
-            col5, col6, col7 = st.columns(3)
-
-            with col1:
-                st.markdown(f"""
-                <div class="scout-card bg-chutes">
-                    <div class="icon">🥅</div>
-                    <div class="scout-title">Chutes Certos</div>
-                    <div class="scout-value">{int(jogo["Chutes"])}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col2:
-                st.markdown(f"""
-                <div class="scout-card bg-chutes-errados">
-                    <div class="icon">❌</div>
-                    <div class="scout-title">Chutes Errados</div>
-                    <div class="scout-value">{int(jogo.get("Chutes Errados", 0))}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col3:
-                st.markdown(f"""
-                <div class="scout-card bg-passes">
-                    <div class="icon">🎯</div>
-                    <div class="scout-title">Passes-chave</div>
-                    <div class="scout-value">{int(jogo["Passes-chave"])}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col4:
-                st.markdown(f"""
-                <div class="scout-card bg-passes-errados">
-                    <div class="icon">📉</div>
-                    <div class="scout-title">Passes Errados</div>
-                    <div class="scout-value">{int(jogo.get("Passes Errados", 0))}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col5:
-                st.markdown(f"""
-                <div class="scout-card bg-desarmes">
-                    <div class="icon">🛡️</div>
-                    <div class="scout-title">Desarmes</div>
-                    <div class="scout-value">{int(jogo["Desarmes"])}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col6:
-                st.markdown(f"""
-                <div class="scout-card bg-faltas">
-                    <div class="icon">⚡</div>
-                    <div class="scout-title">Faltas Sofridas</div>
-                    <div class="scout-value">{int(jogo["Faltas Sofridas"])}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            with col7:
-                st.markdown(f"""
-                <div class="scout-card bg-indiretas">
-                    <div class="icon">🔁</div>
-                    <div class="scout-title">Participações</div>
-                    <div class="scout-value">{int(jogo["Participações Indiretas"])}</div>
-                </div>
-                """, unsafe_allow_html=True)
-
-            # ---------------- GRÁFICO ----------------
-            scout_vals = jogo[scout_cols]
-
-            fig_barra = px.bar(
-                x=scout_vals.index,
-                y=scout_vals.values,
-                color=scout_vals.index,
-                color_discrete_map=SCOUT_COLORS,
-                text=scout_vals.values,  # 👈 MOSTRA OS VALORES
-                labels={"x": "Scout", "y": "Quantidade"},
-                title="Distribuição de Scouts no Jogo"
-            )
-
-            fig_barra.update_traces(
-                texttemplate='%{y}',
-                textposition='inside',
-                insidetextanchor='middle',
-                textfont=dict(
-                    color='white',
-                    size=14
-                )
-            )
-
-            fig_barra.update_layout(
-                showlegend=False,
-                plot_bgcolor="#0E1117",
-                paper_bgcolor="#0E1117",
-                font=dict(color="white"),
-                dragmode=False,
-                hovermode=False
-            )
-
-            fig_barra.update_xaxes(fixedrange=True)
-            fig_barra.update_yaxes(fixedrange=True)
-
-            st.plotly_chart(
-                fig_barra,
-                use_container_width=True,
-                config={
-                    "scrollZoom": False,
-                    "displayModeBar": False,
-                    "doubleClick": False,
-                    "staticPlot": True
-                }
-            )
-
-            # ---------------- RADAR ----------------
-            st.markdown("### 🎮 Radar de Scouts")
-
-            radar_vals = []
-            for scout in scout_cols:
-                max_val = df[scout].max()
-                valor = jogo[scout]
-                radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
-
-            radar_vals += radar_vals[:1]
-            radar_labels = scout_cols + [scout_cols[0]]
-
-            fig_radar = go.Figure()
-            fig_radar.add_trace(
-                go.Scatterpolar(
-                    r=radar_vals,
-                    theta=radar_labels,
-                    mode="lines",
-                    fill="toself",
-                    line=dict(color="#00E5FF", width=4),
-                    fillcolor="rgba(0,229,255,0.35)"
-                )
-            )
-
-            fig_radar.update_layout(
-                polar=dict(
-                    bgcolor="#0E1117",
-                    radialaxis=dict(range=[0, 100], gridcolor="rgba(255,255,255,0.15)"),
-                    angularaxis=dict(tickfont=dict(color="white"))
-                ),
-                paper_bgcolor="#0E1117",
-                font=dict(color="white"),
-                showlegend=False,
-                height=500
-            )
-
-            st.plotly_chart(
-                fig_radar,
-                use_container_width=True,
-                config={
-                    "scrollZoom": False,
-                    "displayModeBar": False,
-                    "doubleClick": False,
-                    "staticPlot": True
-                }
-            )
-
-
-
-            # ======================================================
-            # ======================================================
-            # ⭐ SCORE GERAL DO JOGO (LÓGICA COMPLETA E REAL)
-            # ======================================================
-
-            st.markdown("### ⭐ Score Geral do Jogo")
-
-            # 📌 Dados do jogo
-            gols = int(jogo.get("Gols Marcados", 0))
-            assistencias = int(jogo.get("Assistências", 0))
-            passes_chave = int(jogo.get("Passes-chave", 0))
-            desarmes = int(jogo.get("Desarmes", 0))
-            faltas = int(jogo.get("Faltas Sofridas", 0))
-            participacoes = int(jogo.get("Participações Indiretas", 0))
-
-            chutes_certos = int(jogo.get("Chutes", 0))
-            chutes_errados = int(jogo.get("Chutes Errados", 0))
-            finalizacoes = chutes_certos + chutes_errados
-
-            passes_errados = int(jogo.get("Passes Errados", 0))
-            erros_total = chutes_errados + passes_errados
-
-            # ===============================
-            # 🔢 COMPONENTES DO SCORE
-            # ===============================
-
-            # ⚽ ATAQUE (peso alto)
-            score_gols = gols * 2.2
-            score_assistencia = assistencias * 1.8
-
-            # 🎯 CRIAÇÃO DE JOGO
-            score_passes_chave = passes_chave * 0.6
-            score_participacoes = participacoes * 0.4
-            score_faltas = faltas * 0.3
-
-            # 🛡️ DEFESA
-            score_defesa = desarmes * 0.5
-
-            # ⚡ EFICIÊNCIA NAS FINALIZAÇÕES
-            score_eficiencia = 0
-            if finalizacoes > 0:
-                eficiencia = gols / finalizacoes
-                score_eficiencia = eficiencia * 1.5
-
-            # ❌ ERROS (penalidade CONTROLADA)
-            penalidade_erros = erros_total * 0.35
-
-            # ===============================
-            # ⭐ SCORE FINAL
-            # ===============================
-            score_final = (
-                    score_gols +
-                    score_assistencia +
-                    score_passes_chave +
-                    score_participacoes +
-                    score_faltas +
-                    score_defesa +
-                    score_eficiencia -
-                    penalidade_erros
-            )
-
-            # ===============================
-            # ⚖️ AJUSTE POR MODALIDADE
-            # ===============================
-            modalidade = jogo["Condição do Campo"]
-
-            fator = {
-                "Futsal": 1.0,
-                "Society": 0.9,
-                "Campo": 0.8
-            }.get(modalidade, 1.0)
-
-            score_final = score_final / fator
-
-            # Normaliza 0–10
-            score_final = max(0, min(10, score_final))
-            score_formatado = f"{score_final:.1f}"
-
-            # 🎨 Cor dinâmica
-            if score_final >= 7.5:
-                cor_score = "#00E676"  # Verde
-            elif score_final >= 5.8:
-                cor_score = "#FFB300"  # Amarelo
-            else:
-                cor_score = "#FF1744"  # Vermelho
-
-            # 🧱 Card visual (SEM ALTERAR ESTILO)
+        with col1:
             st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, {cor_score}, #0E1117);
-                border-radius: 20px;
-                padding: 25px;
-                text-align: center;
-                color: white;
-                box-shadow: 0 8px 24px rgba(0,0,0,0.6);
-            ">
-                <div style="font-size:18px; opacity:0.9;">Desempenho Geral</div>
-                <div style="font-size:54px; font-weight:bold;">{score_formatado}</div>
-                <div style="opacity:0.85;">Nota baseada em impacto ofensivo, criação, defesa e erros</div>
-            </div>
-            """, unsafe_allow_html=True)
-
-            # ======================================================
-            # 📝 ANÁLISE TÉCNICA DO JOGO (AGORA NO LUGAR CERTO)
-            # ======================================================
-            st.markdown("### 📝 Análise Técnica do Jogo")
-
-            chutes_certos = jogo["Chutes"]
-            chutes_errados = jogo.get("Chutes Errados", 0)
-            finalizacoes = chutes_certos + chutes_errados
-
-            gols = int(jogo.get("Gols Marcados", 0))
-            assistencias = int(jogo.get("Assistências", 0)) if "Assistências" in jogo else 0
-
-            passes_chave = jogo["Passes-chave"]
-            passes_errados = jogo.get("Passes Errados", 0)
-
-            desarmes = jogo["Desarmes"]
-            faltas = jogo["Faltas Sofridas"]
-
-            analise = []
-
-            # ===============================
-            # ⚽ FINALIZAÇÕES
-            # ===============================
-            if finalizacoes > 0:
-                if gols > 0:
-                    eficiencia = gols / finalizacoes
-                    if eficiencia >= 0.25:
-                        analise.append(
-                            f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols** com boa eficiência."
-                        )
-                    else:
-                        analise.append(
-                            f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols**, mas pode melhorar a precisão."
-                        )
-                else:
-                    analise.append(
-                        f"⚽ Tentou **{finalizacoes} finalizações**, mas não marcou gols."
-                    )
-
-            # ===============================
-            # 🎯 PASSES-CHAVE x ASSISTÊNCIA
-            # ===============================
-            if passes_chave > 0:
-                if assistencias > 0:
-                    analise.append(
-                        f"🎯 Criou **{passes_chave} chances**, resultando em **{assistencias} assistência(s)**."
-                    )
-                else:
-                    analise.append(
-                        f"🎯 Criou **{passes_chave} chances claras**, mas sem conversão em gol."
-                    )
-
-            # ===============================
-            # ⚠️ ERROS DE PASSE
-            # ===============================
-            if passes_errados > passes_chave:
-                analise.append(
-                    "⚠️ Teve mais erros do que passes decisivos, atenção à tomada de decisão."
-                )
-
-            # ===============================
-            # 🛡️ DEFESA
-            # ===============================
-            if desarmes >= 5:
-                analise.append(
-                    f"🛡️ Forte presença defensiva com **{desarmes} desarmes**."
-                )
-
-            if faltas >= 4:
-                analise.append(
-                    f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva."
-                )
-
-
-            analise_texto_pdf = "\n".join(analise)
-            if analise_texto_pdf:
-                st.markdown(
-                    f"""
-                    <div style="
-                        background:#0B1220;
-                        padding:14px;
-                        border-radius:12px;
-                        border-left:4px solid #00E5FF;
-                        margin-bottom:14px;
-                    ">
-                        {analise_texto_pdf.replace("\n", "<br>")}
+                    <div class="scout-card bg-chutes">
+                        <div class="icon">🥅</div>
+                        <div class="scout-title">Chutes Certos</div>
+                        <div class="scout-value">{int(jogo["Chutes"])}</div>
                     </div>
-                    """,
-                    unsafe_allow_html=True
+                    """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown(f"""
+                    <div class="scout-card bg-chutes-errados">
+                        <div class="icon">❌</div>
+                        <div class="scout-title">Chutes Errados</div>
+                        <div class="scout-value">{int(jogo.get("Chutes Errados", 0))}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with col3:
+            st.markdown(f"""
+                    <div class="scout-card bg-passes">
+                        <div class="icon">🎯</div>
+                        <div class="scout-title">Passes-chave</div>
+                        <div class="scout-value">{int(jogo["Passes-chave"])}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with col4:
+            st.markdown(f"""
+                    <div class="scout-card bg-passes-errados">
+                        <div class="icon">📉</div>
+                        <div class="scout-title">Passes Errados</div>
+                        <div class="scout-value">{int(jogo.get("Passes Errados", 0))}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with col5:
+            st.markdown(f"""
+                    <div class="scout-card bg-desarmes">
+                        <div class="icon">🛡️</div>
+                        <div class="scout-title">Desarmes</div>
+                        <div class="scout-value">{int(jogo["Desarmes"])}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with col6:
+            st.markdown(f"""
+                    <div class="scout-card bg-faltas">
+                        <div class="icon">⚡</div>
+                        <div class="scout-title">Faltas Sofridas</div>
+                        <div class="scout-value">{int(jogo["Faltas Sofridas"])}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        with col7:
+            st.markdown(f"""
+                    <div class="scout-card bg-indiretas">
+                        <div class="icon">🔁</div>
+                        <div class="scout-title">Participações</div>
+                        <div class="scout-value">{int(jogo["Participações Indiretas"])}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+        # ---------------- GRÁFICO ----------------
+        scout_vals = jogo[scout_cols]
+
+        fig_barra = px.bar(
+            x=scout_vals.index,
+            y=scout_vals.values,
+            color=scout_vals.index,
+            color_discrete_map=SCOUT_COLORS,
+            text=scout_vals.values,  # 👈 MOSTRA OS VALORES
+            labels={"x": "Scout", "y": "Quantidade"},
+            title="Distribuição de Scouts no Jogo"
+        )
+
+        fig_barra.update_traces(
+            texttemplate='%{y}',
+            textposition='inside',
+            insidetextanchor='middle',
+            textfont=dict(
+                color='white',
+                size=14
+            )
+        )
+
+        fig_barra.update_layout(
+            showlegend=False,
+            plot_bgcolor="#0E1117",
+            paper_bgcolor="#0E1117",
+            font=dict(color="white"),
+            dragmode=False,
+            hovermode=False
+        )
+
+        fig_barra.update_xaxes(fixedrange=True)
+        fig_barra.update_yaxes(fixedrange=True)
+
+        st.plotly_chart(
+            fig_barra,
+            use_container_width=True,
+            config={
+                "scrollZoom": False,
+                "displayModeBar": False,
+                "doubleClick": False,
+                "staticPlot": True
+            }
+        )
+
+        # ---------------- RADAR ----------------
+        st.markdown("### 🎮 Radar de Scouts")
+
+        radar_vals = []
+        for scout in scout_cols:
+            max_val = df[scout].max()
+            valor = jogo[scout]
+            radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+
+        radar_vals += radar_vals[:1]
+        radar_labels = scout_cols + [scout_cols[0]]
+
+        fig_radar = go.Figure()
+        fig_radar.add_trace(
+            go.Scatterpolar(
+                r=radar_vals,
+                theta=radar_labels,
+                mode="lines",
+                fill="toself",
+                line=dict(color="#00E5FF", width=4),
+                fillcolor="rgba(0,229,255,0.35)"
+            )
+        )
+
+        fig_radar.update_layout(
+            polar=dict(
+                bgcolor="#0E1117",
+                radialaxis=dict(range=[0, 100], gridcolor="rgba(255,255,255,0.15)"),
+                angularaxis=dict(tickfont=dict(color="white"))
+            ),
+            paper_bgcolor="#0E1117",
+            font=dict(color="white"),
+            showlegend=False,
+            height=500
+        )
+
+        st.plotly_chart(
+            fig_radar,
+            use_container_width=True,
+            config={
+                "scrollZoom": False,
+                "displayModeBar": False,
+                "doubleClick": False,
+                "staticPlot": True
+            }
+        )
+
+        # ======================================================
+        # ======================================================
+        # ⭐ SCORE GERAL DO JOGO (LÓGICA COMPLETA E REAL)
+        # ======================================================
+
+        st.markdown("### ⭐ Score Geral do Jogo")
+
+        # 📌 Dados do jogo
+        gols = int(jogo.get("Gols Marcados", 0))
+        assistencias = int(jogo.get("Assistências", 0))
+        passes_chave = int(jogo.get("Passes-chave", 0))
+        desarmes = int(jogo.get("Desarmes", 0))
+        faltas = int(jogo.get("Faltas Sofridas", 0))
+        participacoes = int(jogo.get("Participações Indiretas", 0))
+
+        chutes_certos = int(jogo.get("Chutes", 0))
+        chutes_errados = int(jogo.get("Chutes Errados", 0))
+        finalizacoes = chutes_certos + chutes_errados
+
+        passes_errados = int(jogo.get("Passes Errados", 0))
+        erros_total = chutes_errados + passes_errados
+
+        # ===============================
+        # 🔢 COMPONENTES DO SCORE
+        # ===============================
+
+        # ⚽ ATAQUE (peso alto)
+        score_gols = gols * 2.2
+        score_assistencia = assistencias * 1.8
+
+        # 🎯 CRIAÇÃO DE JOGO
+        score_passes_chave = passes_chave * 0.6
+        score_participacoes = participacoes * 0.4
+        score_faltas = faltas * 0.3
+
+        # 🛡️ DEFESA
+        score_defesa = desarmes * 0.5
+
+        # ⚡ EFICIÊNCIA NAS FINALIZAÇÕES
+        score_eficiencia = 0
+        if finalizacoes > 0:
+            eficiencia = gols / finalizacoes
+            score_eficiencia = eficiencia * 1.5
+
+        # ❌ ERROS (penalidade CONTROLADA)
+        penalidade_erros = erros_total * 0.35
+
+        # ===============================
+        # ⭐ SCORE FINAL
+        # ===============================
+        score_final = (
+                score_gols +
+                score_assistencia +
+                score_passes_chave +
+                score_participacoes +
+                score_faltas +
+                score_defesa +
+                score_eficiencia -
+                penalidade_erros
+        )
+
+        # ===============================
+        # ⚖️ AJUSTE POR MODALIDADE
+        # ===============================
+        modalidade = jogo["Condição do Campo"]
+
+        fator = {
+            "Futsal": 1.0,
+            "Society": 0.9,
+            "Campo": 0.8
+        }.get(modalidade, 1.0)
+
+        score_final = score_final / fator
+
+        # Normaliza 0–10
+        score_final = max(0, min(10, score_final))
+        score_formatado = f"{score_final:.1f}"
+
+        # 🎨 Cor dinâmica
+        if score_final >= 7.5:
+            cor_score = "#00E676"  # Verde
+        elif score_final >= 5.8:
+            cor_score = "#FFB300"  # Amarelo
+        else:
+            cor_score = "#FF1744"  # Vermelho
+
+        # 🧱 Card visual (SEM ALTERAR ESTILO)
+        st.markdown(f"""
+                <div style="
+                    background: linear-gradient(135deg, {cor_score}, #0E1117);
+                    border-radius: 20px;
+                    padding: 25px;
+                    text-align: center;
+                    color: white;
+                    box-shadow: 0 8px 24px rgba(0,0,0,0.6);
+                ">
+                    <div style="font-size:18px; opacity:0.9;">Desempenho Geral</div>
+                    <div style="font-size:54px; font-weight:bold;">{score_formatado}</div>
+                    <div style="opacity:0.85;">Nota baseada em impacto ofensivo, criação, defesa e erros</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        # ======================================================
+        # 📝 ANÁLISE TÉCNICA DO JOGO (AGORA NO LUGAR CERTO)
+        # ======================================================
+        st.markdown("### 📝 Análise Técnica do Jogo")
+
+        chutes_certos = jogo["Chutes"]
+        chutes_errados = jogo.get("Chutes Errados", 0)
+        finalizacoes = chutes_certos + chutes_errados
+
+        gols = int(jogo.get("Gols Marcados", 0))
+        assistencias = int(jogo.get("Assistências", 0)) if "Assistências" in jogo else 0
+
+        passes_chave = jogo["Passes-chave"]
+        passes_errados = jogo.get("Passes Errados", 0)
+
+        desarmes = jogo["Desarmes"]
+        faltas = jogo["Faltas Sofridas"]
+
+        analise = []
+
+        # ===============================
+        # ⚽ FINALIZAÇÕES
+        # ===============================
+        if finalizacoes > 0:
+            if gols > 0:
+                eficiencia = gols / finalizacoes
+                if eficiencia >= 0.25:
+                    analise.append(
+                        f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols** com boa eficiência."
+                    )
+                else:
+                    analise.append(
+                        f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols**, mas pode melhorar a precisão."
+                    )
+            else:
+                analise.append(
+                    f"⚽ Tentou **{finalizacoes} finalizações**, mas não marcou gols."
                 )
 
-            # 🔹 SEPARADOR PREMIUM ENTRE ANÁLISE DO JOGO E TENDÊNCIA
-            st.markdown(
-                """
-                <div style="
-                    height: 2px;
-                    margin: 28px 0 32px 0;
-                    background: linear-gradient(
-                        to right,
-                        rgba(0,229,255,0.05),
-                        rgba(0,229,255,0.9),
-                        rgba(0,229,255,0.05)
-                    );
-                    box-shadow: 0 0 12px rgba(0,229,255,0.6);
-                    border-radius: 10px;
-                "></div>
-                """,
-                unsafe_allow_html=True
-            )
-
-            # ======================================================
-            # 🧠 ZONA 1 — CONTEXTO FÍSICO PRÉ-JOGO (7 DIAS ANTERIORES)
-            # ======================================================
-
-            st.markdown("### 🧠 Contexto Físico Pré-Jogo")
-
-            # Data do jogo selecionado
-            data_jogo = jogo["Data_DT"].date()
-
-            # Janela fixa: 7 dias antes do jogo
-            inicio_janela = data_jogo - pd.Timedelta(days=7)
-            fim_janela = data_jogo - pd.Timedelta(days=1)
-
-            # -------- SONO --------
-            sono_periodo = df_sono_full.copy()
-            sono_periodo["Data_DT"] = pd.to_datetime(
-                sono_periodo["Data"], dayfirst=True, errors="coerce"
-            )
-            sono_periodo = sono_periodo[
-                (sono_periodo["Data_DT"].dt.date >= inicio_janela) &
-                (sono_periodo["Data_DT"].dt.date <= fim_janela)
-                ]
-
-            media_sono = None
-            if not sono_periodo.empty and "Duração do Sono (h:min)" in sono_periodo.columns:
-                sono_periodo["Horas"] = sono_periodo["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
-                media_sono = sono_periodo["Horas"].mean()
-
-            # -------- TREINOS --------
-            treinos_periodo = df_treinos_full.copy()
-            treinos_periodo["Date_DT"] = pd.to_datetime(
-                treinos_periodo["Date"], dayfirst=True, errors="coerce"
-            )
-            treinos_periodo = treinos_periodo[
-                (treinos_periodo["Date_DT"].dt.date >= inicio_janela) &
-                (treinos_periodo["Date_DT"].dt.date <= fim_janela)
-                ]
-            qtde_treinos = len(treinos_periodo)
-
-            # -------- SAÚDE --------
-            df_saude = load_saude_df()
-            df_saude["Data_DT"] = pd.to_datetime(
-                df_saude["Data"], dayfirst=True, errors="coerce"
-            )
-            saude_periodo = df_saude[
-                (df_saude["Data_DT"].dt.date >= inicio_janela) &
-                (df_saude["Data_DT"].dt.date <= fim_janela)
-                ]
-
-            alimentacao = saude_periodo["Alimentação"].mode().iloc[0] if not saude_periodo.empty else "N/D"
-            cansaco = saude_periodo["Cansaço"].mode().iloc[0] if not saude_periodo.empty else "N/D"
-
-            # -------- INTERPRETAÇÃO --------
-            alertas = []
-
-            if media_sono is not None and media_sono < 6.5:
-                alertas.append("sono abaixo do ideal")
-
-            if qtde_treinos >= 5:
-                alertas.append("carga elevada de treinos")
-
-            if alimentacao in ["Ruim", "Regular"]:
-                alertas.append("alimentação inadequada")
-
-            if cansaco == "Alto":
-                alertas.append("fadiga relatada")
-
-            # -------- TEXTO FINAL --------
-            if alertas:
-                interpretacao = (
-                        "⚠️ O atleta entrou em campo com sinais de "
-                        + ", ".join(alertas)
-                        + ", o que pode ter impactado o desempenho."
+        # ===============================
+        # 🎯 PASSES-CHAVE x ASSISTÊNCIA
+        # ===============================
+        if passes_chave > 0:
+            if assistencias > 0:
+                analise.append(
+                    f"🎯 Criou **{passes_chave} chances**, resultando em **{assistencias} assistência(s)**."
                 )
             else:
-                interpretacao = (
-                    "✅ O atleta apresentou um contexto físico equilibrado "
-                    "no período pré-jogo."
+                analise.append(
+                    f"🎯 Criou **{passes_chave} chances claras**, mas sem conversão em gol."
                 )
 
-            # -------- CARD VISUAL --------
+        # ===============================
+        # ⚠️ ERROS DE PASSE
+        # ===============================
+        if passes_errados > passes_chave:
+            analise.append(
+                "⚠️ Teve mais erros do que passes decisivos, atenção à tomada de decisão."
+            )
+
+        # ===============================
+        # 🛡️ DEFESA
+        # ===============================
+        if desarmes >= 5:
+            analise.append(
+                f"🛡️ Forte presença defensiva com **{desarmes} desarmes**."
+            )
+
+        if faltas >= 4:
+            analise.append(
+                f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva."
+            )
+
+        analise_texto_pdf = "\n".join(analise)
+        if analise_texto_pdf:
             st.markdown(
                 f"""
-                <div style="
-                    background:#0B1220;
-                    padding:16px;
-                    border-radius:14px;
-                    border-left:6px solid #FF9800;
-                    box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-                ">
-                    <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
-                    😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
-                    💪 Treinos: <b>{qtde_treinos}</b><br>
-                    🍽️ Alimentação: <b>{alimentacao}</b><br>
-                    🥵 Cansaço: <b>{cansaco}</b><br><br>
-                    <em>{interpretacao}</em>
-                </div>
-                """,
+                        <div style="
+                            background:#0B1220;
+                            padding:14px;
+                            border-radius:12px;
+                            border-left:4px solid #00E5FF;
+                            margin-bottom:14px;
+                        ">
+                            {analise_texto_pdf.replace("\n", "<br>")}
+                        </div>
+                        """,
                 unsafe_allow_html=True
             )
 
-            st.markdown(
-                """
-                <div style="
-                    height: 2px;
-                    margin: 28px 0 32px 0;
-                    background: linear-gradient(
-                        to right,
-                        rgba(0,229,255,0.05),
-                        rgba(0,229,255,0.9),
-                        rgba(0,229,255,0.05)
-                    );
-                    box-shadow: 0 0 12px rgba(0,229,255,0.6);
-                    border-radius: 10px;
-                "></div>
-                """,
-                unsafe_allow_html=True
+        # 🔹 SEPARADOR PREMIUM ENTRE ANÁLISE DO JOGO E TENDÊNCIA
+        st.markdown(
+            """
+            <div style="
+                height: 2px;
+                margin: 28px 0 32px 0;
+                background: linear-gradient(
+                    to right,
+                    rgba(0,229,255,0.05),
+                    rgba(0,229,255,0.9),
+                    rgba(0,229,255,0.05)
+                );
+                box-shadow: 0 0 12px rgba(0,229,255,0.6);
+                border-radius: 10px;
+            "></div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # ======================================================
+        # 🧠 ZONA 1 — CONTEXTO FÍSICO PRÉ-JOGO (7 DIAS ANTERIORES)
+        # ======================================================
+
+        st.markdown("### 🧠 Contexto Físico Pré-Jogo")
+
+        # Data do jogo selecionado
+        data_jogo = jogo["Data_DT"].date()
+
+        # Janela fixa: 7 dias antes do jogo
+        inicio_janela = data_jogo - pd.Timedelta(days=7)
+        fim_janela = data_jogo - pd.Timedelta(days=1)
+
+        # -------- SONO --------
+        sono_periodo = df_sono_full.copy()
+        sono_periodo["Data_DT"] = pd.to_datetime(
+            sono_periodo["Data"], dayfirst=True, errors="coerce"
+        )
+        sono_periodo = sono_periodo[
+            (sono_periodo["Data_DT"].dt.date >= inicio_janela) &
+            (sono_periodo["Data_DT"].dt.date <= fim_janela)
+            ]
+
+        media_sono = None
+        if not sono_periodo.empty and "Duração do Sono (h:min)" in sono_periodo.columns:
+            sono_periodo["Horas"] = sono_periodo["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
+            media_sono = sono_periodo["Horas"].mean()
+
+        # -------- TREINOS --------
+        treinos_periodo = df_treinos_full.copy()
+        treinos_periodo["Date_DT"] = pd.to_datetime(
+            treinos_periodo["Date"], dayfirst=True, errors="coerce"
+        )
+        treinos_periodo = treinos_periodo[
+            (treinos_periodo["Date_DT"].dt.date >= inicio_janela) &
+            (treinos_periodo["Date_DT"].dt.date <= fim_janela)
+            ]
+        qtde_treinos = len(treinos_periodo)
+
+        # -------- SAÚDE --------
+        df_saude = load_saude_df()
+        df_saude["Data_DT"] = pd.to_datetime(
+            df_saude["Data"], dayfirst=True, errors="coerce"
+        )
+        saude_periodo = df_saude[
+            (df_saude["Data_DT"].dt.date >= inicio_janela) &
+            (df_saude["Data_DT"].dt.date <= fim_janela)
+            ]
+
+        alimentacao = saude_periodo["Alimentação"].mode().iloc[0] if not saude_periodo.empty else "N/D"
+        cansaco = saude_periodo["Cansaço"].mode().iloc[0] if not saude_periodo.empty else "N/D"
+
+        # -------- INTERPRETAÇÃO --------
+        alertas = []
+
+        if media_sono is not None and media_sono < 6.5:
+            alertas.append("sono abaixo do ideal")
+
+        if qtde_treinos >= 5:
+            alertas.append("carga elevada de treinos")
+
+        if alimentacao in ["Ruim", "Regular"]:
+            alertas.append("alimentação inadequada")
+
+        if cansaco == "Alto":
+            alertas.append("fadiga relatada")
+
+        # -------- TEXTO FINAL --------
+        if alertas:
+            interpretacao = (
+                    "⚠️ O atleta entrou em campo com sinais de "
+                    + ", ".join(alertas)
+                    + ", o que pode ter impactado o desempenho."
+            )
+        else:
+            interpretacao = (
+                "✅ O atleta apresentou um contexto físico equilibrado "
+                "no período pré-jogo."
             )
 
-            # ======================================================
-            # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
-            # ======================================================
-
-            # Modalidade do jogo selecionado
-            modalidade_jogo = jogo["Condição do Campo"]
-
-            st.markdown(
-                f"### 📈 Tendência Recente — {modalidade_jogo} (Últimos 5 Jogos)"
-            )
-
-            # Filtra SOMENTE jogos da mesma modalidade
-            df_tend = df[
-                df["Condição do Campo"] == modalidade_jogo
-                ].copy()
-
-            if not df_tend.empty and len(df_tend) >= 5:
-
-                df_tend["Data_DT"] = pd.to_datetime(
-                    df_tend["Data"], dayfirst=True, errors="coerce"
-                )
-
-                df_tend = df_tend.sort_values("Data_DT")
-
-                # 👉 Score técnico por jogo
-                df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
-
-                # 🔍 Últimos 5 jogos (ordem cronológica)
-                scores = df_tend.tail(5)["Score_Jogo"].values.tolist()
-
-                ultimo = scores[-1]
-                penultimo = scores[-2]
-                antepenultimo = scores[-3]
-                media_5 = sum(scores) / len(scores)
-
-                jogos_ruins = sum(1 for s in scores if s < 4.5)
-                jogos_bons = sum(1 for s in scores if s >= 6)
-
-                queda_continua = ultimo < penultimo < antepenultimo
-                subida_continua = ultimo > penultimo > antepenultimo
-
-                oscilacao = (
-                        max(scores) - min(scores) >= 3
-                        and not subida_continua
-                        and not queda_continua
-                )
-                # ===============================
-                # 🎯 CLASSIFICAÇÃO DE NÍVEL TÉCNICO
-                # ===============================
-
-                if media_5 >= 8:
-                    nivel_label = "🔵 Rendimento altíssimo"
-                elif media_5 >= 6:
-                    nivel_label = "🟢 Rendimento bom"
-                elif media_5 >= 4.5:
-                    nivel_label = "🟠 Rendimento regular"
-                else:
-                    nivel_label = "🔴 Rendimento baixo"
-
-                # ===============================
-                # 🧭 CLASSIFICAÇÃO DE FORMA
-                # ===============================
-
-                # 🟢 ALTA PERFORMANCE
-                if media_5 >= 8 and jogos_bons >= 3 and ultimo >= 7:
-                    forma_label = "🟢 Alta performance"
-                    forma_cor = "#2E7D32"
-                    forma_texto = (
-                        "O atleta vive um momento de alto rendimento técnico, "
-                        "com atuações consistentes e impacto elevado nas partidas recentes."
-                    )
-
-                # 🔴 QUEDA TÉCNICA
-                elif media_5 < 4.5 and jogos_ruins >= 3 and queda_continua:
-                    forma_label = "🔴 Queda técnica"
-                    forma_cor = "#C62828"
-                    forma_texto = (
-                        "O desempenho técnico apresenta queda progressiva nos jogos mais recentes, "
-                        "indicando uma fase de baixo rendimento."
-                    )
-
-                # 📈 EVOLUÇÃO
-                elif subida_continua and ultimo >= media_5 and media_5 >= 4.5:
-                    forma_label = "⬆️ Em evolução técnica"
-                    forma_cor = "#00E676"
-                    forma_texto = (
-                        "Apesar de oscilações anteriores, o atleta demonstra melhora contínua "
-                        "no desempenho técnico recente."
-                    )
-
-                # 🎢 OSCILAÇÃO
-                elif oscilacao:
-                    forma_label = "➡️ Oscilação técnica"
-                    forma_cor = "#FFC107"
-                    forma_texto = (
-                        "O desempenho recente apresenta variações significativas, "
-                        "alternando jogos de bom nível com quedas técnicas."
-                    )
-
-                # ➡️ ESTÁVEL (SOMENTE SE NÃO FOR RUIM)
-                elif media_5 >= 4.5:
-                    forma_label = "➡️ Estável"
-                    forma_cor = "#9E9E9E"
-                    forma_texto = (
-                        "O atleta mantém um padrão técnico relativamente constante, "
-                        "sem grandes variações no desempenho recente."
-                    )
-
-                # 🔴 RUIM SEM QUEDA CONTÍNUA
-                else:
-                    forma_label = "🔴 Baixo rendimento"
-                    forma_cor = "#B71C1C"
-                    forma_texto = (
-                        "O atleta apresenta desempenho técnico abaixo do esperado nos jogos recentes, "
-                        "mesmo sem uma tendência clara de recuperação."
-                    )
-
-                # 🧱 CARD VISUAL FINAL
-                st.markdown(
-                    f"""
+        # -------- CARD VISUAL --------
+        st.markdown(
+            f"""
                     <div style="
+                        background:#0B1220;
                         padding:16px;
                         border-radius:14px;
-                        background:#0B1220;
-                        border-left:6px solid {forma_cor};
+                        border-left:6px solid #FF9800;
                         box-shadow: 0 6px 18px rgba(0,0,0,0.4);
                     ">
-                        <div style="font-size:18px; font-weight:bold;">
-                            {forma_label}
-                        </div>
-                        <div style="font-size:15px; margin-top:6px;">
-                            <strong>{nivel_label}</strong>
-                        </div>
-                        <div style="font-size:14px; opacity:0.9; margin-top:6px;">
-                            {forma_texto}
-                        </div>
+                        <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
+                        😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
+                        💪 Treinos: <b>{qtde_treinos}</b><br>
+                        🍽️ Alimentação: <b>{alimentacao}</b><br>
+                        🥵 Cansaço: <b>{cansaco}</b><br><br>
+                        <em>{interpretacao}</em>
                     </div>
                     """,
-                    unsafe_allow_html=True
-                )
+            unsafe_allow_html=True
+        )
 
+        st.markdown(
+            """
+            <div style="
+                height: 2px;
+                margin: 28px 0 32px 0;
+                background: linear-gradient(
+                    to right,
+                    rgba(0,229,255,0.05),
+                    rgba(0,229,255,0.9),
+                    rgba(0,229,255,0.05)
+                );
+                box-shadow: 0 0 12px rgba(0,229,255,0.6);
+                border-radius: 10px;
+            "></div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # ======================================================
+        # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
+        # ======================================================
+
+        # Modalidade do jogo selecionado
+        modalidade_jogo = jogo["Condição do Campo"]
+
+        st.markdown(
+            f"### 📈 Tendência Recente — {modalidade_jogo} (Últimos 5 Jogos)"
+        )
+
+        # Filtra SOMENTE jogos da mesma modalidade
+        df_tend = df[
+            df["Condição do Campo"] == modalidade_jogo
+            ].copy()
+
+        if not df_tend.empty and len(df_tend) >= 5:
+
+            df_tend["Data_DT"] = pd.to_datetime(
+                df_tend["Data"], dayfirst=True, errors="coerce"
+            )
+
+            df_tend = df_tend.sort_values("Data_DT")
+
+            # 👉 Score técnico por jogo
+            df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
+
+            # 🔍 Últimos 5 jogos (ordem cronológica)
+            scores = df_tend.tail(5)["Score_Jogo"].values.tolist()
+
+            ultimo = scores[-1]
+            penultimo = scores[-2]
+            antepenultimo = scores[-3]
+            media_5 = sum(scores) / len(scores)
+
+            jogos_ruins = sum(1 for s in scores if s < 4.5)
+            jogos_bons = sum(1 for s in scores if s >= 6)
+
+            queda_continua = ultimo < penultimo < antepenultimo
+            subida_continua = ultimo > penultimo > antepenultimo
+
+            oscilacao = (
+                    max(scores) - min(scores) >= 3
+                    and not subida_continua
+                    and not queda_continua
+            )
+            # ===============================
+            # 🎯 CLASSIFICAÇÃO DE NÍVEL TÉCNICO
+            # ===============================
+
+            if media_5 >= 8:
+                nivel_label = "🔵 Rendimento altíssimo"
+            elif media_5 >= 6:
+                nivel_label = "🟢 Rendimento bom"
+            elif media_5 >= 4.5:
+                nivel_label = "🟠 Rendimento regular"
             else:
-                st.info(
-                    f"Dados insuficientes para análise de tendência em **{modalidade_jogo}** "
-                    "(mínimo 5 jogos)."
+                nivel_label = "🔴 Rendimento baixo"
+
+            # ===============================
+            # 🧭 CLASSIFICAÇÃO DE FORMA
+            # ===============================
+
+            # 🟢 ALTA PERFORMANCE
+            if media_5 >= 8 and jogos_bons >= 3 and ultimo >= 7:
+                forma_label = "🟢 Alta performance"
+                forma_cor = "#2E7D32"
+                forma_texto = (
+                    "O atleta vive um momento de alto rendimento técnico, "
+                    "com atuações consistentes e impacto elevado nas partidas recentes."
                 )
 
-            st.write("")
-
-
-            # ======================================================
-            # 📋 VISUALIZAÇÃO DOS ÚLTIMOS 5 JOGOS (SUPORTE À TENDÊNCIA)
-            # ======================================================
-
-            st.markdown("#### 📋 Jogos considerados na análise")
-
-            df_ultimos_5 = df_tend.tail(5).copy()
-
-            df_ultimos_5["Jogo"] = (
-                    df_ultimos_5["Casa"].astype(str) +
-                    " x " +
-                    df_ultimos_5["Visitante"].astype(str)
-            )
-
-            df_ultimos_5["Data_fmt"] = df_ultimos_5["Data_DT"].dt.strftime("%d/%m")
-
-            df_visual = df_ultimos_5[[
-                "Data_fmt",
-                "Jogo",
-                "Condição do Campo",
-                "Score_Jogo"
-            ]].rename(columns={
-                "Data_fmt": "Data",
-                "Condição do Campo": "Modalidade",
-                "Score_Jogo": "Nota"
-            })
-
-            df_visual["Nota"] = df_visual["Nota"].round(1)
-
-            st.dataframe(
-                df_visual,
-                use_container_width=True,
-                hide_index=True
-            )
-
-            # ======================================================
-            # 📈 GRÁFICO DE EVOLUÇÃO DAS NOTAS (ÚLTIMOS 5 JOGOS)
-            # ======================================================
-
-            st.markdown("#### 📈 Evolução das notas (últimos 5 jogos)")
-
-            # Dados já ordenados cronologicamente
-            df_chart = df_ultimos_5.copy()
-
-            df_chart["Rotulo"] = (
-                    df_chart["Data_DT"].dt.strftime("%d/%m") +
-                    " | " +
-                    df_chart["Casa"] +
-                    " x " +
-                    df_chart["Visitante"]
-            )
-
-            fig_notas = go.Figure()
-
-            fig_notas.add_trace(
-                go.Scatter(
-                    x=df_chart["Rotulo"],
-                    y=df_chart["Score_Jogo"],
-                    mode="lines+markers",
-                    line=dict(
-                        color="#00E5FF",
-                        width=3
-                    ),
-                    marker=dict(
-                        size=10,
-                        color=df_chart["Score_Jogo"],
-                        colorscale="RdYlGn",
-                        cmin=0,
-                        cmax=10
-                    ),
-                    hovertemplate="Nota: %{y:.1f}<extra></extra>"
-                )
-            )
-
-            fig_notas.update_layout(
-                height=230,
-                margin=dict(l=20, r=20, t=10, b=20),
-                plot_bgcolor="#0E1117",
-                paper_bgcolor="#0E1117",
-                font=dict(color="white", size=12),
-                yaxis=dict(
-                    range=[0, 10.5],
-                    showgrid=True,
-                    gridcolor="rgba(255,255,255,0.1)",
-                    title="Nota"
-                ),
-                xaxis=dict(
-                    showgrid=False,
-                    title=""
-                ),
-                showlegend=False
-            )
-
-            st.plotly_chart(
-                fig_notas,
-                use_container_width=True,
-                config={
-                    "displayModeBar": False,
-                    "scrollZoom": False
-                }
-            )
-
-
-
-            if st.button("📄 Gerar PDF do Jogo"):
-                img_barra = gerar_barra_pdf(jogo, scout_cols)
-                img_radar = gerar_radar_pdf(jogo, scout_cols, df)
-
-
-                caminho_pdf = gerar_pdf_jogo(
-                    jogo=jogo,
-                    score_formatado=score_formatado,
-                    analise_texto=analise_texto_pdf,
-                    img_barra=img_barra,
-                    img_radar=img_radar
+            # 🔴 QUEDA TÉCNICA
+            elif media_5 < 4.5 and jogos_ruins >= 3 and queda_continua:
+                forma_label = "🔴 Queda técnica"
+                forma_cor = "#C62828"
+                forma_texto = (
+                    "O desempenho técnico apresenta queda progressiva nos jogos mais recentes, "
+                    "indicando uma fase de baixo rendimento."
                 )
 
-                with open(caminho_pdf, "rb") as f:
-                    st.download_button(
-                        label="⬇️ Baixar PDF do Jogo",
-                        data=f,
-                        file_name=f"relatorio_jogo_{jogo['Data']}.pdf",
-                        mime="application/pdf"
-                    )
+            # 📈 EVOLUÇÃO
+            elif subida_continua and ultimo >= media_5 and media_5 >= 4.5:
+                forma_label = "⬆️ Em evolução técnica"
+                forma_cor = "#00E676"
+                forma_texto = (
+                    "Apesar de oscilações anteriores, o atleta demonstra melhora contínua "
+                    "no desempenho técnico recente."
+                )
 
+            # 🎢 OSCILAÇÃO
+            elif oscilacao:
+                forma_label = "➡️ Oscilação técnica"
+                forma_cor = "#FFC107"
+                forma_texto = (
+                    "O desempenho recente apresenta variações significativas, "
+                    "alternando jogos de bom nível com quedas técnicas."
+                )
+
+            # ➡️ ESTÁVEL (SOMENTE SE NÃO FOR RUIM)
+            elif media_5 >= 4.5:
+                forma_label = "➡️ Estável"
+                forma_cor = "#9E9E9E"
+                forma_texto = (
+                    "O atleta mantém um padrão técnico relativamente constante, "
+                    "sem grandes variações no desempenho recente."
+                )
+
+            # 🔴 RUIM SEM QUEDA CONTÍNUA
+            else:
+                forma_label = "🔴 Baixo rendimento"
+                forma_cor = "#B71C1C"
+                forma_texto = (
+                    "O atleta apresenta desempenho técnico abaixo do esperado nos jogos recentes, "
+                    "mesmo sem uma tendência clara de recuperação."
+                )
+
+            # 🧱 CARD VISUAL FINAL
+            st.markdown(
+                f"""
+                        <div style="
+                            padding:16px;
+                            border-radius:14px;
+                            background:#0B1220;
+                            border-left:6px solid {forma_cor};
+                            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+                        ">
+                            <div style="font-size:18px; font-weight:bold;">
+                                {forma_label}
+                            </div>
+                            <div style="font-size:15px; margin-top:6px;">
+                                <strong>{nivel_label}</strong>
+                            </div>
+                            <div style="font-size:14px; opacity:0.9; margin-top:6px;">
+                                {forma_texto}
+                            </div>
+                        </div>
+                        """,
+                unsafe_allow_html=True
+            )
+
+        else:
+            st.info(
+                f"Dados insuficientes para análise de tendência em **{modalidade_jogo}** "
+                "(mínimo 5 jogos)."
+            )
+
+        st.write("")
 
         # ======================================================
-        # 📊 2️⃣ MÉDIA POR JOGO
+        # 📋 VISUALIZAÇÃO DOS ÚLTIMOS 5 JOGOS (SUPORTE À TENDÊNCIA)
         # ======================================================
-        elif modo_scout == "📊 Média por jogo":
 
-            total_jogos = len(df)
-            medias = df[scout_cols].sum() / total_jogos if total_jogos > 0 else 0
+        st.markdown("#### 📋 Jogos considerados na análise")
 
-            c1, c2, c3, c4, c5 = st.columns(5)
+        df_ultimos_5 = df_tend.tail(5).copy()
 
-            c1.metric("🥅 Chutes/jogo", round(medias["Chutes"], 2))
-            c2.metric("🛡️ Desarmes/jogo", round(medias["Desarmes"], 2))
-            c3.metric("🎯 Passes-chave/jogo", round(medias["Passes-chave"], 2))
-            c4.metric("⚡ Faltas Sofridas/jogo", round(medias["Faltas Sofridas"], 2))
-            c5.metric("🔁 Part. Indiretas/jogo", round(medias["Participações Indiretas"], 2))
+        df_ultimos_5["Jogo"] = (
+                df_ultimos_5["Casa"].astype(str) +
+                " x " +
+                df_ultimos_5["Visitante"].astype(str)
+        )
+
+        df_ultimos_5["Data_fmt"] = df_ultimos_5["Data_DT"].dt.strftime("%d/%m")
+
+        df_visual = df_ultimos_5[[
+            "Data_fmt",
+            "Jogo",
+            "Condição do Campo",
+            "Score_Jogo"
+        ]].rename(columns={
+            "Data_fmt": "Data",
+            "Condição do Campo": "Modalidade",
+            "Score_Jogo": "Nota"
+        })
+
+        df_visual["Nota"] = df_visual["Nota"].round(1)
+
+        st.dataframe(
+            df_visual,
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # ======================================================
+        # 📈 GRÁFICO DE EVOLUÇÃO DAS NOTAS (ÚLTIMOS 5 JOGOS)
+        # ======================================================
+
+        st.markdown("#### 📈 Evolução das notas (últimos 5 jogos)")
+
+        # Dados já ordenados cronologicamente
+        df_chart = df_ultimos_5.copy()
+
+        df_chart["Rotulo"] = (
+                df_chart["Data_DT"].dt.strftime("%d/%m") +
+                " | " +
+                df_chart["Casa"] +
+                " x " +
+                df_chart["Visitante"]
+        )
+
+        fig_notas = go.Figure()
+
+        fig_notas.add_trace(
+            go.Scatter(
+                x=df_chart["Rotulo"],
+                y=df_chart["Score_Jogo"],
+                mode="lines+markers",
+                line=dict(
+                    color="#00E5FF",
+                    width=3
+                ),
+                marker=dict(
+                    size=10,
+                    color=df_chart["Score_Jogo"],
+                    colorscale="RdYlGn",
+                    cmin=0,
+                    cmax=10
+                ),
+                hovertemplate="Nota: %{y:.1f}<extra></extra>"
+            )
+        )
+
+        fig_notas.update_layout(
+            height=230,
+            margin=dict(l=20, r=20, t=10, b=20),
+            plot_bgcolor="#0E1117",
+            paper_bgcolor="#0E1117",
+            font=dict(color="white", size=12),
+            yaxis=dict(
+                range=[0, 10.5],
+                showgrid=True,
+                gridcolor="rgba(255,255,255,0.1)",
+                title="Nota"
+            ),
+            xaxis=dict(
+                showgrid=False,
+                title=""
+            ),
+            showlegend=False
+        )
+
+        st.plotly_chart(
+            fig_notas,
+            use_container_width=True,
+            config={
+                "displayModeBar": False,
+                "scrollZoom": False
+            }
+        )
+
+        if st.button("📄 Gerar PDF do Jogo"):
+            img_barra = gerar_barra_pdf(jogo, scout_cols)
+            img_radar = gerar_radar_pdf(jogo, scout_cols, df)
+
+            caminho_pdf = gerar_pdf_jogo(
+                jogo=jogo,
+                score_formatado=score_formatado,
+                analise_texto=analise_texto_pdf,
+                img_barra=img_barra,
+                img_radar=img_radar
+            )
+
+            with open(caminho_pdf, "rb") as f:
+                st.download_button(
+                    label="⬇️ Baixar PDF do Jogo",
+                    data=f,
+                    file_name=f"relatorio_jogo_{jogo['Data']}.pdf",
+                    mime="application/pdf"
+                )
+
+
+    # ======================================================
+    # 📊 2️⃣ MÉDIA POR JOGO
+    # ======================================================
+    elif modo_scout == "📊 Média por jogo":
+
+        total_jogos = len(df)
+        medias = df[scout_cols].sum() / total_jogos if total_jogos > 0 else 0
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+
+        c1.metric("🥅 Chutes/jogo", round(medias["Chutes"], 2))
+        c2.metric("🛡️ Desarmes/jogo", round(medias["Desarmes"], 2))
+        c3.metric("🎯 Passes-chave/jogo", round(medias["Passes-chave"], 2))
+        c4.metric("⚡ Faltas Sofridas/jogo", round(medias["Faltas Sofridas"], 2))
+        c5.metric("🔁 Part. Indiretas/jogo", round(medias["Participações Indiretas"], 2))
+
+        fig = px.bar(
+            x=medias.index,
+            y=medias.values,
+            color=medias.index,
+            color_discrete_map=SCOUT_COLORS,
+            labels={"x": "Scout", "y": "Média por jogo"},
+            title="Média de Scouts por Jogo"
+        )
+
+        fig.update_layout(
+            showlegend=False,
+            plot_bgcolor="#0E1117",
+            paper_bgcolor="#0E1117",
+            font=dict(color="white")
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ======================================================
+    # ⚖️ 3️⃣ COMPARAÇÃO POR MODALIDADE
+    # ======================================================
+    elif modo_scout == "⚖️ Comparação por modalidade":
+
+        if "Condição do Campo" not in df.columns:
+            st.warning("Modalidade não encontrada.")
+        else:
+            comp = (
+                df.groupby("Condição do Campo")[scout_cols]
+                .mean()
+                .reset_index()
+            )
 
             fig = px.bar(
-                x=medias.index,
-                y=medias.values,
-                color=medias.index,
+                comp,
+                x="Condição do Campo",
+                y=scout_cols,
+                barmode="group",
                 color_discrete_map=SCOUT_COLORS,
-                labels={"x": "Scout", "y": "Média por jogo"},
-                title="Média de Scouts por Jogo"
+                title="Comparação de Scouts por Modalidade"
             )
 
             fig.update_layout(
-                showlegend=False,
                 plot_bgcolor="#0E1117",
                 paper_bgcolor="#0E1117",
                 font=dict(color="white")
@@ -4174,183 +4190,151 @@ if st.session_state["pagina"] == "dashboard":
 
             st.plotly_chart(fig, use_container_width=True)
 
-        # ======================================================
-        # ⚖️ 3️⃣ COMPARAÇÃO POR MODALIDADE
-        # ======================================================
-        elif modo_scout == "⚖️ Comparação por modalidade":
+    # 🔹 SEPARADOR PREMIUM — FIM DO RELATÓRIO DO JOGO
+    st.markdown(
+        """
+        <div style="
+            height: 2px;
+            margin: 40px 0 40px 0;
+            background: linear-gradient(
+                to right,
+                rgba(0,229,255,0.05),
+                rgba(0,229,255,0.9),
+                rgba(0,229,255,0.05)
+            );
+            box-shadow: 0 0 14px rgba(0,229,255,0.6);
+            border-radius: 10px;
+        "></div>
+        """,
+        unsafe_allow_html=True
+    )
 
-            if "Condição do Campo" not in df.columns:
-                st.warning("Modalidade não encontrada.")
-            else:
-                comp = (
-                    df.groupby("Condição do Campo")[scout_cols]
-                    .mean()
-                    .reset_index()
-                )
+    # =============================
+    # 🌙 SONO DIÁRIO (COM FILTRO PRÓPRIO)
+    # =============================
+    st.markdown("### 🌙 Sono Diário")
+    st.markdown("#### 🔍 Filtro de Período do Sono (Gráfico)")
 
-                fig = px.bar(
-                    comp,
-                    x="Condição do Campo",
-                    y=scout_cols,
-                    barmode="group",
-                    color_discrete_map=SCOUT_COLORS,
-                    title="Comparação de Scouts por Modalidade"
-                )
+    col_sono_1, col_sono_2, col_sono_3 = st.columns([1, 1, 1])
 
-                fig.update_layout(
-                    plot_bgcolor="#0E1117",
-                    paper_bgcolor="#0E1117",
-                    font=dict(color="white")
-                )
-
-                st.plotly_chart(fig, use_container_width=True)
-
-        # 🔹 SEPARADOR PREMIUM — FIM DO RELATÓRIO DO JOGO
-        st.markdown(
-            """
-            <div style="
-                height: 2px;
-                margin: 40px 0 40px 0;
-                background: linear-gradient(
-                    to right,
-                    rgba(0,229,255,0.05),
-                    rgba(0,229,255,0.9),
-                    rgba(0,229,255,0.05)
-                );
-                box-shadow: 0 0 14px rgba(0,229,255,0.6);
-                border-radius: 10px;
-            "></div>
-            """,
-            unsafe_allow_html=True
+    with col_sono_1:
+        sono_data_inicio = st.date_input(
+            "🗓️ Data inicial (sono)",
+            value=(pd.to_datetime('today') - pd.Timedelta(days=7)).date(),
+            key="sono_data_inicio_grafico"
         )
 
-        # =============================
-        # 🌙 SONO DIÁRIO (COM FILTRO PRÓPRIO)
-        # =============================
-        st.markdown("### 🌙 Sono Diário")
-        st.markdown("#### 🔍 Filtro de Período do Sono (Gráfico)")
+    with col_sono_2:
+        sono_data_fim = st.date_input(
+            "🗓️ Data final (sono)",
+            value=pd.to_datetime('today').date(),
+            key="sono_data_fim_grafico"
+        )
 
-        col_sono_1, col_sono_2, col_sono_3 = st.columns([1, 1, 1])
+    with col_sono_3:
+        gerar_grafico_sono = st.button("📈 Gerar gráfico de sono")
 
-        with col_sono_1:
-            sono_data_inicio = st.date_input(
-                "🗓️ Data inicial (sono)",
-                value=(pd.to_datetime('today') - pd.Timedelta(days=7)).date(),
-                key="sono_data_inicio_grafico"
+    # 👇 GRÁFICO SOMENTE SE CLICAR NO BOTÃO
+    if gerar_grafico_sono:
+
+        # 🔹 USA O DATAFRAME COMPLETO (IGNORA FILTRO DE CIMA)
+        df_sono_periodo = df_sono_full.copy()
+
+        # 🔧 LIMPEZA FORÇADA DA DATA (ESSENCIAL)
+        df_sono_periodo["Data"] = (
+            df_sono_periodo["Data"]
+            .astype(str)
+            .str.strip()  # remove espaços antes/depois
+            .str.replace(r"\s+", "", regex=True)  # remove espaços invisíveis
+        )
+
+        # 🔹 Converte a data
+        df_sono_periodo["Data_DT"] = pd.to_datetime(
+            df_sono_periodo["Data"],
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        # 🔹 Converte duração para horas (OBRIGATÓRIO)
+        if "Duração do Sono (h:min)" in df_sono_periodo.columns:
+            df_sono_periodo["Duração_Horas"] = df_sono_periodo["Duração do Sono (h:min)"].apply(
+                parse_duration_to_hours)
+
+        # 🔒 REMOVE QUALQUER REGISTRO INVÁLIDO (PROTEÇÃO)
+        df_sono_periodo = df_sono_periodo.dropna(
+            subset=["Data_DT", "Duração_Horas"]
+        )
+
+        # 🔹 Aplica SOMENTE o filtro de baixo
+        df_sono_periodo["Data_Date"] = df_sono_periodo["Data_DT"].dt.date
+
+        df_sono_periodo = df_sono_periodo[
+            (df_sono_periodo["Data_Date"] >= sono_data_inicio) &
+            (df_sono_periodo["Data_Date"] <= sono_data_fim)
+            ]
+
+        if df_sono_periodo.empty:
+            st.info("Não há registros de sono no período selecionado.")
+        else:
+            df_sono_periodo = df_sono_periodo.sort_values("Data_DT")
+
+            fig_sono, ax_sono = plt.subplots(figsize=(12, 6))
+
+            # 🎨 Dark Mode
+            fig_sono.patch.set_facecolor('#0E1117')
+            ax_sono.set_facecolor('#0E1117')
+            ax_sono.tick_params(colors='white')
+            ax_sono.spines['bottom'].set_color('white')
+            ax_sono.spines['left'].set_color('white')
+
+            x = range(len(df_sono_periodo))
+            y = df_sono_periodo["Duração_Horas"].values
+
+            ax_sono.plot(x, y, linestyle='--', linewidth=2, color='#2196F3')
+
+            # 🔹 Pontos + horas
+            for i, val in enumerate(y):
+                if val < 6:
+                    color = "red"
+                elif val > 8:
+                    color = "lightgreen"
+                else:
+                    color = "#FF9800"
+
+                ax_sono.scatter(i, val, color=color, s=80, zorder=3)
+
+                h = int(val)
+                m = int((val - h) * 60)
+                ax_sono.text(i, val + 0.15, f"{h}h{m:02d}", ha='center', color='white', fontsize=9)
+
+            # 🔹 Média do período
+            media = y.mean()
+            h_med = int(media)
+            m_med = int((media - h_med) * 60)
+
+            ax_sono.axhline(
+                media,
+                color='#009688',
+                linestyle='-',
+                linewidth=1,
+                label=f"Média do período ({h_med}h{m_med:02d})"
             )
 
-        with col_sono_2:
-            sono_data_fim = st.date_input(
-                "🗓️ Data final (sono)",
-                value=pd.to_datetime('today').date(),
-                key="sono_data_fim_grafico"
-            )
+            ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
+            ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
 
-        with col_sono_3:
-            gerar_grafico_sono = st.button("📈 Gerar gráfico de sono")
+            datas = df_sono_periodo["Data_DT"].dt.strftime('%d/%m/%Y')
+            ax_sono.set_xticks(x)
+            ax_sono.set_xticklabels(datas, rotation=45, ha='right', color='white')
 
-        # 👇 GRÁFICO SOMENTE SE CLICAR NO BOTÃO
-        if gerar_grafico_sono:
+            ax_sono.set_ylabel("Duração do sono (horas)", color='white')
+            ax_sono.set_title("Sono no Período Selecionado", color='white')
+            ax_sono.grid(True, linestyle=':', alpha=0.3)
+            ax_sono.legend(facecolor='#1F2430', edgecolor='white', labelcolor='white')
 
-            # 🔹 USA O DATAFRAME COMPLETO (IGNORA FILTRO DE CIMA)
-            df_sono_periodo = df_sono_full.copy()
-
-            # 🔧 LIMPEZA FORÇADA DA DATA (ESSENCIAL)
-            df_sono_periodo["Data"] = (
-                df_sono_periodo["Data"]
-                .astype(str)
-                .str.strip()  # remove espaços antes/depois
-                .str.replace(r"\s+", "", regex=True)  # remove espaços invisíveis
-            )
-
-            # 🔹 Converte a data
-            df_sono_periodo["Data_DT"] = pd.to_datetime(
-                df_sono_periodo["Data"],
-                dayfirst=True,
-                errors="coerce"
-            )
-
-            # 🔹 Converte duração para horas (OBRIGATÓRIO)
-            if "Duração do Sono (h:min)" in df_sono_periodo.columns:
-                df_sono_periodo["Duração_Horas"] = df_sono_periodo["Duração do Sono (h:min)"].apply(
-                    parse_duration_to_hours)
-
-            # 🔒 REMOVE QUALQUER REGISTRO INVÁLIDO (PROTEÇÃO)
-            df_sono_periodo = df_sono_periodo.dropna(
-                subset=["Data_DT", "Duração_Horas"]
-            )
-
-            # 🔹 Aplica SOMENTE o filtro de baixo
-            df_sono_periodo["Data_Date"] = df_sono_periodo["Data_DT"].dt.date
-
-            df_sono_periodo = df_sono_periodo[
-                (df_sono_periodo["Data_Date"] >= sono_data_inicio) &
-                (df_sono_periodo["Data_Date"] <= sono_data_fim)
-                ]
-
-            if df_sono_periodo.empty:
-                st.info("Não há registros de sono no período selecionado.")
-            else:
-                df_sono_periodo = df_sono_periodo.sort_values("Data_DT")
-
-                fig_sono, ax_sono = plt.subplots(figsize=(12, 6))
-
-                # 🎨 Dark Mode
-                fig_sono.patch.set_facecolor('#0E1117')
-                ax_sono.set_facecolor('#0E1117')
-                ax_sono.tick_params(colors='white')
-                ax_sono.spines['bottom'].set_color('white')
-                ax_sono.spines['left'].set_color('white')
-
-                x = range(len(df_sono_periodo))
-                y = df_sono_periodo["Duração_Horas"].values
-
-                ax_sono.plot(x, y, linestyle='--', linewidth=2, color='#2196F3')
-
-                # 🔹 Pontos + horas
-                for i, val in enumerate(y):
-                    if val < 6:
-                        color = "red"
-                    elif val > 8:
-                        color = "lightgreen"
-                    else:
-                        color = "#FF9800"
-
-                    ax_sono.scatter(i, val, color=color, s=80, zorder=3)
-
-                    h = int(val)
-                    m = int((val - h) * 60)
-                    ax_sono.text(i, val + 0.15, f"{h}h{m:02d}", ha='center', color='white', fontsize=9)
-
-                # 🔹 Média do período
-                media = y.mean()
-                h_med = int(media)
-                m_med = int((media - h_med) * 60)
-
-                ax_sono.axhline(
-                    media,
-                    color='#009688',
-                    linestyle='-',
-                    linewidth=1,
-                    label=f"Média do período ({h_med}h{m_med:02d})"
-                )
-
-                ax_sono.axhline(6, color='red', linestyle=':', linewidth=1, label='Alerta (6h)')
-                ax_sono.axhline(8, color='lightgreen', linestyle=':', linewidth=1, label='Meta (8h)')
-
-                datas = df_sono_periodo["Data_DT"].dt.strftime('%d/%m/%Y')
-                ax_sono.set_xticks(x)
-                ax_sono.set_xticklabels(datas, rotation=45, ha='right', color='white')
-
-                ax_sono.set_ylabel("Duração do sono (horas)", color='white')
-                ax_sono.set_title("Sono no Período Selecionado", color='white')
-                ax_sono.grid(True, linestyle=':', alpha=0.3)
-                ax_sono.legend(facecolor='#1F2430', edgecolor='white', labelcolor='white')
-
-                plt.tight_layout()
-                st.pyplot(fig_sono)
-                plt.close(fig_sono)
-
+            plt.tight_layout()
+            st.pyplot(fig_sono)
+            plt.close(fig_sono)
 
             if st.button("🔄 Recarregar Dados da Planilha"):
                 st.info("Forçando recarregamento dos dados...")
