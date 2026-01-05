@@ -34,6 +34,9 @@ IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
 
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "home"
+
 
 # ----------------------
 # Configurações de arquivos
@@ -551,19 +554,9 @@ def criar_logo_link_alinhado(col, path, width):
 
 #----------------------------------------------
 
-# Abas principais
-tab = st.tabs([
-    "🏠 Início",
-    "⚽ Jogos",
-    "💪 Treinos",
-    "😴 Sono",
-    "🩺 Saúde",
-    "🏆 Campeonatos",
-    "📊 Dashboard"
-])
 
 #Pagina Home
-with tab[0]:
+if st.session_state["pagina"] == "home":
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
     st.markdown("---")
@@ -684,27 +677,20 @@ with tab[0]:
     # =========================
     # 🚀 AÇÕES RÁPIDAS
     # =========================
-    col_a, col_b, col_c, col_d, col_e = st.columns(5)
+    if st.button("⚽ Registrar Jogo"):
+        st.session_state["pagina"] = "jogos"
 
-    with col_a:
-        if st.button("⚽ Registrar Jogo"):
-            st.session_state["tab"] = 0
+    if st.button("💪 Registrar Treino"):
+        st.session_state["pagina"] = "treinos"
 
-    with col_b:
-        if st.button("💪 Registrar Treino"):
-            st.session_state["tab"] = 1
+    if st.button("😴 Registrar Sono"):
+        st.session_state["pagina"] = "sono"
 
-    with col_c:
-        if st.button("🌙 Registrar Sono"):
-            st.session_state["tab"] = 2
+    if st.button("🩺 Registrar Saúde"):
+        st.session_state["pagina"] = "saude"
 
-    with col_d:
-        if st.button("🍎 Registrar Saúde"):
-            st.session_state["tab"] = 3
-
-    with col_e:
-        if st.button("📊 Ver Análises"):
-            st.session_state["tab"] = 5
+    if st.button("📊 Dashboard"):
+        st.session_state["pagina"] = "dashboard"
 
     st.markdown("---")
     st.info("💡 Disciplina hoje vira desempenho amanhã.")
@@ -713,7 +699,7 @@ with tab[0]:
 # --------------------------
 # Aba Jogos
 # --------------------------
-with tab[1]:
+if st.session_state["pagina"] == "jogos":
     st.header("⚽ Registrar Jogos")
     col1, col2 = st.columns([2, 1])
 
@@ -970,7 +956,7 @@ with tab[1]:
 
 # Aba Treinos
 # --------------------------
-with tab[2]:
+if st.session_state["pagina"] == "treinos":
     st.header("🎯Treinos")
     df_treinos = load_treinos_df()
 
@@ -1197,7 +1183,7 @@ with tab[2]:
 
 # Aba Sono
 # --------------------------
-with tab[3]:
+if st.session_state["pagina"] == "sono":
     st.header("💤Controle de Sono")
 
     # AS CONSTANTES JÁ FORAM DEFINIDAS NO TOPO. USAMOS ELAS AQUI.
@@ -1401,7 +1387,7 @@ def save_saude_df(df):
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
-with tab[4]:
+if st.session_state["pagina"] == "saude":
     st.header("🩺 Saúde & Preparação do Atleta")
     st.caption(
         "Registro diário de sono, alimentação e acompanhamento físico. "
@@ -2107,7 +2093,7 @@ with tab[4]:
 #-------------------------------------
 # Aba Campeonatos BLOCO: LOGOS DOS CAMPEONATOS (AGORA DENTRO DA NOVA ABA)
 # ----------------------------------------------------------------------
-with tab[5]:
+if st.session_state["pagina"] == "campeonatos":
 
     # --- NOVO BLOCO: CSS ESPECÍFICO PARA CENTRALIZAR O LOGO E O LINK ---
     st.markdown("""
@@ -2163,8 +2149,6 @@ with tab[5]:
     criar_logo_link_alinhado(col_logo6, LOGO_PATH_6, TAMANHO_LOGO)
     criar_logo_link_alinhado(col_logo7, LOGO_PATH_7, TAMANHO_LOGO)
     criar_logo_link_alinhado(col_logo8, LOGO_PATH_8, TAMANHO_LOGO)
-
-
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
@@ -2690,8 +2674,7 @@ def gerar_radar_pdf(jogo, scout_cols, df):
     return caminho
 
 
-
-with tab[6]:
+if st.session_state["pagina"] == "dashboard":
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
 
