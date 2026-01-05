@@ -712,7 +712,7 @@ if st.session_state["pagina"] == "home":
 # Aba Jogos
 # --------------------------
 if st.session_state["pagina"] == "jogos":
-    
+
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
         st.rerun()
@@ -974,6 +974,11 @@ if st.session_state["pagina"] == "jogos":
 # Aba Treinos
 # --------------------------
 if st.session_state["pagina"] == "treinos":
+
+    if st.button("⬅️ Voltar para Início"):
+        st.session_state["pagina"] = "home"
+        st.rerun()
+
     st.header("🎯Treinos")
     df_treinos = load_treinos_df()
 
@@ -1201,6 +1206,11 @@ if st.session_state["pagina"] == "treinos":
 # Aba Sono
 # --------------------------
 if st.session_state["pagina"] == "sono":
+
+    if st.button("⬅️ Voltar para Início"):
+        st.session_state["pagina"] = "home"
+        st.rerun()
+
     st.header("💤Controle de Sono")
 
     # AS CONSTANTES JÁ FORAM DEFINIDAS NO TOPO. USAMOS ELAS AQUI.
@@ -1405,6 +1415,11 @@ def save_saude_df(df):
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
 if st.session_state["pagina"] == "saude":
+
+    if st.button("⬅️ Voltar para Início"):
+        st.session_state["pagina"] = "home"
+        st.rerun()
+
     st.header("🩺 Saúde & Preparação do Atleta")
     st.caption(
         "Registro diário de sono, alimentação e acompanhamento físico. "
@@ -2112,6 +2127,10 @@ if st.session_state["pagina"] == "saude":
 # ----------------------------------------------------------------------
 if st.session_state["pagina"] == "campeonatos":
 
+    if st.button("⬅️ Voltar para Início"):
+        st.session_state["pagina"] = "home"
+        st.rerun()
+
     # --- NOVO BLOCO: CSS ESPECÍFICO PARA CENTRALIZAR O LOGO E O LINK ---
     st.markdown("""
             <style>
@@ -2692,6 +2711,11 @@ def gerar_radar_pdf(jogo, scout_cols, df):
 
 
 if st.session_state["pagina"] == "dashboard":
+
+    if st.button("⬅️ Voltar para Início"):
+        st.session_state["pagina"] = "home"
+        st.rerun()
+
         st.markdown("## 📊 Dashboard de Performance do Atleta")
         st.markdown("---")
 
