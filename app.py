@@ -3320,9 +3320,11 @@ if st.session_state["pagina"] == "dashboard":
     ]
 
     for c in scout_cols:
-        if c not in df.columns:
-            df[c] = 0
-        df[c] = pd.to_numeric(df[c], errors="coerce").fillna(0)
+        if c not in df_jogos_full.columns:
+            df_jogos_full[c] = 0
+        df_jogos_full[c] = pd.to_numeric(
+            df_jogos_full[c], errors="coerce"
+        ).fillna(0)
 
     # ---------------------------
     # MODO DE VISUALIZAÇÃO
@@ -3342,7 +3344,8 @@ if st.session_state["pagina"] == "dashboard":
     # ======================================================
     if modo_scout == "🎯 Scout por jogo":
 
-        df_jogos = df.copy()
+        df_jogos = df_jogos_full.copy()
+
 
         df_jogos["Data_DT"] = pd.to_datetime(
             df_jogos["Data"], dayfirst=True, errors="coerce"
