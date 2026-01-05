@@ -509,7 +509,7 @@ def criar_logo_link_alinhado(col, path, width):
 #----------------------------------------------
 
 # Abas principais
-tabs = st.tabs([
+tab = st.tabs([
     "🏠 Início",
     "⚽ Jogos",
     "💪 Treinos",
