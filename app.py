@@ -2250,7 +2250,7 @@ def calculate_metrics(df_jogos, df_treinos, df_sono):
 def analisar_resultado(df):
     """Calcula o total de Vitórias, Empates e Derrotas com base na coluna 'Resultado'."""
     vitorias, empates, derrotas = 0, 0, 0
-    total_jogos = len(df_jogos_full)
+    total_jogos = len(df)
 
     if total_jogos == 0 or 'Resultado' not in df.columns:
         return 0, 0, 0, 0
@@ -3483,7 +3483,7 @@ if st.session_state["pagina"] == "dashboard":
 
         radar_vals = []
         for scout in scout_cols:
-            max_val = df[scout].max()
+            max_val = df_jogos_full[scout].max()
             valor = jogo[scout]
             radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
