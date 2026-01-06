@@ -1192,17 +1192,8 @@ if st.session_state["pagina"] == "treinos":
                 )
 
                 # ===============================
-                # 🚨 ALERTA DE REGULARIDADE (CORRETO)
+                # 🚨 ALERTA DE REGULARIDADE (LÓGICA CORRETA)
                 # ===============================
-
-                # Datas reais do período analisado
-                inicio_periodo = df_filtrado["date_obj"].min()
-                fim_periodo = df_filtrado["date_obj"].max()
-
-                # Total de semanas no período analisado
-                intervalo_semanas = (
-                                            (fim_periodo - inicio_periodo).days // 7
-                                    ) + 1
 
                 # Semanas que tiveram ao menos 1 treino
                 semanas_com_treino = (
@@ -1211,15 +1202,33 @@ if st.session_state["pagina"] == "treinos":
                     .nunique()
                 )
 
-                semanas_sem_treino = max(0, intervalo_semanas - semanas_com_treino)
+                # TOTAL DE SEMANAS DO MÊS SELECIONADO
+                if mes_filter:
+                    ano_ref = df_filtrado["date_obj"].dt.year.mode()[0]
+                    mes_ref = int(mes_filter)
+
+                    semanas_do_mes = (
+                        pd.date_range(
+                            start=f"{ano_ref}-{mes_ref:02d}-01",
+                            end=pd.Timestamp(f"{ano_ref}-{mes_ref:02d}-01") + pd.offsets.MonthEnd(1),
+                            freq="W-MON"
+                        )
+                        .to_period("W")
+                        .nunique()
+                    )
+                else:
+                    # fallback seguro (sem filtro)
+                    semanas_do_mes = semanas_com_treino
+
+                semanas_sem_treino = max(0, semanas_do_mes - semanas_com_treino)
 
                 # Feedback claro e confiável
                 if semanas_sem_treino == 0:
-                    st.success("✅ Excelente consistência: treinou em todas as semanas do período.")
-                elif semanas_sem_treino <= 1:
-                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana sem treino no período analisado.")
+                    st.success("✅ Excelente consistência: treinou em todas as semanas do mês.")
+                elif semanas_sem_treino == 1:
+                    st.warning("⚠️ Atenção: 1 semana sem treino no mês.")
                 else:
-                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino no período analisado.")
+                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino no mês.")
 
                 # 2️⃣ AGRUPAMENTO USANDO DATETIME (CORRETO)
                 df_linha = (
