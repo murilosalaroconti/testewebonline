@@ -1528,25 +1528,29 @@ if st.session_state["pagina"] == "sono":
             # Prioridade 2: horário (somente se existir)
             elif hora_dormiu is not None:
 
-                if hora_dormiu >= 2:
-                    status = "🚨 Sono Muito Tardio"
-                    cor = "red"
-                    mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
-
-                elif 0 <= hora_dormiu < 2:
+                # Dormiu depois da meia-noite
+                if 0 <= hora_dormiu < 2:
                     status = "⚠️ Sono Tardio"
                     cor = "orange"
                     mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
 
+                # Dormiu muito tarde (madrugada pesada)
+                elif 2 <= hora_dormiu < 6:
+                    status = "🚨 Sono Muito Tardio"
+                    cor = "red"
+                    mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
+
+                # Dormiu no limite
                 elif 23 <= hora_dormiu < 24:
                     status = "⚠️ Dormiu no Limite"
                     cor = "orange"
                     mensagem = "Dormiu próximo do limite ideal (23:00)."
 
-            else:
-                status = "ℹ️ Sono Parcial"
-                cor = "#4FC3F7"
-                mensagem = "Registro sem horário noturno (apenas cochilo)."
+                # Antes de 23h → ideal
+                else:
+                    status = "✅ Sono Ideal"
+                    cor = "green"
+                    mensagem = "Dormiu em horário adequado para boa recuperação."
 
             # 👉 CARD VISUAL
             st.markdown("### 🧠 Análise do Último Sono (dentro do periodo selecionado)")
