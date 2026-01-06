@@ -1418,6 +1418,12 @@ if st.session_state["pagina"] == "sono":
 
     ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
 
+    times_disponiveis = ["Todos"] + sorted(
+        df_sono["Time"].dropna().unique().tolist()
+    ) if "Time" in df_sono.columns else ["Todos"]
+
+    time_filter = st.selectbox("Filtrar por Time", times_disponiveis)
+
     if st.button("Gerar Gráfico (Sono)"):
         df_sono = load_sono_df()
 
@@ -1454,19 +1460,32 @@ if st.session_state["pagina"] == "sono":
 
             # 👉 AVALIAÇÃO
             # 👉 AVALIAÇÃO DO HORÁRIO (CORRETA E LEGÍVEL)
+            # 👉 AVALIAÇÃO DO SONO (ORDEM CORRETA)
+            # 👉 AVALIAÇÃO DO SONO (ORDEM DEFINITIVA)
             status = "✅ Sono Ideal"
             cor = "green"
             mensagem = "Horário e duração adequados."
 
-            if hora_dormiu >= 2:
+            # 1️⃣ Quantidade vem primeiro
+            if dur_h < 6:
+                status = "🚨 Sono Insuficiente"
+                cor = "red"
+                mensagem = "Quantidade de sono abaixo do ideal."
+
+            # 2️⃣ Madrugada pesada
+            elif hora_dormiu >= 2:
                 status = "🚨 Sono Muito Tardio"
                 cor = "red"
                 mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
-            elif hora_dormiu >= 0:
+
+            # 3️⃣ Madrugada leve
+            elif 0 <= hora_dormiu < 2:
                 status = "⚠️ Sono Tardio"
                 cor = "orange"
-                mensagem = "Dormiu após 00:00. Pode prejudicar a qualidade do descanso."
-            elif hora_dormiu >= 23:
+                mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
+
+            # 4️⃣ Limite saudável
+            elif 23 <= hora_dormiu < 24:
                 status = "⚠️ Dormiu no Limite"
                 cor = "orange"
                 mensagem = "Dormiu próximo do limite ideal (23:00)."
@@ -1504,8 +1523,16 @@ if st.session_state["pagina"] == "sono":
             datas = []
             duracoes = []
             indicador_cochilo = []
+            horarios_dormir = []
 
             for _, row in df_sono.iterrows():
+
+                time_row = str(row.get("Time", "")).strip()
+
+                if time_filter != "Todos" and time_row != time_filter:
+                    continue
+
+
                 d = row.get("Data", "")
                 dur_str = str(row.get("Duração do Sono (h:min)", ""))
 
@@ -1516,7 +1543,7 @@ if st.session_state["pagina"] == "sono":
                     if d:
                         data_obj = datetime.strptime(d, "%d/%m/%Y")
 
-                        if mes_filter and data_obj.month != int(mes_filter):
+                        if mes_filter_s and data_obj.month != int(mes_filter_s):
                             continue
 
                         if ano_filter and data_obj.year != int(ano_filter):
@@ -1531,6 +1558,10 @@ if st.session_state["pagina"] == "sono":
                             datas.append(data_obj.strftime("%d/%m/%Y"))
                             duracoes.append(dur_h)
                             indicador_cochilo.append(cochilo_str == 'Sim')
+
+                            hora_dormir_str = str(row.get("Hora Dormir", "00:00"))
+                            horarios_dormir.append(hora_dormir_str)
+
 
                 except Exception:
                     continue
@@ -1567,9 +1598,14 @@ if st.session_state["pagina"] == "sono":
                             fontsize=9)
 
                     # Indicador de horário tardio
-                    hora_dormir_str = str(row.get("Hora Dormir", "00:00"))
-                    h, m = hora_dormir_str.split(":")
-                    hora_dormiu = int(h) + int(m) / 60
+                    hora_dormir_str = horarios_dormir[i]
+
+
+                    if ":" in hora_dormir_str:
+                        h, m = hora_dormir_str.split(":")
+                        hora_dormiu = int(h) + int(m) / 60
+                    else:
+                        hora_dormiu = 0
 
                     if hora_dormiu >= 2:
                         ax.scatter(i, val, s=200, facecolors='none', edgecolors='red', linewidths=2)
