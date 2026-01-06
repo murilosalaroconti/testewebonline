@@ -1172,24 +1172,7 @@ if st.session_state["pagina"] == "treinos":
 
                 total_treinos = df_filtrado.shape[0]
 
-                # ===============================
-                # 🚨 ALERTA DE REGULARIDADE
-                # ===============================
 
-                semanas_com_treino = df_linha["Semana_DT"].nunique()
-
-                intervalo_semanas = (
-                                            df_plot["Semana_DT"].max() - df_plot["Semana_DT"].min()
-                                    ).days // 7 + 1
-
-                semanas_sem_treino = max(0, intervalo_semanas - semanas_com_treino)
-
-                if semanas_sem_treino == 0:
-                    st.success("✅ Excelente consistência: nenhuma semana sem treino.")
-                elif semanas_sem_treino <= 2:
-                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana(s) sem treino no período.")
-                else:
-                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino detectadas.")
 
                 # --- GRÁFICO MODERNO: LINHA DO TEMPO POR TIPO DE TREINO ---
 
@@ -1213,6 +1196,25 @@ if st.session_state["pagina"] == "treinos":
                     .dt.to_period("W")
                     .apply(lambda x: x.start_time)
                 )
+
+                # ===============================
+                # 🚨 ALERTA DE REGULARIDADE
+                # ===============================
+
+                semanas_com_treino = df_plot["Semana_DT"].nunique()
+
+                intervalo_semanas = (
+                                            (df_plot["Semana_DT"].max() - df_plot["Semana_DT"].min()).days // 7
+                                    ) + 1
+
+                semanas_sem_treino = max(0, intervalo_semanas - semanas_com_treino)
+
+                if semanas_sem_treino == 0:
+                    st.success("✅ Excelente consistência: nenhuma semana sem treino.")
+                elif semanas_sem_treino <= 2:
+                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana(s) sem treino no período.")
+                else:
+                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino detectadas.")
 
                 # 2️⃣ AGRUPAMENTO USANDO DATETIME (CORRETO)
                 df_linha = (
