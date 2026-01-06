@@ -1431,13 +1431,12 @@ if st.session_state["pagina"] == "sono":
 
     times_disponiveis = ["Todos"] + sorted(
         df_sono["Time"].dropna().unique().tolist()
-    ) if "Time" in df_sono.columns and not df_sono["Time"].dropna().empty:
-    times_disponiveis = ["Todos"] + sorted(df_sono["Time"].dropna().unique().tolist())
-else:
-    times_disponiveis = ["Todos"]
+    )
 
-time_filter = st.selectbox("Filtrar por Time", times_disponiveis)
-
+    if "Time" in df_sono.columns and not df_sono["Time"].dropna().empty:
+        times_disponiveis = ["Todos"] + sorted(df_sono["Time"].dropna().unique().tolist())
+    else:
+        times_disponiveis = ["Todos"]
 
     time_filter = st.selectbox("Filtrar por Time", times_disponiveis)
 
