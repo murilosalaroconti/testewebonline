@@ -562,7 +562,7 @@ if st.session_state["pagina"] == "home":
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
     st.markdown(
-        "<p style='color:#9CA3AF; margin-top:-12px; font-size:14px;'>Onde o jogo encontra a inteligência.</p>",
+        "<p style='color:#9CA3AF; margin-top:-12px; font-size:14px;'>Dados que viram decisões.</p>",
         unsafe_allow_html=True
     )
     st.markdown("---")
