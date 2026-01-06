@@ -1330,8 +1330,16 @@ if st.session_state["pagina"] == "sono":
     # Garante que a função load_sono_df() está carregando o DF aqui
     df_sono = load_sono_df()
 
+    # NORMALIZAÇÃO DO CAMPO TIME
     if "Time" in df_sono.columns:
-        df_sono["Time"] = df_sono["Time"].astype(str).str.strip().str.title()
+        df_sono["Time"] = (
+            df_sono["Time"]
+            .astype(str)
+            .str.strip()
+            .replace({"": None, "Nan": None, "None": None})
+            .dropna()
+            .str.title()
+        )
 
     # --- GARANTE AS COLUNAS NO DF PRINCIPAL USANDO VALORES STRING ---
     for col in COLUNAS_COCHILO_NAMES:
@@ -1423,7 +1431,13 @@ if st.session_state["pagina"] == "sono":
 
     times_disponiveis = ["Todos"] + sorted(
         df_sono["Time"].dropna().unique().tolist()
-    ) if "Time" in df_sono.columns else ["Todos"]
+    ) if "Time" in df_sono.columns and not df_sono["Time"].dropna().empty:
+    times_disponiveis = ["Todos"] + sorted(df_sono["Time"].dropna().unique().tolist())
+else:
+    times_disponiveis = ["Todos"]
+
+time_filter = st.selectbox("Filtrar por Time", times_disponiveis)
+
 
     time_filter = st.selectbox("Filtrar por Time", times_disponiveis)
 
@@ -1443,7 +1457,7 @@ if st.session_state["pagina"] == "sono":
 
         df_sono_card = df_sono_card.dropna(subset=["date_obj"])
 
-        # Aplica filtros ao card (coerência com gráfico)
+        # APLICA OS MESMOS FILTROS DO GRÁFICO AO CARD
         if mes_filter_s:
             df_sono_card = df_sono_card[
                 df_sono_card["date_obj"].dt.month == int(mes_filter_s)
@@ -1456,7 +1470,7 @@ if st.session_state["pagina"] == "sono":
 
         if time_filter != "Todos" and "Time" in df_sono_card.columns:
             df_sono_card = df_sono_card[
-                df_sono_card["Time"].astype(str).str.strip() == time_filter
+                df_sono_card["Time"] == time_filter
                 ]
 
         if not df_sono_card.empty:
@@ -1493,10 +1507,17 @@ if st.session_state["pagina"] == "sono":
                 mensagem = "Quantidade de sono abaixo do ideal."
 
             else:
-                # Converte horário corretamente
-                h, m = hora_d_str.split(":")
-                h = int(h)
-                m = int(m)
+                hora_d_str = str(ultimo.get("Hora Dormir", "")).strip()
+
+                # Validação de horário segura
+                if ":" in hora_d_str:
+                    h, m = hora_d_str.split(":")
+                    h = int(h)
+                    m = int(m)
+                else:
+                    # fallback seguro (não trava o app)
+                    h = 0
+                    m = 0
 
                 # 2️⃣ Madrugada pesada (02:00+)
                 if h >= 2 and h < 12:
