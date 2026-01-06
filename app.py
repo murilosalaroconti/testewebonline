@@ -1407,6 +1407,81 @@ if st.session_state["pagina"] == "sono":
     if st.button("Gerar Gráfico (Sono)"):
         df_sono = load_sono_df()
 
+        # ===============================
+        # 🧠 CARD – QUALIDADE DO SONO (ÚLTIMO REGISTRO)
+        # ===============================
+
+        df_sono_card = df_sono.copy()
+
+        # Garante datas válidas
+        df_sono_card["date_obj"] = pd.to_datetime(
+            df_sono_card["Data"], dayfirst=True, errors="coerce"
+        )
+
+        df_sono_card = df_sono_card.dropna(subset=["date_obj"])
+
+        if not df_sono_card.empty:
+            # Ordena do mais recente para o mais antigo
+            df_sono_card = df_sono_card.sort_values("date_obj", ascending=False)
+
+            ultimo = df_sono_card.iloc[0]
+
+            # Duração do sono
+            dur_str = str(ultimo.get("Duração do Sono (h:min)", "0:00"))
+            partes = dur_str.split(":")
+            horas = int(partes[0])
+            minutos = int(partes[1]) if len(partes) > 1 else 0
+            dur_h = horas + minutos / 60
+
+            # Horário que dormiu
+            hora_d_str = str(ultimo.get("Hora Dormir", "00:00"))
+            h, m = hora_d_str.split(":")
+            hora_dormiu = int(h) + int(m) / 60
+
+            # 👉 AVALIAÇÃO
+            status = "✅ Sono Ideal"
+            cor = "green"
+            mensagem = "Excelente rotina de descanso."
+
+            if dur_h < 6:
+                status = "🚨 Sono Insuficiente"
+                cor = "red"
+                mensagem = "Quantidade de sono abaixo do ideal."
+            elif hora_dormiu >= 2:
+                status = "🚨 Sono Muito Tardio"
+                cor = "red"
+                mensagem = "Dormiu após 02:00. Alto impacto negativo."
+            elif hora_dormiu >= 0:
+                status = "⚠️ Sono Tardio"
+                cor = "orange"
+                mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
+            elif hora_dormiu > 23:
+                status = "⚠️ Dormiu no Limite"
+                cor = "orange"
+                mensagem = "Dormiu próximo do limite recomendado (23:00)."
+
+            # 👉 CARD VISUAL
+            st.markdown("### 🛌 Qualidade do Último Sono")
+
+            st.markdown(
+                f"""
+                <div style="
+                    padding:18px;
+                    border-radius:12px;
+                    background-color:#1F2430;
+                    border-left:6px solid {cor};
+                ">
+                    <h4>{status}</h4>
+                    <p><b>Duração:</b> {horas}h {minutos:02d}min</p>
+                    <p><b>Hora de dormir:</b> {hora_d_str}</p>
+                    <p style="opacity:0.8;">{mensagem}</p>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown("---")
+
         # Garante que as novas colunas existem
         for col in COLUNAS_COCHILO_NAMES:
             if col not in df_sono.columns:
