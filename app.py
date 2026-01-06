@@ -1439,9 +1439,17 @@ if st.session_state["pagina"] == "sono":
 
     ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
 
-
-
-        times_validos = df_sono["Time"].dropna().unique().tolist()
+    # ---------- FILTRO DE TIME (CORRETO E SEGURO) ----------
+    if "Time" in df_sono.columns:
+        times_validos = (
+            df_sono["Time"]
+            .dropna()
+            .astype(str)
+            .str.strip()
+            .loc[lambda x: x != ""]
+            .unique()
+            .tolist()
+        )
 
         if times_validos:
             times_disponiveis = ["Todos"] + sorted(times_validos)
