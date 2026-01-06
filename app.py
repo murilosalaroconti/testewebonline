@@ -1198,23 +1198,34 @@ if st.session_state["pagina"] == "treinos":
                 )
 
                 # ===============================
-                # 🚨 ALERTA DE REGULARIDADE
+                # 🚨 ALERTA DE REGULARIDADE (CORRETO)
                 # ===============================
 
-                semanas_com_treino = df_plot["Semana_DT"].nunique()
+                # Datas reais do período analisado
+                inicio_periodo = df_filtrado["date_obj"].min()
+                fim_periodo = df_filtrado["date_obj"].max()
 
+                # Total de semanas no período analisado
                 intervalo_semanas = (
-                                            (df_plot["Semana_DT"].max() - df_plot["Semana_DT"].min()).days // 7
+                                            (fim_periodo - inicio_periodo).days // 7
                                     ) + 1
+
+                # Semanas que tiveram ao menos 1 treino
+                semanas_com_treino = (
+                    df_filtrado["date_obj"]
+                    .dt.to_period("W")
+                    .nunique()
+                )
 
                 semanas_sem_treino = max(0, intervalo_semanas - semanas_com_treino)
 
+                # Feedback claro e confiável
                 if semanas_sem_treino == 0:
-                    st.success("✅ Excelente consistência: nenhuma semana sem treino.")
-                elif semanas_sem_treino <= 2:
-                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana(s) sem treino no período.")
+                    st.success("✅ Excelente consistência: treinou em todas as semanas do período.")
+                elif semanas_sem_treino <= 1:
+                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana sem treino no período analisado.")
                 else:
-                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino detectadas.")
+                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino no período analisado.")
 
                 # 2️⃣ AGRUPAMENTO USANDO DATETIME (CORRETO)
                 df_linha = (
