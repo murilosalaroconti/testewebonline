@@ -1172,6 +1172,25 @@ if st.session_state["pagina"] == "treinos":
 
                 total_treinos = df_filtrado.shape[0]
 
+                # ===============================
+                # 🚨 ALERTA DE REGULARIDADE
+                # ===============================
+
+                semanas_com_treino = df_linha["Semana_DT"].nunique()
+
+                intervalo_semanas = (
+                                            df_plot["Semana_DT"].max() - df_plot["Semana_DT"].min()
+                                    ).days // 7 + 1
+
+                semanas_sem_treino = max(0, intervalo_semanas - semanas_com_treino)
+
+                if semanas_sem_treino == 0:
+                    st.success("✅ Excelente consistência: nenhuma semana sem treino.")
+                elif semanas_sem_treino <= 2:
+                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana(s) sem treino no período.")
+                else:
+                    st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino detectadas.")
+
                 # --- GRÁFICO MODERNO: LINHA DO TEMPO POR TIPO DE TREINO ---
 
                 st.markdown("### 📈 Evolução dos Treinos por Tipo")
@@ -1218,7 +1237,7 @@ if st.session_state["pagina"] == "treinos":
                         y="Quantidade",
                         color=NOME_COLUNA_TIPO,
                         markers=True,
-                        title="Frequência de Treinos por Tipo (Linha do Tempo)"
+                        title="Semanas com Treino por Tipo (não representa o total de sessões)"
                     )
 
                     fig.update_traces(
@@ -1235,6 +1254,11 @@ if st.session_state["pagina"] == "treinos":
                     )
 
                     st.plotly_chart(fig, use_container_width=True)
+
+                st.caption(
+                    "📌 Cada ponto representa uma semana com ao menos um treino. "
+                    "O total de treinos está no resumo abaixo."
+                )
 
                 # --- RESUMO ESCRITO DETALHADO ---
                 st.markdown("### 📋 Detalhamento da Frequência")
