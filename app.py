@@ -975,8 +975,6 @@ if st.session_state["pagina"] == "jogos":
                 mime="text/csv"
             )
 
-
-
 # Aba Treinos
 # --------------------------
 if st.session_state["pagina"] == "treinos":
@@ -1316,6 +1314,20 @@ if st.session_state["pagina"] == "treinos":
 
 # Aba Sono
 # --------------------------
+def safe_parse_hour(hora_str):
+    """
+    Converte 'HH:MM' em hora decimal.
+    Retorna None se inválido.
+    """
+    try:
+        if not hora_str or ":" not in str(hora_str):
+            return None
+        h, m = str(hora_str).split(":")
+        return int(h) + int(m) / 60
+    except:
+        return None
+
+
 if st.session_state["pagina"] == "sono":
 
     if st.button("⬅️ Voltar para Início"):
@@ -1336,9 +1348,7 @@ if st.session_state["pagina"] == "sono":
             df_sono["Time"]
             .astype(str)
             .str.strip()
-            .replace({"": None, "Nan": None, "None": None})
-            .dropna()
-            .str.title()
+            .replace({"": None, "None": None, "nan": None, "NaN": None})
         )
 
     # --- GARANTE AS COLUNAS NO DF PRINCIPAL USANDO VALORES STRING ---
@@ -1429,14 +1439,7 @@ if st.session_state["pagina"] == "sono":
 
     ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
 
-    # ---------- FILTRO DE TIME (SEGURO, NUNCA QUEBRA) ----------
-    if "Time" in df_sono.columns:
-        df_sono["Time"] = (
-            df_sono["Time"]
-            .astype(str)
-            .str.strip()
-            .replace({"": None, "None": None, "nan": None, "NaN": None})
-        )
+
 
         times_validos = df_sono["Time"].dropna().unique().tolist()
 
@@ -1496,8 +1499,8 @@ if st.session_state["pagina"] == "sono":
 
             # Horário que dormiu
             hora_d_str = str(ultimo.get("Hora Dormir", "00:00"))
-            h, m = hora_d_str.split(":")
-            hora_dormiu = int(h) + int(m) / 60
+            hora_dormiu = safe_parse_hour(ultimo.get("Hora Dormir"))
+
 
             # 👉 AVALIAÇÃO
             # 👉 AVALIAÇÃO DO HORÁRIO (CORRETA E LEGÍVEL)
@@ -1508,38 +1511,37 @@ if st.session_state["pagina"] == "sono":
             cor = "green"
             mensagem = "Horário e duração adequados."
 
-            # Prioridade 1: quantidade de sono
+            # Prioridade 1: quantidade
             if dur_h < 6:
                 status = "🚨 Sono Insuficiente"
                 cor = "red"
                 mensagem = "Quantidade de sono abaixo do ideal."
 
-            else:
-                hora_d_str = str(ultimo.get("Hora Dormir", "")).strip()
+            # Prioridade 2: horário (somente se existir)
+            elif hora_dormiu is not None:
 
-                if ":" in hora_d_str:
-                    h, m = hora_d_str.split(":")
-                    h = int(h)
-                else:
-                    h = 0
-
-                if h >= 2:
+                if hora_dormiu >= 2:
                     status = "🚨 Sono Muito Tardio"
                     cor = "red"
                     mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
 
-                elif h >= 0 and h < 2:
+                elif 0 <= hora_dormiu < 2:
                     status = "⚠️ Sono Tardio"
                     cor = "orange"
                     mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
 
-                elif h == 23:
+                elif 23 <= hora_dormiu < 24:
                     status = "⚠️ Dormiu no Limite"
                     cor = "orange"
                     mensagem = "Dormiu próximo do limite ideal (23:00)."
 
+            else:
+                status = "ℹ️ Sono Parcial"
+                cor = "#4FC3F7"
+                mensagem = "Registro sem horário noturno (apenas cochilo)."
+
             # 👉 CARD VISUAL
-            st.markdown("### 🧠 Análise do Último Sono (dentro do periodo selecionado")
+            st.markdown("### 🧠 Análise do Último Sono (dentro do periodo selecionado)")
 
             st.markdown(
                 f"""
@@ -1648,17 +1650,13 @@ if st.session_state["pagina"] == "sono":
                     # Indicador de horário tardio
                     hora_dormir_str = horarios_dormir[i]
 
+                    hora_dormiu = safe_parse_hour(horarios_dormir[i])
 
-                    if ":" in hora_dormir_str:
-                        h, m = hora_dormir_str.split(":")
-                        hora_dormiu = int(h) + int(m) / 60
-                    else:
-                        hora_dormiu = 0
-
-                    if hora_dormiu >= 2:
-                        ax.scatter(i, val, s=200, facecolors='none', edgecolors='red', linewidths=2)
-                    elif hora_dormiu >= 23:
-                        ax.scatter(i, val, s=160, facecolors='none', edgecolors='orange', linewidths=2)
+                    if hora_dormiu is not None:
+                        if hora_dormiu >= 2:
+                            ax.scatter(i, val, s=200, facecolors='none', edgecolors='red', linewidths=2)
+                        elif hora_dormiu >= 23:
+                            ax.scatter(i, val, s=160, facecolors='none', edgecolors='orange', linewidths=2)
 
                 # Linhas de referência (Média, Alerta)
                 ax.axhline(media, color='#009688', linestyle='-', linewidth=1,
