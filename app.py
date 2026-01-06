@@ -561,6 +561,10 @@ def criar_logo_link_alinhado(col, path, width):
 if st.session_state["pagina"] == "home":
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
+    st.markdown(
+        "<p style='color:#9CA3AF; margin-top:-12px; font-size:14px;'>Onde o jogo encontra a inteligência.</p>",
+        unsafe_allow_html=True
+    )
     st.markdown("---")
 
     # =========================
@@ -4350,7 +4354,9 @@ if st.session_state["pagina"] == "dashboard":
 
 # Aba Análises (resumo / gráficos rápidos)
 
-st.markdown("""---
-Feito para uso pessoal — acesse no celular usando o mesmo endereço do navegador quando rodar localmente, ou hospede no Streamlit Cloud para acesso pela internet.
-""")
+st.markdown(
+    "<p style='text-align:center; color:#6B7280; font-size:13px;'>ScoutMind • Desenvolvido para evolução contínua do atleta.</p>",
+    unsafe_allow_html=True
+)
+
 
