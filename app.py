@@ -1172,17 +1172,52 @@ if st.session_state["pagina"] == "treinos":
 
                 total_treinos = df_filtrado.shape[0]
 
-                # --- GERAÇÃO DO GRÁFICO (PIZZA) ---
-                labels = [f"{row[NOME_COLUNA_TIPO]} ({row['Contagem_Tipo']})" for index, row in
-                          df_contagem_tipo.iterrows()]
-                vals = df_contagem_tipo['Contagem_Tipo'].tolist()
+                # --- GRÁFICO MODERNO: LINHA DO TEMPO POR TIPO DE TREINO ---
 
-                fig, ax = plt.subplots(figsize=(6, 6))
-                ax.pie(vals, labels=labels, autopct="%1.1f%%", startangle=90)
-                ax.set_title(f"Distribuição dos Tipos de Treino ({total_treinos} treinos)")
-                ax.axis("equal")
-                st.pyplot(fig)
-                plt.close(fig)
+                st.markdown("### 📈 Evolução dos Treinos por Tipo")
+
+                df_plot = df_filtrado.copy()
+
+                # Garante data válida
+                df_plot["date_obj"] = pd.to_datetime(df_plot["date_obj"], errors="coerce")
+                df_plot = df_plot.dropna(subset=["date_obj"])
+
+                # Agrupa por semana e tipo
+                df_plot["Semana"] = df_plot["date_obj"].dt.to_period("W").astype(str)
+
+                df_linha = (
+                    df_plot
+                    .groupby(["Semana", NOME_COLUNA_TIPO])
+                    .size()
+                    .reset_index(name="Quantidade")
+                )
+
+                if df_linha.empty:
+                    st.info("Sem dados suficientes para gerar o gráfico.")
+                else:
+                    fig = px.line(
+                        df_linha,
+                        x="Semana",
+                        y="Quantidade",
+                        color=NOME_COLUNA_TIPO,
+                        markers=True,
+                        title="Frequência de Treinos por Tipo (Linha do Tempo)"
+                    )
+
+                    fig.update_traces(
+                        line=dict(width=3),
+                        marker=dict(size=8)
+                    )
+
+                    fig.update_layout(
+                        plot_bgcolor="#0E1117",
+                        paper_bgcolor="#0E1117",
+                        font=dict(color="white"),
+                        hovermode="x unified",
+                        legend_title_text="Tipo de Treino"
+                    )
+
+                    st.plotly_chart(fig, use_container_width=True)
 
                 # --- RESUMO ESCRITO DETALHADO ---
                 st.markdown("### 📋 Detalhamento da Frequência")
