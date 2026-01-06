@@ -1086,10 +1086,23 @@ if st.session_state["pagina"] == "treinos":
                 # FORÇA O RECARREGAMENTO DO SCRIPT PARA INCLUIR OS NOVOS TREINOS/TIPOS NA LISTA!
                 st.rerun()
 
+    # Criar coluna de data para ordenação (se ainda não existir)
+    if "date_obj" not in df_treinos.columns:
+        df_treinos["date_obj"] = pd.to_datetime(
+            df_treinos["Date"], dayfirst=True, errors="coerce"
+        )
+
     with col2:
         st.markdown("### 🏃Treinos Realizados")
         # EXIBE O DATAFRAME JÁ NORMALIZADO
-        st.dataframe(df_treinos.tail(200), width='stretch')
+        df_treinos_view = (
+            df_treinos
+            .sort_values("date_obj", ascending=False)
+            .drop(columns=["date_obj"], errors="ignore")
+        )
+
+        st.dataframe(df_treinos_view.head(200), width="stretch")
+
         if st.button("Exportar Treinos CSV"):
             towrite = io.BytesIO()
             df_treinos.to_csv(towrite, index=False, sep=';')
