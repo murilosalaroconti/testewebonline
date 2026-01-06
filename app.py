@@ -1404,6 +1404,20 @@ if st.session_state["pagina"] == "sono":
     mes_filter_s = st.selectbox("Filtrar por mês (mm) — deixe em branco para todos:",
                                 [""] + [f"{i:02d}" for i in range(1, 13)], key="mes_sono")
 
+    anos_disponiveis = sorted(
+        list(
+            set(
+                pd.to_datetime(df_sono["Data"], dayfirst=True, errors="coerce")
+                .dt.year
+                .dropna()
+                .astype(int)
+            )
+        ),
+        reverse=True
+    )
+
+    ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
+
     if st.button("Gerar Gráfico (Sono)"):
         df_sono = load_sono_df()
 
@@ -1439,44 +1453,41 @@ if st.session_state["pagina"] == "sono":
             hora_dormiu = int(h) + int(m) / 60
 
             # 👉 AVALIAÇÃO
+            # 👉 AVALIAÇÃO DO HORÁRIO (CORRETA E LEGÍVEL)
             status = "✅ Sono Ideal"
             cor = "green"
-            mensagem = "Excelente rotina de descanso."
+            mensagem = "Horário e duração adequados."
 
-            if dur_h < 6:
-                status = "🚨 Sono Insuficiente"
-                cor = "red"
-                mensagem = "Quantidade de sono abaixo do ideal."
-            elif hora_dormiu >= 2:
+            if hora_dormiu >= 2:
                 status = "🚨 Sono Muito Tardio"
                 cor = "red"
-                mensagem = "Dormiu após 02:00. Alto impacto negativo."
+                mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
             elif hora_dormiu >= 0:
                 status = "⚠️ Sono Tardio"
                 cor = "orange"
-                mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
-            elif hora_dormiu > 23:
+                mensagem = "Dormiu após 00:00. Pode prejudicar a qualidade do descanso."
+            elif hora_dormiu >= 23:
                 status = "⚠️ Dormiu no Limite"
                 cor = "orange"
-                mensagem = "Dormiu próximo do limite recomendado (23:00)."
+                mensagem = "Dormiu próximo do limite ideal (23:00)."
 
             # 👉 CARD VISUAL
-            st.markdown("### 🛌 Qualidade do Último Sono")
+            st.markdown("### 🧠 Análise do Último Sono")
 
             st.markdown(
                 f"""
-                <div style="
-                    padding:18px;
-                    border-radius:12px;
-                    background-color:#1F2430;
-                    border-left:6px solid {cor};
-                ">
-                    <h4>{status}</h4>
-                    <p><b>Duração:</b> {horas}h {minutos:02d}min</p>
-                    <p><b>Hora de dormir:</b> {hora_d_str}</p>
-                    <p style="opacity:0.8;">{mensagem}</p>
-                </div>
-                """,
+                    <div style="
+                        padding:18px;
+                        border-radius:12px;
+                        background-color:#1F2430;
+                        border-left:6px solid {cor};
+                    ">
+                        <h4>{status}</h4>
+                        <p><b>Duração:</b> {horas}h {minutos:02d}min</p>
+                        <p><b>Hora de dormir:</b> {hora_d_str}</p>
+                        <p style="opacity:0.8;">{mensagem}</p>
+                    </div>
+                    """,
                 unsafe_allow_html=True
             )
 
@@ -1504,7 +1515,11 @@ if st.session_state["pagina"] == "sono":
                 try:
                     if d:
                         data_obj = datetime.strptime(d, "%d/%m/%Y")
-                        if mes_filter_s and data_obj.month != int(mes_filter_s):
+
+                        if mes_filter and data_obj.month != int(mes_filter):
+                            continue
+
+                        if ano_filter and data_obj.year != int(ano_filter):
                             continue
 
                         parts = dur_str.split(":")
@@ -1551,6 +1566,16 @@ if st.session_state["pagina"] == "sono":
                     ax.text(i, val + 0.15, f"{horas_l}h{minutos_l:02d}{texto_extra}", ha='center', color='white',
                             fontsize=9)
 
+                    # Indicador de horário tardio
+                    hora_dormir_str = str(row.get("Hora Dormir", "00:00"))
+                    h, m = hora_dormir_str.split(":")
+                    hora_dormiu = int(h) + int(m) / 60
+
+                    if hora_dormiu >= 2:
+                        ax.scatter(i, val, s=200, facecolors='none', edgecolors='red', linewidths=2)
+                    elif hora_dormiu >= 23:
+                        ax.scatter(i, val, s=160, facecolors='none', edgecolors='orange', linewidths=2)
+
                 # Linhas de referência (Média, Alerta)
                 ax.axhline(media, color='#009688', linestyle='-', linewidth=1,
                            label=f'Média ({horas_med}h{minutos_med:02d})')
@@ -1576,6 +1601,7 @@ if st.session_state["pagina"] == "sono":
                 plt.tight_layout()
                 st.pyplot(fig)
                 plt.close(fig)
+
 
 # --------------------------
 # Aba Análises (resumo / gráficos rápidos)
