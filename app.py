@@ -146,9 +146,11 @@ def get_client():
 
 # Botão para atualizar dados
 # ------------------------------
-if st.button("Atualizar planilha"):
-    st.cache_data.clear()  # limpa o cache de todas as funções com @st.cache_data
-    st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
+if st.session_state.get("pagina") != "home":
+    if st.button("Atualizar planilha"):
+        st.cache_data.clear()
+        st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
+
 
 def calcular_score_jogo(row):
     # 🔢 Garante valores numéricos seguros
