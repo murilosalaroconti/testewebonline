@@ -1429,12 +1429,21 @@ if st.session_state["pagina"] == "sono":
 
     ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
 
-    times_disponiveis = ["Todos"] + sorted(
-        df_sono["Time"].dropna().unique().tolist()
-    )
+    # ---------- FILTRO DE TIME (SEGURO, NUNCA QUEBRA) ----------
+    if "Time" in df_sono.columns:
+        df_sono["Time"] = (
+            df_sono["Time"]
+            .astype(str)
+            .str.strip()
+            .replace({"": None, "None": None, "nan": None, "NaN": None})
+        )
 
-    if "Time" in df_sono.columns and not df_sono["Time"].dropna().empty:
-        times_disponiveis = ["Todos"] + sorted(df_sono["Time"].dropna().unique().tolist())
+        times_validos = df_sono["Time"].dropna().unique().tolist()
+
+        if times_validos:
+            times_disponiveis = ["Todos"] + sorted(times_validos)
+        else:
+            times_disponiveis = ["Todos"]
     else:
         times_disponiveis = ["Todos"]
 
@@ -1499,7 +1508,7 @@ if st.session_state["pagina"] == "sono":
             cor = "green"
             mensagem = "Horário e duração adequados."
 
-            # 1️⃣ Prioridade: quantidade de sono
+            # Prioridade 1: quantidade de sono
             if dur_h < 6:
                 status = "🚨 Sono Insuficiente"
                 cor = "red"
@@ -1508,29 +1517,22 @@ if st.session_state["pagina"] == "sono":
             else:
                 hora_d_str = str(ultimo.get("Hora Dormir", "")).strip()
 
-                # Validação de horário segura
                 if ":" in hora_d_str:
                     h, m = hora_d_str.split(":")
                     h = int(h)
-                    m = int(m)
                 else:
-                    # fallback seguro (não trava o app)
                     h = 0
-                    m = 0
 
-                # 2️⃣ Madrugada pesada (02:00+)
-                if h >= 2 and h < 12:
+                if h >= 2:
                     status = "🚨 Sono Muito Tardio"
                     cor = "red"
                     mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
 
-                # 3️⃣ Madrugada leve (00:00–01:59)
-                elif h < 2:
+                elif h >= 0 and h < 2:
                     status = "⚠️ Sono Tardio"
                     cor = "orange"
-                    mensagem = "Dormiu na madrugada (após 00:00). Atenção ao ritmo biológico."
+                    mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
 
-                # 4️⃣ Limite saudável (23:00–23:59)
                 elif h == 23:
                     status = "⚠️ Dormiu no Limite"
                     cor = "orange"
