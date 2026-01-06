@@ -1183,7 +1183,11 @@ if st.session_state["pagina"] == "treinos":
                 df_plot = df_plot.dropna(subset=["date_obj"])
 
                 # Agrupa por semana e tipo
-                df_plot["Semana"] = df_plot["date_obj"].dt.to_period("W").astype(str)
+                df_plot["Semana"] = (
+                    df_plot["date_obj"]
+                    .dt.to_period("W")
+                    .apply(lambda x: x.start_time.strftime("%d/%m/%Y"))
+                )
 
                 df_linha = (
                     df_plot
