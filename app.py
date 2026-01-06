@@ -1142,20 +1142,24 @@ if st.session_state["pagina"] == "treinos":
 
             df_treinos["date_obj"] = df_treinos["Date"].apply(parse_date_str)
 
+            df_treinos["date_obj"] = pd.to_datetime(df_treinos["date_obj"], errors="coerce")
+            df_treinos = df_treinos.dropna(subset=["date_obj"])
+
             # --- APLICAÇÃO DOS FILTROS ---
             df_filtrado = df_treinos.copy()
 
+            df_filtrado = df_treinos.copy()
+
             if treino_selecionado != "Todos":
-                # Filtra o treino JÁ NORMALIZADO
                 df_filtrado = df_filtrado[df_filtrado[NOME_COLUNA_TREINO] == treino_selecionado]
 
             if mes_filter:
-                df_filtrado = df_filtrado[
-                    df_filtrado["date_obj"].apply(lambda d: d.month if d is not None else None) == int(mes_filter)]
+                df_filtrado = df_filtrado[df_filtrado["date_obj"].dt.month == int(mes_filter)]
 
             if df_filtrado.empty:
-                st.info("Nenhum treino após filtro.")
-            else:
+                st.info("Nenhum treino no período selecionado.")
+                st.stop()
+
                 # ----------------------------------------------------
                 # NOVO: PROCESSAMENTO PARA GRÁFICO E RESUMO DETALHADO
                 # ----------------------------------------------------
@@ -1171,7 +1175,6 @@ if st.session_state["pagina"] == "treinos":
                     name='Contagem_Detalhe')
 
                 total_treinos = df_filtrado.shape[0]
-
 
 
                 # --- GRÁFICO MODERNO: LINHA DO TEMPO POR TIPO DE TREINO ---
@@ -1198,32 +1201,32 @@ if st.session_state["pagina"] == "treinos":
                 )
 
                 # ===============================
-                # 🚨 ALERTA DE REGULARIDADE (CORRETO)
+                # 🚨 ALERTA DE REGULARIDADE (CORRETO E CONFIÁVEL)
                 # ===============================
 
-                # Datas reais do período analisado
-                inicio_periodo = df_filtrado["date_obj"].min()
-                fim_periodo = df_filtrado["date_obj"].max()
-
-                # Total de semanas no período analisado
-                intervalo_semanas = (
-                                            (fim_periodo - inicio_periodo).days // 7
-                                    ) + 1
-
-                # Semanas que tiveram ao menos 1 treino
-                semanas_com_treino = (
+                # Semana de cada treino (datetime real)
+                df_filtrado["Semana_DT"] = (
                     df_filtrado["date_obj"]
                     .dt.to_period("W")
-                    .nunique()
+                    .apply(lambda x: x.start_time)
                 )
 
-                semanas_sem_treino = max(0, intervalo_semanas - semanas_com_treino)
+                # Semanas distintas COM treino
+                semanas_com_treino = df_filtrado["Semana_DT"].nunique()
 
-                # Feedback claro e confiável
+                # Intervalo REAL do período analisado
+                inicio = df_filtrado["date_obj"].min()
+                fim = df_filtrado["date_obj"].max()
+
+                total_semanas_periodo = ((fim - inicio).days // 7) + 1
+
+                semanas_sem_treino = max(0, total_semanas_periodo - semanas_com_treino)
+
+                # Feedback
                 if semanas_sem_treino == 0:
                     st.success("✅ Excelente consistência: treinou em todas as semanas do período.")
-                elif semanas_sem_treino <= 1:
-                    st.warning(f"⚠️ Atenção: {semanas_sem_treino} semana sem treino no período analisado.")
+                elif semanas_sem_treino == 1:
+                    st.warning("⚠️ Atenção: 1 semana sem treino no período analisado.")
                 else:
                     st.error(f"🚨 Alerta: {semanas_sem_treino} semanas sem treino no período analisado.")
 
