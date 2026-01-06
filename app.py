@@ -1330,6 +1330,9 @@ if st.session_state["pagina"] == "sono":
     # Garante que a função load_sono_df() está carregando o DF aqui
     df_sono = load_sono_df()
 
+    if "Time" in df_sono.columns:
+        df_sono["Time"] = df_sono["Time"].astype(str).str.strip().str.title()
+
     # --- GARANTE AS COLUNAS NO DF PRINCIPAL USANDO VALORES STRING ---
     for col in COLUNAS_COCHILO_NAMES:
         if col not in df_sono.columns:
@@ -1440,6 +1443,22 @@ if st.session_state["pagina"] == "sono":
 
         df_sono_card = df_sono_card.dropna(subset=["date_obj"])
 
+        # Aplica filtros ao card (coerência com gráfico)
+        if mes_filter_s:
+            df_sono_card = df_sono_card[
+                df_sono_card["date_obj"].dt.month == int(mes_filter_s)
+                ]
+
+        if ano_filter:
+            df_sono_card = df_sono_card[
+                df_sono_card["date_obj"].dt.year == int(ano_filter)
+                ]
+
+        if time_filter != "Todos" and "Time" in df_sono_card.columns:
+            df_sono_card = df_sono_card[
+                df_sono_card["Time"].astype(str).str.strip() == time_filter
+                ]
+
         if not df_sono_card.empty:
             # Ordena do mais recente para o mais antigo
             df_sono_card = df_sono_card.sort_values("date_obj", ascending=False)
@@ -1462,36 +1481,43 @@ if st.session_state["pagina"] == "sono":
             # 👉 AVALIAÇÃO DO HORÁRIO (CORRETA E LEGÍVEL)
             # 👉 AVALIAÇÃO DO SONO (ORDEM CORRETA)
             # 👉 AVALIAÇÃO DO SONO (ORDEM DEFINITIVA)
+            # 👉 AVALIAÇÃO DO SONO (LÓGICA CORRETA)
             status = "✅ Sono Ideal"
             cor = "green"
             mensagem = "Horário e duração adequados."
 
-            # 1️⃣ Quantidade vem primeiro
+            # 1️⃣ Prioridade: quantidade de sono
             if dur_h < 6:
                 status = "🚨 Sono Insuficiente"
                 cor = "red"
                 mensagem = "Quantidade de sono abaixo do ideal."
 
-            # 2️⃣ Madrugada pesada
-            elif hora_dormiu >= 2:
-                status = "🚨 Sono Muito Tardio"
-                cor = "red"
-                mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
+            else:
+                # Converte horário corretamente
+                h, m = hora_d_str.split(":")
+                h = int(h)
+                m = int(m)
 
-            # 3️⃣ Madrugada leve
-            elif 0 <= hora_dormiu < 2:
-                status = "⚠️ Sono Tardio"
-                cor = "orange"
-                mensagem = "Dormiu após 00:00. Atenção ao ritmo biológico."
+                # 2️⃣ Madrugada pesada (02:00+)
+                if h >= 2 and h < 12:
+                    status = "🚨 Sono Muito Tardio"
+                    cor = "red"
+                    mensagem = "Dormiu após 02:00. Alto impacto negativo na recuperação."
 
-            # 4️⃣ Limite saudável
-            elif 23 <= hora_dormiu < 24:
-                status = "⚠️ Dormiu no Limite"
-                cor = "orange"
-                mensagem = "Dormiu próximo do limite ideal (23:00)."
+                # 3️⃣ Madrugada leve (00:00–01:59)
+                elif h < 2:
+                    status = "⚠️ Sono Tardio"
+                    cor = "orange"
+                    mensagem = "Dormiu na madrugada (após 00:00). Atenção ao ritmo biológico."
+
+                # 4️⃣ Limite saudável (23:00–23:59)
+                elif h == 23:
+                    status = "⚠️ Dormiu no Limite"
+                    cor = "orange"
+                    mensagem = "Dormiu próximo do limite ideal (23:00)."
 
             # 👉 CARD VISUAL
-            st.markdown("### 🧠 Análise do Último Sono")
+            st.markdown("### 🧠 Análise do Último Sono (dentro do periodo selecionado")
 
             st.markdown(
                 f"""
