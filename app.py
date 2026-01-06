@@ -1182,19 +1182,32 @@ if st.session_state["pagina"] == "treinos":
                 df_plot["date_obj"] = pd.to_datetime(df_plot["date_obj"], errors="coerce")
                 df_plot = df_plot.dropna(subset=["date_obj"])
 
-                # Agrupa por semana e tipo
-                df_plot["Semana"] = (
+                df_plot = df_filtrado.copy()
+
+                # Garante data válida
+                df_plot["date_obj"] = pd.to_datetime(df_plot["date_obj"], errors="coerce")
+                df_plot = df_plot.dropna(subset=["date_obj"])
+
+                # 1️⃣ DATA REAL DA SEMANA (datetime)
+                df_plot["Semana_DT"] = (
                     df_plot["date_obj"]
                     .dt.to_period("W")
-                    .apply(lambda x: x.start_time.strftime("%d/%m/%Y"))
+                    .apply(lambda x: x.start_time)
                 )
 
+                # 2️⃣ AGRUPAMENTO USANDO DATETIME (CORRETO)
                 df_linha = (
                     df_plot
-                    .groupby(["Semana", NOME_COLUNA_TIPO])
+                    .groupby(["Semana_DT", NOME_COLUNA_TIPO])
                     .size()
                     .reset_index(name="Quantidade")
                 )
+
+                # 3️⃣ ORDENAÇÃO CRONOLÓGICA (ESSENCIAL)
+                df_linha = df_linha.sort_values("Semana_DT")
+
+                # 4️⃣ DATA BR SÓ PARA EXIBIÇÃO
+                df_linha["Semana"] = df_linha["Semana_DT"].dt.strftime("%d/%m/%Y")
 
                 if df_linha.empty:
                     st.info("Sem dados suficientes para gerar o gráfico.")
