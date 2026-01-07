@@ -1632,10 +1632,26 @@ if st.session_state["pagina"] == "sono":
                     hora_dormiu = safe_parse_hour(horarios_dormir[i])
 
                     if hora_dormiu is not None:
-                        if hora_dormiu >= 2:
-                            ax.scatter(i, val, s=200, facecolors='none', edgecolors='red', linewidths=2)
-                        elif hora_dormiu >= 23:
-                            ax.scatter(i, val, s=160, facecolors='none', edgecolors='orange', linewidths=2)
+
+                        # Madrugada pesada (02:00–05:59)
+                        if 2 <= hora_dormiu < 6:
+                            ax.scatter(
+                                i, val,
+                                s=200,
+                                facecolors='none',
+                                edgecolors='red',
+                                linewidths=2
+                            )
+
+                        # Dormiu no limite (23:00–23:59)
+                        elif 23 <= hora_dormiu < 24:
+                            ax.scatter(
+                                i, val,
+                                s=160,
+                                facecolors='none',
+                                edgecolors='orange',
+                                linewidths=2
+                            )
 
                 # Linhas de referência (Média, Alerta)
                 ax.axhline(media, color='#009688', linestyle='-', linewidth=1,
