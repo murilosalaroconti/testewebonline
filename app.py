@@ -4142,26 +4142,76 @@ if st.session_state["pagina"] == "dashboard":
         else:
             status_cansaco = ("Alto", 30, "🔴")
 
+        # -------- FLAGS DOS PILARES --------
+
+        sono_ruim = status_sono[1] <= 60
+        sono_irregular = status_sono[1] == 65
+
+        treino_baixo = status_treino[1] <= 40
+        treino_alto = status_treino[1] >= 90
+
+        alimentacao_ruim = status_alimentacao[1] <= 40
+
+        cansaco_alto = status_cansaco[1] <= 40
+        cansaco_moderado = status_cansaco[1] == 60
+
         # -------- INTERPRETAÇÃO INTELIGENTE --------
 
-        if status_sono[1] < 60 or status_treino[1] < 40:
+        # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
+        if treino_alto and (sono_ruim or sono_irregular) and cansaco_alto and alimentacao_ruim:
             interpretacao = (
-                "⚠️ O atleta apresentou boa capacidade física geral, porém com "
-                "irregularidades na recuperação e/ou baixa carga de treinos, "
-                "fatores que podem impactar o rendimento."
+                "🚨🚨 O contexto físico pré-jogo indica alto risco fisiológico, com sinais claros de "
+                "sobrecarga, recuperação inadequada e falhas nutricionais. "
+                "Recomenda-se ajuste imediato da carga de treino e foco prioritário na recuperação."
             )
-        elif status_cansaco[1] < 60:
+
+        # 🔴 CENÁRIO 7 — SOBRECARGA INSTALADA
+        elif treino_alto and cansaco_alto:
             interpretacao = (
-                "⚠️ Foram observados sinais de fadiga no período pré-jogo, "
-                "o que merece atenção no controle de carga."
+                "🚨 O atleta apresentou sinais claros de excesso de carga no período pré-jogo, "
+                "com impacto potencial negativo na recuperação e no desempenho."
             )
+
+        # 🔴 CENÁRIO 6 — SOBRECARGA INICIAL
+        elif treino_alto and sono_irregular and cansaco_moderado:
+            interpretacao = (
+                "🚨 O contexto físico pré-jogo aponta sinais iniciais de sobrecarga, "
+                "associados a treinos intensos, sono irregular e aumento do cansaço."
+            )
+
+        # 🟠 CENÁRIO 4 — RISCO DE ACÚMULO
+        elif treino_alto and sono_irregular:
+            interpretacao = (
+                "⚠️ O atleta manteve boa carga de treinos, porém com sono irregular, "
+                "o que pode comprometer a recuperação e gerar risco de acúmulo físico."
+            )
+
+        # 🔴 CENÁRIO 5 — PREPARAÇÃO INSUFICIENTE
+        elif sono_ruim and treino_baixo:
+            interpretacao = (
+                "🚨 Sono inadequado aliado à baixa carga de treinos indica risco elevado "
+                "por recuperação deficiente e preparo físico insuficiente."
+            )
+
+        # 🟠 CENÁRIO 3 — RECUPERAÇÃO E NUTRIÇÃO IRREGULARES
+        elif sono_irregular and alimentacao_ruim:
+            interpretacao = (
+                "⚠️ O atleta apresentou irregularidades no período pré-jogo, "
+                "especialmente relacionadas à recuperação e à qualidade da alimentação."
+            )
+
+        # 🟡 CENÁRIO 2 — ALERTA LEVE
+        elif sono_irregular or alimentacao_ruim:
+            interpretacao = (
+                "⚠️ Foram observadas pequenas irregularidades no período pré-jogo, "
+                "que merecem atenção para manutenção do rendimento."
+            )
+
+        # 🟢 CENÁRIO 1 — CONTEXTO EQUILIBRADO
         else:
             interpretacao = (
-                "✅ O atleta apresentou um contexto físico equilibrado "
-                "no período pré-jogo."
+                "✅ O atleta apresentou um contexto físico equilibrado no período pré-jogo."
             )
-
-
 
         # -------- CARD VISUAL --------
         st.markdown(
