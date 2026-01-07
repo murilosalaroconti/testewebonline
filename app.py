@@ -1633,8 +1633,8 @@ if st.session_state["pagina"] == "sono":
 
                     if hora_dormiu is not None:
 
-                        # 🟢 Dormiu cedo – antes das 23:00
-                        if hora_dormiu < 23:
+                        # 🟢 Dormiu cedo (até 22:45)
+                        if hora_dormiu <= 22.75:
                             ax.scatter(
                                 i, val,
                                 s=140,
@@ -1643,8 +1643,8 @@ if st.session_state["pagina"] == "sono":
                                 linewidths=2
                             )
 
-                        # 🟠 Limite – entre 23:00 e 23:59
-                        elif 23 <= hora_dormiu < 24:
+                        # 🟠 Limite aceitável (23:00 até 23:45)
+                        elif 23.0 <= hora_dormiu <= 23.75:
                             ax.scatter(
                                 i, val,
                                 s=160,
@@ -1653,8 +1653,8 @@ if st.session_state["pagina"] == "sono":
                                 linewidths=2
                             )
 
-                        # 🔴 Tarde – a partir da 00:00
-                        else:  # hora_dormiu >= 0 e < 23 já caiu acima
+                        # 🔴 Tarde (00:00 até 06:00)
+                        elif 0.0 <= hora_dormiu <= 6.0:
                             ax.scatter(
                                 i, val,
                                 s=200,
