@@ -4098,24 +4098,7 @@ if st.session_state["pagina"] == "dashboard":
         alimentacao = saude_periodo["Alimentação"].mode().iloc[0] if not saude_periodo.empty else "N/D"
         cansaco = saude_periodo["Cansaço"].mode().iloc[0] if not saude_periodo.empty else "N/D"
 
-        # -------- INTERPRETAÇÃO INTELIGENTE --------
 
-        if status_sono[1] < 60 or status_treino[1] < 40:
-            interpretacao = (
-                "⚠️ O atleta apresentou boa capacidade física geral, porém com "
-                "irregularidades na recuperação e/ou baixa carga de treinos, "
-                "fatores que podem impactar o rendimento."
-            )
-        elif status_cansaco[1] < 60:
-            interpretacao = (
-                "⚠️ Foram observados sinais de fadiga no período pré-jogo, "
-                "o que merece atenção no controle de carga."
-            )
-        else:
-            interpretacao = (
-                "✅ O atleta apresentou um contexto físico equilibrado "
-                "no período pré-jogo."
-            )
 
         # -------- STATUS NORMALIZADO DOS PILARES --------
 
@@ -4153,18 +4136,26 @@ if st.session_state["pagina"] == "dashboard":
         else:
             status_cansaco = ("Alto", 30, "🔴")
 
-        # -------- TEXTO FINAL --------
-        if alertas:
+        # -------- INTERPRETAÇÃO INTELIGENTE --------
+
+        if status_sono[1] < 60 or status_treino[1] < 40:
             interpretacao = (
-                    "⚠️ O atleta entrou em campo com sinais de "
-                    + ", ".join(alertas)
-                    + ", o que pode ter impactado o desempenho."
+                "⚠️ O atleta apresentou boa capacidade física geral, porém com "
+                "irregularidades na recuperação e/ou baixa carga de treinos, "
+                "fatores que podem impactar o rendimento."
+            )
+        elif status_cansaco[1] < 60:
+            interpretacao = (
+                "⚠️ Foram observados sinais de fadiga no período pré-jogo, "
+                "o que merece atenção no controle de carga."
             )
         else:
             interpretacao = (
                 "✅ O atleta apresentou um contexto físico equilibrado "
                 "no período pré-jogo."
             )
+
+        
 
         # -------- CARD VISUAL --------
         st.markdown(
