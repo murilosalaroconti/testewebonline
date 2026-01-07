@@ -1633,23 +1633,33 @@ if st.session_state["pagina"] == "sono":
 
                     if hora_dormiu is not None:
 
-                        # Madrugada pesada (02:00–05:59)
-                        if 2 <= hora_dormiu < 6:
+                        # 🟢 Dormiu cedo – antes das 23:00
+                        if hora_dormiu < 23:
                             ax.scatter(
                                 i, val,
-                                s=200,
+                                s=140,
                                 facecolors='none',
-                                edgecolors='red',
+                                edgecolors='green',
                                 linewidths=2
                             )
 
-                        # Dormiu no limite (23:00–23:59)
+                        # 🟠 Limite – entre 23:00 e 23:59
                         elif 23 <= hora_dormiu < 24:
                             ax.scatter(
                                 i, val,
                                 s=160,
                                 facecolors='none',
                                 edgecolors='orange',
+                                linewidths=2
+                            )
+
+                        # 🔴 Tarde – a partir da 00:00
+                        else:  # hora_dormiu >= 0 e < 23 já caiu acima
+                            ax.scatter(
+                                i, val,
+                                s=200,
+                                facecolors='none',
+                                edgecolors='red',
                                 linewidths=2
                             )
 
