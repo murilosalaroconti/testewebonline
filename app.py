@@ -4063,6 +4063,17 @@ if st.session_state["pagina"] == "dashboard":
             sono_periodo["Horas"] = sono_periodo["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
             media_sono = sono_periodo["Horas"].mean()
 
+        # -------- ANÁLISE DE HORÁRIO DO SONO --------
+        dias_sono = len(sono_periodo)
+        dias_apos_meia_noite = 0
+
+        if not sono_periodo.empty and "Hora Dormir" in sono_periodo.columns:
+            for h in sono_periodo["Hora Dormir"]:
+                hora = safe_parse_hour(h)
+                if hora is not None and hora >= 0:
+                    if hora < 6 or hora >= 24 or hora >= 0 and hora < 2:
+                        dias_apos_meia_noite += 1
+
         # -------- TREINOS --------
         treinos_periodo = df_treinos_full.copy()
         treinos_periodo["Date_DT"] = pd.to_datetime(
@@ -4087,20 +4098,60 @@ if st.session_state["pagina"] == "dashboard":
         alimentacao = saude_periodo["Alimentação"].mode().iloc[0] if not saude_periodo.empty else "N/D"
         cansaco = saude_periodo["Cansaço"].mode().iloc[0] if not saude_periodo.empty else "N/D"
 
-        # -------- INTERPRETAÇÃO --------
-        alertas = []
+        # -------- INTERPRETAÇÃO INTELIGENTE --------
 
-        if media_sono is not None and media_sono < 6.5:
-            alertas.append("sono abaixo do ideal")
+        if status_sono[1] < 60 or status_treino[1] < 40:
+            interpretacao = (
+                "⚠️ O atleta apresentou boa capacidade física geral, porém com "
+                "irregularidades na recuperação e/ou baixa carga de treinos, "
+                "fatores que podem impactar o rendimento."
+            )
+        elif status_cansaco[1] < 60:
+            interpretacao = (
+                "⚠️ Foram observados sinais de fadiga no período pré-jogo, "
+                "o que merece atenção no controle de carga."
+            )
+        else:
+            interpretacao = (
+                "✅ O atleta apresentou um contexto físico equilibrado "
+                "no período pré-jogo."
+            )
 
-        if qtde_treinos >= 5:
-            alertas.append("carga elevada de treinos")
+        # -------- STATUS NORMALIZADO DOS PILARES --------
 
-        if alimentacao in ["Ruim", "Regular"]:
-            alertas.append("alimentação inadequada")
+        # 💤 SONO
+        if media_sono is None:
+            status_sono = ("N/D", 50, "⚪")
+        elif media_sono >= 8 and dias_apos_meia_noite <= 1:
+            status_sono = ("Bom", 100, "🟢")
+        elif media_sono >= 7:
+            status_sono = ("Irregular", 65, "🟡")
+        else:
+            status_sono = ("Insuficiente", 30, "🔴")
 
-        if cansaco == "Alto":
-            alertas.append("fadiga relatada")
+        # 💪 TREINO
+        if qtde_treinos >= 4:
+            status_treino = ("Bom", 100, "🟢")
+        elif qtde_treinos >= 2:
+            status_treino = ("Baixo", 60, "🟡")
+        else:
+            status_treino = ("Muito Baixo", 30, "🔴")
+
+        # 🍽️ ALIMENTAÇÃO
+        if alimentacao == "Boa":
+            status_alimentacao = ("Boa", 100, "🟢")
+        elif alimentacao == "Regular":
+            status_alimentacao = ("Regular", 60, "🟡")
+        else:
+            status_alimentacao = ("Ruim", 30, "🔴")
+
+        # 🥵 CANSAÇO
+        if cansaco == "Baixo":
+            status_cansaco = ("Controlado", 100, "🟢")
+        elif cansaco == "Médio":
+            status_cansaco = ("Atenção", 60, "🟡")
+        else:
+            status_cansaco = ("Alto", 30, "🔴")
 
         # -------- TEXTO FINAL --------
         if alertas:
@@ -4135,6 +4186,34 @@ if st.session_state["pagina"] == "dashboard":
                     """,
             unsafe_allow_html=True
         )
+
+        # -------- VISUAL MODERNO DOS 4 PILARES --------
+        st.markdown("#### 📊 Leitura Rápida do Contexto Físico")
+
+
+        def barra(label, status):
+            nome, valor, emoji = status
+            st.markdown(
+                f"""
+                <div style="margin-bottom:10px;">
+                    <strong>{label}</strong> {emoji} <span style="opacity:0.7;">({nome})</span>
+                    <div style="background:#1F2933; border-radius:10px; overflow:hidden; height:10px;">
+                        <div style="
+                            width:{valor}%;
+                            background:linear-gradient(90deg, #00E5FF, #1DE9B6);
+                            height:10px;
+                        "></div>
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+
+        barra("😴 Sono", status_sono)
+        barra("💪 Treino", status_treino)
+        barra("🍽️ Alimentação", status_alimentacao)
+        barra("🥵 Cansaço", status_cansaco)
 
         st.markdown(
             """
