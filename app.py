@@ -1342,14 +1342,7 @@ if st.session_state["pagina"] == "sono":
     # Garante que a função load_sono_df() está carregando o DF aqui
     df_sono = load_sono_df()
 
-    # NORMALIZAÇÃO DO CAMPO TIME
-    if "Time" in df_sono.columns:
-        df_sono["Time"] = (
-            df_sono["Time"]
-            .astype(str)
-            .str.strip()
-            .replace({"": None, "None": None, "nan": None, "NaN": None})
-        )
+
 
     # --- GARANTE AS COLUNAS NO DF PRINCIPAL USANDO VALORES STRING ---
     for col in COLUNAS_COCHILO_NAMES:
@@ -1439,26 +1432,7 @@ if st.session_state["pagina"] == "sono":
 
     ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
 
-    # ---------- FILTRO DE TIME (CORRETO E SEGURO) ----------
-    if "Time" in df_sono.columns:
-        times_validos = (
-            df_sono["Time"]
-            .dropna()
-            .astype(str)
-            .str.strip()
-            .loc[lambda x: x != ""]
-            .unique()
-            .tolist()
-        )
 
-        if times_validos:
-            times_disponiveis = ["Todos"] + sorted(times_validos)
-        else:
-            times_disponiveis = ["Todos"]
-    else:
-        times_disponiveis = ["Todos"]
-
-    time_filter = st.selectbox("Filtrar por Time", times_disponiveis)
 
     if st.button("Gerar Gráfico (Sono)"):
         df_sono = load_sono_df()
@@ -1487,10 +1461,7 @@ if st.session_state["pagina"] == "sono":
                 df_sono_card["date_obj"].dt.year == int(ano_filter)
                 ]
 
-        if time_filter != "Todos" and "Time" in df_sono_card.columns:
-            df_sono_card = df_sono_card[
-                df_sono_card["Time"] == time_filter
-                ]
+
 
         if not df_sono_card.empty:
             # Ordena do mais recente para o mais antigo
@@ -1589,10 +1560,6 @@ if st.session_state["pagina"] == "sono":
 
             for _, row in df_sono.iterrows():
 
-                time_row = str(row.get("Time", "")).strip()
-
-                if time_filter != "Todos" and time_row != time_filter:
-                    continue
 
 
                 d = row.get("Data", "")
