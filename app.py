@@ -4067,11 +4067,19 @@ if st.session_state["pagina"] == "dashboard":
         dias_sono = len(sono_periodo)
         dias_apos_meia_noite = 0
 
+        texto_horario_sono = ""
+
+        if dias_sono > 0 and dias_apos_meia_noite > 0:
+            texto_horario_sono = (
+                f"⏰ Dormiu após 00:00 em "
+                f"<b>{dias_apos_meia_noite}</b> de <b>{dias_sono}</b> dias<br>"
+            )
+
         if not sono_periodo.empty and "Hora Dormir" in sono_periodo.columns:
             for h in sono_periodo["Hora Dormir"]:
                 hora = safe_parse_hour(h)
                 if hora is not None and hora >= 0:
-                    if hora < 6 or hora >= 24 or hora >= 0 and hora < 2:
+                    if hora is not None and hora < 6:
                         dias_apos_meia_noite += 1
 
         # -------- TREINOS --------
@@ -4155,7 +4163,7 @@ if st.session_state["pagina"] == "dashboard":
                 "no período pré-jogo."
             )
 
-        
+
 
         # -------- CARD VISUAL --------
         st.markdown(
@@ -4169,6 +4177,7 @@ if st.session_state["pagina"] == "dashboard":
                     ">
                         <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
                         😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
+                        {texto_horario_sono}
                         💪 Treinos: <b>{qtde_treinos}</b><br>
                         🍽️ Alimentação: <b>{alimentacao}</b><br>
                         🥵 Cansaço: <b>{cansaco}</b><br><br>
