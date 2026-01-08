@@ -4407,6 +4407,44 @@ if st.session_state["pagina"] == "dashboard":
                 "com boa gestão de carga, recuperação adequada e condições favoráveis de desempenho."
             )
 
+        # ======================================================
+        # 🧠 LEITURA DO SISTEMA — MOTIVOS OBJETIVOS
+        # ======================================================
+
+        motivos_irregularidades = []
+
+        if sono_comprometido:
+            motivos_irregularidades.append(
+                "Sono com padrão irregular (horários tardios ou recuperação incompleta)"
+            )
+
+        if alerta_forte_carga:
+            motivos_irregularidades.append(
+                "Sequência de jogos em curto intervalo"
+            )
+
+        if treino_alto:
+            motivos_irregularidades.append(
+                "Volume semanal de treinos elevado"
+            )
+
+        if alimentacao_ruim_flag:
+            motivos_irregularidades.append(
+                "Qualidade da alimentação abaixo do ideal"
+            )
+
+        if motivos_irregularidades:
+            leitura_sistema = (
+                    "🧠 <strong>Leitura do sistema</strong><br>"
+                    "⚠️ Irregularidades identificadas no período pré-jogo:<br>"
+                    + "<br>".join([f"• {m}" for m in motivos_irregularidades])
+            )
+        else:
+            leitura_sistema = (
+                "🧠 <strong>Leitura do sistema</strong><br>"
+                "✅ Nenhuma irregularidade relevante foi identificada no período pré-jogo."
+            )
+
         # -------- CARD VISUAL --------
         html_lista_jogos = "<br>".join(lista_jogos_txt) if lista_jogos_txt else "Nenhum jogo registrado no período."
 
@@ -4438,7 +4476,8 @@ if st.session_state["pagina"] == "dashboard":
             f"{alerta_sequencia + '<br><br>' if alerta_sequencia else ''}"
 
             "<strong>🧠 Leitura do sistema</strong><br>"
-            f"<em>{interpretacao}</em>"
+            f"<em>{interpretacao}</em><br><br>{leitura_sistema}"
+
 
             "</div>"
         )
