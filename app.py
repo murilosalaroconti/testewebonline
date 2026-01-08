@@ -4131,7 +4131,57 @@ if st.session_state["pagina"] == "dashboard":
 
             carga_jogos += minutos * peso
 
+        # ======================================================
+        # 📆 LISTA DOS JOGOS CONSIDERADOS (7 DIAS)
+        # ======================================================
 
+        lista_jogos_txt = []
+        total_minutos_jogos = 0
+
+        for _, j in jogos_periodo.iterrows():
+            data_fmt = j["Data_DT"].strftime("%d/%m")
+            modalidade_j = j.get("Condição do Campo", "N/D")
+            minutos = int(j.get("Minutos Jogados", 0))
+
+            total_minutos_jogos += minutos
+
+            lista_jogos_txt.append(
+                f"• {data_fmt} — {modalidade_j} — {minutos} min"
+            )
+
+        # ======================================================
+        # 🔵 ALERTA AUTOMÁTICO DE SEQUÊNCIA DE JOGOS
+        # ======================================================
+
+        alerta_sequencia = None
+
+        if not jogos_periodo.empty:
+
+            # Datas únicas dos jogos
+            datas_jogos = sorted(jogos_periodo["Data_DT"].dt.date.unique())
+
+            dias_consecutivos = 0
+            for i in range(1, len(datas_jogos)):
+                if (datas_jogos[i] - datas_jogos[i - 1]).days == 1:
+                    dias_consecutivos += 1
+
+            jogos_por_dia = jogos_periodo["Data_DT"].dt.date.value_counts().max()
+
+            total_jogos = len(jogos_periodo)
+
+            # CONDIÇÕES DE ALERTA (nível elite)
+            if (
+                    dias_consecutivos >= 1
+                    or jogos_por_dia >= 2
+                    or total_minutos_jogos >= 70
+            ):
+                alerta_sequencia = (
+                    f"⚠️ Atenção: o atleta participou de "
+                    f"<b>{total_jogos} jogo(s)</b> em "
+                    f"<b>{len(datas_jogos)} dia(s)</b>, "
+                    f"acumulando <b>{total_minutos_jogos} minutos</b>, "
+                    f"o que exige controle da recuperação."
+                )
 
         # ======================================================
         # 💪 CARGA FÍSICA DOS TREINOS (7 DIAS ANTERIORES)
@@ -4218,7 +4268,7 @@ if st.session_state["pagina"] == "dashboard":
         alimentacao_ruim_flag = (status_alimentacao[1] <= 40)
         cansaco_medio_ou_alto = (status_cansaco[1] <= 60)
 
-       
+
         # ======================================================
         # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
         # ======================================================
@@ -4290,22 +4340,31 @@ if st.session_state["pagina"] == "dashboard":
         # -------- CARD VISUAL --------
         st.markdown(
             f"""
-                    <div style="
-                        background:#0B1220;
-                        padding:16px;
-                        border-radius:14px;
-                        border-left:6px solid #FF9800;
-                        box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-                    ">
-                        <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
-                        😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
-                        {texto_horario_sono}
-                        💪 Treinos: <b>{qtde_treinos}</b><br>
-                        🍽️ Alimentação: <b>{alimentacao}</b><br>
-                        🥵 Cansaço: <b>{cansaco}</b><br><br>
-                        <em>{interpretacao}</em>
-                    </div>
-                    """,
+            <div style="
+                background:#0B1220;
+                padding:16px;
+                border-radius:14px;
+                border-left:6px solid #FF9800;
+                box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+            ">
+                <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
+
+                <b>📆 Jogos considerados:</b><br>
+                {"<br>".join(lista_jogos_txt) if lista_jogos_txt else "Nenhum jogo registrado no período."}<br><br>
+
+                ⏱️ <b>Minutagem acumulada:</b> {total_minutos_jogos} min<br>
+                🎮 <b>Total de jogos:</b> {len(lista_jogos_txt)}<br><br>
+
+                😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
+                {texto_horario_sono}
+                💪 Treinos: <b>{qtde_treinos}</b><br>
+                🍽️ Alimentação: <b>{alimentacao}</b><br>
+                🥵 Cansaço: <b>{cansaco}</b><br><br>
+
+                {alerta_sequencia + "<br><br>" if alerta_sequencia else ""}
+                <em>{interpretacao}</em>
+            </div>
+            """,
             unsafe_allow_html=True
         )
 
