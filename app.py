@@ -4349,9 +4349,9 @@ if st.session_state["pagina"] == "dashboard":
             )
 
         # 🟠 CENÁRIO 6 — SOBRECARGA EM CONSTRUÇÃO
-            elif carga_moderada and sono_comprometido and cansaco_medio_ou_alto:
+        elif carga_moderada and sono_comprometido and cansaco_medio_ou_alto:
 
-            elif carga_moderada and alerta_forte_carga:
+        elif carga_moderada and alerta_forte_carga:
             interpretacao = (
                 "⚠️ A carga física recente foi moderada, impulsionada por jogos em dias próximos ou "
                 "acúmulo de minutagem. Mesmo com cansaço controlado, a recuperação deve ser monitorada "
