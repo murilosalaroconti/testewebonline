@@ -4228,6 +4228,11 @@ if st.session_state["pagina"] == "dashboard":
 
         carga_total = carga_jogos + carga_treinos + carga_fisica_jogo
 
+
+        # ======================================================
+        # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
+        # ======================================================
+
         if carga_total >= 350:
             status_carga = ("Alta", 30, "🔴")
         elif carga_total >= 180:
@@ -4235,9 +4240,10 @@ if st.session_state["pagina"] == "dashboard":
         else:
             status_carga = ("Baixa", 100, "🟢")
 
-        carga_baixa = (status_carga[0] == "Baixa")
-        carga_moderada = (status_carga[0] == "Moderada")
-        carga_alta = (status_carga[0] == "Alta")
+        # 🔹 AGORA SIM as flags
+        carga_baixa = status_carga[0] == "Baixa"
+        carga_moderada = status_carga[0] == "Moderada"
+        carga_alta = status_carga[0] == "Alta"
 
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
         if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
