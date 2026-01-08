@@ -4341,34 +4341,32 @@ if st.session_state["pagina"] == "dashboard":
 
         # -------- CARD VISUAL --------
         html_lista_jogos = "<br>".join(lista_jogos_txt) if lista_jogos_txt else "Nenhum jogo registrado no período."
-        
+
         st.markdown(
-            f"""
-            <div style="
-                background:#0B1220;
-                padding:16px;
-                border-radius:14px;
-                border-left:6px solid #FF9800;
-                box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-            ">
-                <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
+            f"""<div style="background:#0B1220;
+        padding:16px;
+        border-radius:14px;
+        border-left:6px solid #FF9800;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.4);">
 
-                <b>📆 Jogos considerados:</b><br>
-                {"<br>".join(lista_jogos_txt) if lista_jogos_txt else "Nenhum jogo registrado no período."}<br><br>
+        <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
 
-                ⏱️ <b>Minutagem acumulada:</b> {total_minutos_jogos} min<br>
-                🎮 <b>Total de jogos:</b> {len(lista_jogos_txt)}<br><br>
+        <strong>📆 Jogos considerados:</strong><br>
+        {html_lista_jogos}<br><br>
 
-                😴 Sono médio: <b>{f"{media_sono:.1f}h" if media_sono else "N/D"}</b><br>
-                {texto_horario_sono}
-                💪 Treinos: <b>{qtde_treinos}</b><br>
-                🍽️ Alimentação: <b>{alimentacao}</b><br>
-                🥵 Cansaço: <b>{cansaco}</b><br><br>
+        ⏱️ <strong>Minutagem acumulada:</strong> {total_minutos_jogos} min<br>
+        🎮 <strong>Total de jogos:</strong> {len(lista_jogos_txt)}<br><br>
 
-                {alerta_sequencia + "<br><br>" if alerta_sequencia else ""}
-                <em>{interpretacao}</em>
-            </div>
-            """,
+        😴 Sono médio: <strong>{f"{media_sono:.1f}h" if media_sono else "N/D"}</strong><br>
+        {texto_horario_sono}
+        💪 Treinos: <strong>{qtde_treinos}</strong><br>
+        🍽️ Alimentação: <strong>{alimentacao}</strong><br>
+        🥵 Cansaço: <strong>{cansaco}</strong><br><br>
+
+        {f"<div style='margin-bottom:10px;'>{alerta_sequencia}</div>" if alerta_sequencia else ""}
+        <em>{interpretacao}</em>
+
+        </div>""",
             unsafe_allow_html=True
         )
 
