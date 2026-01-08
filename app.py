@@ -828,35 +828,13 @@ if st.session_state["pagina"] == "jogos":
 
         st.markdown("### 📊 Scout Ao Vivo")
 
-
-        def contador(label, chave):
-            st.markdown(label)
-            c1, c2, c3 = st.columns([1, 2, 1])
-
-            with c1:
-                if st.button("➖", key=f"{chave}_menos"):
-                    if st.session_state["scout_temp"][chave] > 0:
-                        st.session_state["scout_temp"][chave] -= 1
-
-            with c2:
-                st.markdown(
-                    f"<h2 style='text-align:center;'>{st.session_state['scout_temp'][chave]}</h2>",
-                    unsafe_allow_html=True
-                )
-
-            with c3:
-                if st.button("➕", key=f"{chave}_mais"):
-                    st.session_state["scout_temp"][chave] += 1
-
-
-        # ======== SCOUTS ========
-        contador("🥅 Chutes", "Chutes")
-        contador("❌ Chutes Errados", "Chutes Errados")
-        contador("🛡️ Desarmes", "Desarmes")
-        contador("🎯 Passes-chave", "Passes-chave")
-        contador("❌ Passes Errados", "Passes Errados")
-        contador("⚡ Faltas Sofridas", "Faltas Sofridas")
-        contador("🔁 Participações Indiretas", "Participações Indiretas")
+        st.number_input("🥅 Chutes", min_value=0, key="Chutes")
+        st.number_input("❌ Chutes Errados", min_value=0, key="Chutes Errados")
+        st.number_input("🛡️ Desarmes", min_value=0, key="Desarmes")
+        st.number_input("🎯 Passes-chave", min_value=0, key="Passes-chave")
+        st.number_input("❌ Passes Errados", min_value=0, key="Passes Errados")
+        st.number_input("⚡ Faltas Sofridas", min_value=0, key="Faltas Sofridas")
+        st.number_input("🔁 Participações Indiretas", min_value=0, key="Participações Indiretas")
 
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
@@ -895,7 +873,14 @@ if st.session_state["pagina"] == "jogos":
                     "Assistências": assistencias,
                     "Resultado": f"{gols_atleta}x{gols_adversario}",
                     "Condição do Campo": modalidade,
-                    **st.session_state["scout_temp"]
+                    "Chutes": st.session_state["Chutes"],
+                    "Chutes Errados": st.session_state["Chutes Errados"],
+                    "Desarmes": st.session_state["Desarmes"],
+                    "Passes-chave": st.session_state["Passes-chave"],
+                    "Passes Errados": st.session_state["Passes Errados"],
+                    "Faltas Sofridas": st.session_state["Faltas Sofridas"],
+                    "Participações Indiretas": st.session_state["Participações Indiretas"],
+
                 }
 
 
@@ -906,14 +891,12 @@ if st.session_state["pagina"] == "jogos":
                     st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
 
                 # 🔥 LIMPA O SCOUT SÓ AGORA
-                for k in st.session_state["scout_temp"]:
-                    st.session_state["scout_temp"][k] = 0
-
-
-
-
-
-
+                for k in [
+                    "Chutes", "Chutes Errados", "Desarmes",
+                    "Passes-chave", "Passes Errados",
+                    "Faltas Sofridas", "Participações Indiretas"
+                ]:
+                    st.session_state[k] = 0
 
     # ----------------------------------------------------------------------
     # COLUNA 2 - TABELA
