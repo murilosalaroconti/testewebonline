@@ -4303,7 +4303,10 @@ if st.session_state["pagina"] == "dashboard":
         sono_irregular = status_sono[1] == 65
 
         treino_baixo = status_treino[1] <= 40
-        treino_alto = status_treino[1] >= 90
+        treino_alto = (
+                qtde_treinos >= 5
+                or max_treinos_no_dia >= 2
+        )
 
         alimentacao_ruim = status_alimentacao[1] <= 40
 
@@ -4337,6 +4340,10 @@ if st.session_state["pagina"] == "dashboard":
             status_carga = ("Moderada", 60, "🟡")
         else:
             status_carga = ("Baixa", 100, "🟢")
+
+        # 🔧 AJUSTE DE COERÊNCIA FISIOLÓGICA
+        if alerta_forte_carga and status_carga[0] == "Baixa":
+            status_carga = ("Moderada", 60, "🟡")
 
         # 🔹 FLAGS (ESSENCIAIS)
         carga_baixa = status_carga[0] == "Baixa"
@@ -4475,8 +4482,9 @@ if st.session_state["pagina"] == "dashboard":
 
             f"{alerta_sequencia + '<br><br>' if alerta_sequencia else ''}"
 
-            "<strong>🧠 Leitura do sistema</strong><br>"
-            f"<em>{interpretacao}</em><br><br>{leitura_sistema}"
+            "<strong>🧠 Conclusão do sistema</strong><br>"
+            f"<em>{interpretacao}</em><br><br>"
+            f"{leitura_sistema}"
 
 
             "</div>"
