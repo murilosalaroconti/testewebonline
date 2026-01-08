@@ -4036,16 +4036,6 @@ if st.session_state["pagina"] == "dashboard":
         # Modalidade do jogo
         modalidade_jogo = jogo["Condição do Campo"]
 
-        # Peso da modalidade
-        peso_modalidade = PESO_MODALIDADE.get(modalidade_jogo, 1.0)
-
-        # 🔥 Carga física do jogo
-        carga_fisica_jogo = minutos_jogo * peso_modalidade
-
-        # Janela fixa: 7 dias antes do jogo
-        inicio_janela = data_jogo - pd.Timedelta(days=7)
-        fim_janela = data_jogo - pd.Timedelta(days=1)
-
         # ======================================================
         # ⚖️ PESOS DE CARGA FÍSICA (BASE FISIOLÓGICA)
         # ======================================================
@@ -4061,6 +4051,18 @@ if st.session_state["pagina"] == "dashboard":
             "Society": 6,
             "Campo": 6
         }
+
+        # Peso da modalidade
+        peso_modalidade = PESO_MODALIDADE.get(modalidade_jogo, 1.0)
+
+        # 🔥 Carga física do jogo
+        carga_fisica_jogo = minutos_jogo * peso_modalidade
+
+        # Janela fixa: 7 dias antes do jogo
+        inicio_janela = data_jogo - pd.Timedelta(days=7)
+        fim_janela = data_jogo - pd.Timedelta(days=1)
+
+
 
         # -------- SONO --------
         sono_periodo = df_sono_full.copy()
@@ -4128,17 +4130,7 @@ if st.session_state["pagina"] == "dashboard":
 
             carga_jogos += minutos * peso
 
-        # ======================================================
-        # 💪 CARGA FÍSICA DOS TREINOS (7 DIAS ANTERIORES)
-        # ======================================================
 
-        carga_treinos = 0
-
-        for _, t in treinos_periodo.iterrows():
-            tipo = t.get("Tipo", "")
-            carga = CARGA_TREINO_MODALIDADE.get(tipo, 4)
-
-            carga_treinos += carga
 
         # ======================================================
         # 💪 CARGA FÍSICA DOS TREINOS (7 DIAS ANTERIORES)
@@ -4228,6 +4220,19 @@ if st.session_state["pagina"] == "dashboard":
         carga_baixa = (status_carga[0] == "Baixa")
         carga_moderada = (status_carga[0] == "Moderada")
         carga_alta = (status_carga[0] == "Alta")
+
+        # ======================================================
+        # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
+        # ======================================================
+
+        carga_total = carga_jogos + carga_treinos + carga_fisica_jogo
+
+        if carga_total >= 350:
+            status_carga = ("Alta", 30, "🔴")
+        elif carga_total >= 180:
+            status_carga = ("Moderada", 60, "🟡")
+        else:
+            status_carga = ("Baixa", 100, "🟢")
 
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
         if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
