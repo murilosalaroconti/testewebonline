@@ -4218,10 +4218,7 @@ if st.session_state["pagina"] == "dashboard":
         alimentacao_ruim_flag = (status_alimentacao[1] <= 40)
         cansaco_medio_ou_alto = (status_cansaco[1] <= 60)
 
-        carga_baixa = (status_carga[0] == "Baixa")
-        carga_moderada = (status_carga[0] == "Moderada")
-        carga_alta = (status_carga[0] == "Alta")
-
+       
         # ======================================================
         # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
         # ======================================================
