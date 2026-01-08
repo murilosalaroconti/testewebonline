@@ -4167,7 +4167,8 @@ if st.session_state["pagina"] == "dashboard":
                 if (datas_jogos[i] - datas_jogos[i - 1]).days == 1:
                     dias_consecutivos += 1
 
-            jogos_por_dia = jogos_periodo["Data_DT"].dt.date.value_counts().max()
+            max_jogos_no_dia = jogos_periodo["Data_DT"].dt.date.value_counts().max()
+
 
             st.write("DEBUG - Carga jogos ajustada:", carga_jogos)
             st.write("DEBUG - Jogos por dia:", jogos_por_dia)
@@ -4177,7 +4178,7 @@ if st.session_state["pagina"] == "dashboard":
             # CONDIÇÕES DE ALERTA (nível elite)
             if (
                     dias_consecutivos >= 1
-                    or jogos_por_dia >= 2
+                    or max_jogos_no_dia >= 2
                     or total_minutos_jogos >= 70
             ):
                 alerta_sequencia = (
