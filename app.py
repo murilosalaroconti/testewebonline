@@ -4113,6 +4113,21 @@ if st.session_state["pagina"] == "dashboard":
         max_treinos_no_dia = treinos_por_dia.max()
 
         # ======================================================
+        # 🏋️ CLASSIFICAÇÃO DE VOLUME SEMANAL DE TREINOS
+        # ======================================================
+
+        if qtde_treinos >= 6:
+            nivel_treino = "Excessivo"
+        elif qtde_treinos == 5:
+            nivel_treino = "Alto"
+        else:
+            nivel_treino = "Normal"
+
+        # Flags objetivas (para o sistema)
+        treino_alto = nivel_treino in ["Alto", "Excessivo"]
+        treino_excessivo = nivel_treino == "Excessivo"
+
+        # ======================================================
         # 🏋️ CARGA FÍSICA DOS TREINOS (7 DIAS) — AJUSTADA
         # ======================================================
 
@@ -4430,9 +4445,13 @@ if st.session_state["pagina"] == "dashboard":
                 "Sequência de jogos em curto intervalo"
             )
 
-        if treino_alto:
+        if treino_excessivo:
             motivos_irregularidades.append(
-                "Volume semanal de treinos elevado"
+                "Volume semanal de treinos excessivo"
+            )
+        elif nivel_treino == "Alto":
+            motivos_irregularidades.append(
+                "Volume semanal de treinos alto"
             )
 
         if alimentacao_ruim_flag:
