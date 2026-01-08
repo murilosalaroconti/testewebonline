@@ -872,41 +872,6 @@ if st.session_state["pagina"] == "jogos":
                 value=st.session_state["scout_temp"]["Participações Indiretas"]
             )
 
-        data = st.date_input("Data do Jogo", format="DD/MM/YYYY", key="data")
-
-        horario = st.time_input(
-            "Horário",
-            value=time(20, 0),
-            key="horario"
-        )
-
-        horario_str = horario.strftime("%H:%M")
-
-        quadro = st.selectbox("Quadro Jogado", OPCOES_QUADRO, key="quadro")
-
-        minutos = st.number_input(
-            "Minutos Jogados",
-            min_value=0,
-            max_value=120,
-            step=1,
-            key="minutos"
-        )
-
-        gols = st.number_input(
-            "Gols Marcados",
-            min_value=0,
-            max_value=20,
-            step=1,
-            key="gols"
-        )
-
-        assistencias = st.number_input(
-            "Assistências",
-            min_value=0,
-            max_value=20,
-            step=1,
-            key="assistencias"
-        )
 
         st.markdown("##### 🏁 Resultado da Partida")
 
