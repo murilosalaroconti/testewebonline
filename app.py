@@ -914,16 +914,16 @@ if st.session_state["pagina"] == "jogos":
                     **st.session_state["scout_temp"]
                 }
 
-            
-            with st.spinner("💾 Salvando jogo..."):
-                df_reg = load_registros()
-                adicionar_jogo(df_reg, novo)
 
-                st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
+                with st.spinner("💾 Salvando jogo..."):
+                    df_reg = load_registros()
+                    adicionar_jogo(df_reg, novo)
 
-            # 🔥 LIMPA O SCOUT SÓ AGORA
-            for k in st.session_state["scout_temp"]:
-                st.session_state["scout_temp"][k] = 0
+                    st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
+
+                # 🔥 LIMPA O SCOUT SÓ AGORA
+                for k in st.session_state["scout_temp"]:
+                    st.session_state["scout_temp"][k] = 0
 
 
 
