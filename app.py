@@ -4170,8 +4170,7 @@ if st.session_state["pagina"] == "dashboard":
             max_jogos_no_dia = jogos_periodo["Data_DT"].dt.date.value_counts().max()
 
 
-            st.write("DEBUG - Carga jogos ajustada:", carga_jogos)
-            st.write("DEBUG - Jogos por dia:", jogos_por_dia)
+
 
             total_jogos = len(jogos_periodo)
 
@@ -4218,6 +4217,9 @@ if st.session_state["pagina"] == "dashboard":
                 fator_repeticao = 1.5  # +50% (crítico)
 
             carga_jogos += minutos * peso * fator_repeticao
+
+        st.write("DEBUG - Carga jogos ajustada:", carga_jogos)
+        st.write("DEBUG - Jogos por dia:", jogos_por_dia)
 
         # -------- SAÚDE --------
         df_saude = load_saude_df()
