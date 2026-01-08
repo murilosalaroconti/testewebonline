@@ -34,8 +34,16 @@ IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
 
+# -------------------------------
+# CONTROLE DE PÁGINA (ANTI-RESET)
+# -------------------------------
+
+query_params = st.query_params
+
 if "pagina" not in st.session_state:
-    st.session_state["pagina"] = "home"
+    # tenta recuperar da URL
+    st.session_state["pagina"] = query_params.get("pagina", "home")
+
 
 
 # ----------------------
@@ -688,6 +696,7 @@ if st.session_state["pagina"] == "home":
     with col_a:
         if st.button("⚽ Registrar Jogo", use_container_width=True):
             st.session_state["pagina"] = "jogos"
+            st.query_params["pagina"] = "jogos"
             st.rerun()
 
     with col_b:
