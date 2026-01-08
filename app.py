@@ -4149,6 +4149,9 @@ if st.session_state["pagina"] == "dashboard":
                 f"• {data_fmt} — {modalidade_j} — {minutos} min"
             )
 
+        st.write("DEBUG lista_jogos_txt:", lista_jogos_txt)
+        st.write("DEBUG total_minutos_jogos:", total_minutos_jogos)
+
         # ======================================================
         # 🔵 ALERTA AUTOMÁTICO DE SEQUÊNCIA DE JOGOS
         # ======================================================
