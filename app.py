@@ -4053,7 +4053,8 @@ if st.session_state["pagina"] == "dashboard":
         }
 
         # Peso da modalidade
-        peso_modalidade = PESO_MODALIDADE.get(modalidade_jogo, 1.0)
+        peso_modalidade = PESO_JOGO_MODALIDADE.get(modalidade_jogo, 1.0)
+
 
         # 🔥 Carga física do jogo
         carga_fisica_jogo = minutos_jogo * peso_modalidade
@@ -4233,6 +4234,10 @@ if st.session_state["pagina"] == "dashboard":
             status_carga = ("Moderada", 60, "🟡")
         else:
             status_carga = ("Baixa", 100, "🟢")
+
+        carga_baixa = (status_carga[0] == "Baixa")
+        carga_moderada = (status_carga[0] == "Moderada")
+        carga_alta = (status_carga[0] == "Alta")
 
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
         if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
