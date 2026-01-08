@@ -4195,12 +4195,12 @@ if st.session_state["pagina"] == "dashboard":
                     or total_minutos_jogos >= 70
             ):
                 alerta_sequencia = (
-                    f"⚠️ Atenção: o atleta participou de "
-                    f"<b>{total_jogos} jogo(s)</b> em "
-                    f"<b>{len(datas_jogos)} dia(s)</b>, "
-                    f"acumulando <b>{total_minutos_jogos} minutos</b>, "
-                    f"o que exige controle da recuperação."
+                    "⚠️ Atenção: houve sequência de jogos em dias próximos, "
+                    f"com <b>{total_minutos_jogos} minutos acumulados</b>. "
+                    "Mesmo com cansaço percebido como baixo, esse padrão exige "
+                    "monitoramento, pois a sobrecarga pode se manifestar de forma tardia."
                 )
+
             alerta_forte_carga = alerta_sequencia is not None
 
         # ======================================================
