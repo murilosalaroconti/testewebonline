@@ -4106,21 +4106,31 @@ if st.session_state["pagina"] == "dashboard":
             (treinos_periodo["Date_DT"].dt.date >= inicio_janela) &
             (treinos_periodo["Date_DT"].dt.date <= fim_janela)
             ]
-        qtde_treinos = len(treinos_periodo)
+
+        treinos_por_dia = treinos_periodo["Date_DT"].dt.date.value_counts()
+
+        qtde_treinos = treinos_por_dia.sum()
+        max_treinos_no_dia = treinos_por_dia.max()
 
         # ======================================================
-        # 🏋️ CARGA FÍSICA DOS TREINOS (7 DIAS)
+        # 🏋️ CARGA FÍSICA DOS TREINOS (7 DIAS) — AJUSTADA
         # ======================================================
 
         carga_treinos = 0
 
-        if not treinos_periodo.empty and "Tipo" in treinos_periodo.columns:
-            for _, t in treinos_periodo.iterrows():
-                modalidade_treino = t.get("Tipo", "")
-                carga_treinos += CARGA_TREINO_MODALIDADE.get(modalidade_treino, 5)
+        if not treinos_periodo.empty:
+            # Conta quantos treinos houve por dia
+            treinos_por_dia = treinos_periodo["Date_DT"].dt.date.value_counts()
+
+            for data, qtd in treinos_por_dia.items():
+                if qtd == 1:
+                    carga_treinos += 5
+                elif qtd == 2:
+                    carga_treinos += 8 * 2  # dois treinos no mesmo dia
+                else:
+                    carga_treinos += 10 * qtd  # 3 ou mais = crítico
         else:
-            # fallback seguro
-            carga_treinos = qtde_treinos * 5
+            carga_treinos = 0
 
         # ======================================================
         # 🎮 CARGA FÍSICA DOS JOGOS (7 DIAS ANTERIORES)
@@ -4197,8 +4207,9 @@ if st.session_state["pagina"] == "dashboard":
                 alerta_sequencia = (
                     "⚠️ Atenção: houve sequência de jogos em dias próximos, "
                     f"com <b>{total_minutos_jogos} minutos acumulados</b>. "
-                    "Mesmo com cansaço percebido como baixo, esse padrão exige "
-                    "monitoramento, pois a sobrecarga pode se manifestar de forma tardia."
+                    "Embora o atleta relate cansaço baixo, a exposição física recente "
+                    "indica necessidade de monitoramento, pois a sobrecarga pode se "
+                    "manifestar de forma tardia."
                 )
 
             alerta_forte_carga = alerta_sequencia is not None
@@ -4332,6 +4343,16 @@ if st.session_state["pagina"] == "dashboard":
         carga_moderada = status_carga[0] == "Moderada"
         carga_alta = status_carga[0] == "Alta"
 
+        # ===============================
+        # 📊 CAMADA OBJETIVA — CARGA REAL
+        # ===============================
+
+        texto_carga_real = (
+            f"📈 <strong>Exposição física:</strong> "
+            f"{status_carga[0]}<br>"
+            f"⏱️ Minutagem acumulada: <strong>{total_minutos_jogos} min</strong><br>"
+            f"💪 Treinos na semana: <strong>{qtde_treinos}</strong>"
+        )
 
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
         if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
@@ -4396,21 +4417,27 @@ if st.session_state["pagina"] == "dashboard":
             "border-left:6px solid #FF9800;"
             "box-shadow: 0 6px 18px rgba(0,0,0,0.4);'>"
 
-            "<strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>"
+            "<strong>📆 Baseado nos 7 dias anteriores ao jogo</strong><br><br>"
 
             "<strong>📆 Jogos considerados:</strong><br>"
             f"{html_lista_jogos}<br><br>"
 
-            f"⏱️ <strong>Minutagem acumulada:</strong> {total_minutos_jogos} min<br>"
-            f"🎮 <strong>Total de jogos:</strong> {len(lista_jogos_txt)}<br><br>"
+            "<hr style='border:0.5px solid #333;'><br>"
 
-            f"😴 Sono médio: <strong>{f'{media_sono:.1f}h' if media_sono else 'N/D'}</strong><br>"
-            f"{texto_horario_sono}"
-            f"💪 Treinos: <strong>{qtde_treinos}</strong><br>"
+            "<strong>🧠 Percepção do atleta (autorrelato)</strong><br>"
+            f"🥵 Cansaço relatado: <strong>{cansaco}</strong><br>"
             f"🍽️ Alimentação: <strong>{alimentacao}</strong><br>"
-            f"🥵 Cansaço: <strong>{cansaco}</strong><br><br>"
+            f"😴 Sono médio: <strong>{f'{media_sono:.1f}h' if media_sono else 'N/D'}</strong><br>"
+            f"{texto_horario_sono}<br>"
+
+            "<hr style='border:0.5px solid #333;'><br>"
+
+            "<strong>📊 Exposição física real (dados objetivos)</strong><br>"
+            f"{texto_carga_real}<br><br>"
 
             f"{alerta_sequencia + '<br><br>' if alerta_sequencia else ''}"
+
+            "<strong>🧠 Leitura do sistema</strong><br>"
             f"<em>{interpretacao}</em>"
 
             "</div>"
