@@ -4308,17 +4308,30 @@ if st.session_state["pagina"] == "dashboard":
         alimentacao_ruim_flag = (status_alimentacao[1] <= 40)
         cansaco_medio_ou_alto = (status_cansaco[1] <= 60)
 
-
         # ======================================================
         # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
         # ======================================================
 
+        # 🔒 Garantia de existência (EVITA ERRO)
+        if "alerta_forte_carga" not in locals():
+            alerta_forte_carga = False
+
+        # 🔢 Cálculo final da carga
         carga_total = carga_jogos + carga_treinos + carga_fisica_jogo
 
+        # 🎯 Classificação objetiva da carga
+        if carga_total >= 350:
+            status_carga = ("Alta", 30, "🔴")
+        elif carga_total >= 180:
+            status_carga = ("Moderada", 60, "🟡")
+        else:
+            status_carga = ("Baixa", 100, "🟢")
 
-        # ======================================================
-        # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
-        # ======================================================
+        # 🔹 FLAGS (ESSENCIAIS)
+        carga_baixa = status_carga[0] == "Baixa"
+        carga_moderada = status_carga[0] == "Moderada"
+        carga_alta = status_carga[0] == "Alta"
+
 
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
         if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
