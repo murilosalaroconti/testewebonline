@@ -4169,6 +4169,9 @@ if st.session_state["pagina"] == "dashboard":
 
             jogos_por_dia = jogos_periodo["Data_DT"].dt.date.value_counts().max()
 
+            st.write("DEBUG - Carga jogos ajustada:", carga_jogos)
+            st.write("DEBUG - Jogos por dia:", jogos_por_dia)
+
             total_jogos = len(jogos_periodo)
 
             # CONDIÇÕES DE ALERTA (nível elite)
@@ -4186,16 +4189,34 @@ if st.session_state["pagina"] == "dashboard":
                 )
 
         # ======================================================
-        # 💪 CARGA FÍSICA DOS TREINOS (7 DIAS ANTERIORES)
+        # ======================================================
+        # 🎮 CARGA FÍSICA DOS JOGOS (7 DIAS ANTERIORES) — AJUSTADA
         # ======================================================
 
-        carga_treinos = 0
+        carga_jogos = 0
+        jogos_por_dia = {}
 
-        for _, t in treinos_periodo.iterrows():
-            tipo = t.get("Tipo", "")
-            carga = CARGA_TREINO_MODALIDADE.get(tipo, 4)
+        for _, j in jogos_periodo.iterrows():
+            data_j = j["Data_DT"].date()
+            minutos = int(j.get("Minutos Jogados", 0))
+            modalidade_j = j.get("Condição do Campo", "")
+            peso = PESO_JOGO_MODALIDADE.get(modalidade_j, 1.0)
 
-            carga_treinos += carga
+            # Conta quantos jogos já ocorreram naquele dia
+            jogos_por_dia.setdefault(data_j, 0)
+            jogos_por_dia[data_j] += 1
+
+            ordem_jogo_dia = jogos_por_dia[data_j]
+
+            # Penalidade por repetição no mesmo dia
+            if ordem_jogo_dia == 1:
+                fator_repeticao = 1.0
+            elif ordem_jogo_dia == 2:
+                fator_repeticao = 1.3  # +30%
+            else:
+                fator_repeticao = 1.5  # +50% (crítico)
+
+            carga_jogos += minutos * peso * fator_repeticao
 
         # -------- SAÚDE --------
         df_saude = load_saude_df()
