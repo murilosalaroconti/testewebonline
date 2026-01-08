@@ -4320,18 +4320,6 @@ if st.session_state["pagina"] == "dashboard":
         # 📊 STATUS DA CARGA FÍSICA (NORMALIZADO)
         # ======================================================
 
-        if carga_total >= 350:
-            status_carga = ("Alta", 30, "🔴")
-        elif carga_total >= 180:
-            status_carga = ("Moderada", 60, "🟡")
-        else:
-            status_carga = ("Baixa", 100, "🟢")
-
-        # 🔹 AGORA SIM as flags
-        carga_baixa = status_carga[0] == "Baixa"
-        carga_moderada = status_carga[0] == "Moderada"
-        carga_alta = status_carga[0] == "Alta"
-
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
         if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
             interpretacao = (
@@ -4348,9 +4336,7 @@ if st.session_state["pagina"] == "dashboard":
                 "Recomenda-se controle rigoroso da minutagem e da intensidade."
             )
 
-        # 🟠 CENÁRIO 6 — SOBRECARGA EM CONSTRUÇÃO
-        elif carga_moderada and sono_comprometido and cansaco_medio_ou_alto:
-
+        # 🟠 CENÁRIO 6A — CARGA MODERADA COM SEQUÊNCIA (PRIORIDADE)
         elif carga_moderada and alerta_forte_carga:
             interpretacao = (
                 "⚠️ A carga física recente foi moderada, impulsionada por jogos em dias próximos ou "
@@ -4358,19 +4344,20 @@ if st.session_state["pagina"] == "dashboard":
                 "para evitar impacto no desempenho."
             )
 
+        # 🟠 CENÁRIO 6B — SOBRECARGA EM CONSTRUÇÃO
+        elif carga_moderada and sono_comprometido and cansaco_medio_ou_alto:
             interpretacao = (
                 "⚠️ O contexto físico pré-jogo sugere início de acúmulo de carga, "
                 "associado a recuperação incompleta e aumento progressivo do cansaço. "
                 "Atenção à gestão de esforço."
             )
 
-        # 🟠 CENÁRIO 5 — RECUPERAÇÃO DEFICIENTE
+        # 🟠 CENÁRIO 5 — RECUPERAÇÃO DEFICIENTE (SÓ COM CARGA REALMENTE BAIXA)
         elif carga_baixa and sono_comprometido and not alerta_forte_carga:
             interpretacao = (
                 "⚠️ Apesar da baixa carga física recente, o padrão de sono indica "
                 "recuperação insuficiente, o que pode impactar o rendimento em jogo."
             )
-
 
         # 🟡 CENÁRIO 4 — ALERTA LEVE
         elif sono_comprometido or alimentacao_ruim_flag:
