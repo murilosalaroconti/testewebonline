@@ -4029,9 +4029,33 @@ if st.session_state["pagina"] == "dashboard":
         # Data do jogo selecionado
         data_jogo = jogo["Data_DT"].date()
 
+        # ===============================
+        # 🧠 PASSO 1 — CARGA FÍSICA POR JOGO
+        # ===============================
+
+        PESO_MODALIDADE = {
+            "Futsal": 1.4,  # Alta intensidade
+            "Society": 1.2,  # Mista
+            "Campo": 1.0  # Volume longo
+        }
+
+        # Minutos jogados no jogo
+        minutos_jogo = int(jogo.get("Minutos Jogados", 0))
+
+        # Modalidade do jogo
+        modalidade_jogo = jogo["Condição do Campo"]
+
+        # Peso da modalidade
+        peso_modalidade = PESO_MODALIDADE.get(modalidade_jogo, 1.0)
+
+        # 🔥 Carga física do jogo
+        carga_fisica_jogo = minutos_jogo * peso_modalidade
+
         # Janela fixa: 7 dias antes do jogo
         inicio_janela = data_jogo - pd.Timedelta(days=7)
         fim_janela = data_jogo - pd.Timedelta(days=1)
+
+        st.write("⚙️ DEBUG | Carga física do jogo:", carga_fisica_jogo)
 
         # -------- SONO --------
         sono_periodo = df_sono_full.copy()
