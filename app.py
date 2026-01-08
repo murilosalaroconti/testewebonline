@@ -1749,6 +1749,33 @@ if st.session_state["pagina"] == "saude":
     )
 
     st.markdown("---")
+    st.subheader("📊 Registros Recentes de Saúde")
+
+    df_saude = load_saude_df()
+
+    if df_saude.empty:
+        st.info("Nenhum registro de saúde cadastrado ainda.")
+    else:
+        # Converte data para datetime
+        df_saude["Data_dt"] = pd.to_datetime(
+            df_saude["Data"], dayfirst=True, errors="coerce"
+        )
+
+        # Ordena do mais recente para o mais antigo
+        df_saude = df_saude.sort_values("Data_dt", ascending=False)
+
+        # Mantém apenas colunas relevantes
+        df_exibicao = df_saude[
+            ["Data", "Alimentação", "Hidratação", "Cansaço", "Observação"]
+        ].copy()
+
+        st.dataframe(
+            df_exibicao,
+            use_container_width=True,
+            hide_index=True
+        )
+
+    st.markdown("---")
     st.subheader("📄 Documentos de Saúde")
     st.markdown(
         "Aqui você pode anexar relatórios da nutricionista, exames ou avaliações físicas."
