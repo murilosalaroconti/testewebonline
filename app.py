@@ -873,38 +873,6 @@ if st.session_state["pagina"] == "jogos":
             )
 
 
-        st.markdown("##### 🏁 Resultado da Partida")
-
-        c1, c2 = st.columns(2)
-
-        with c1:
-            gols_atleta = st.number_input(
-                "Gols Time do Atleta",
-                min_value=0,
-                max_value=20,
-                step=1,
-                key="gols_atleta"
-            )
-
-        with c2:
-            gols_adversario = st.number_input(
-                "Gols do Adversário",
-                min_value=0,
-                max_value=20,
-                step=1,
-                key="gols_adversario"
-            )
-
-        resultado = f"{gols_atleta}x{gols_adversario}"
-
-        modalidade = st.selectbox(
-            "Modalidade",
-            OPCOES_MODALIDADE,
-            key="modalidade"
-        )
-
-
-
 
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
@@ -945,6 +913,36 @@ if st.session_state["pagina"] == "jogos":
                     "Condição do Campo": modalidade,
                     **st.session_state["scout_temp"]
                 }
+
+        st.markdown("##### 🏁 Resultado da Partida")
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            gols_atleta = st.number_input(
+                "Gols Time do Atleta",
+                min_value=0,
+                max_value=20,
+                step=1,
+                key="gols_atleta"
+            )
+
+        with c2:
+            gols_adversario = st.number_input(
+                "Gols do Adversário",
+                min_value=0,
+                max_value=20,
+                step=1,
+                key="gols_adversario"
+            )
+
+        resultado = f"{gols_atleta}x{gols_adversario}"
+
+        modalidade = st.selectbox(
+            "Modalidade",
+            OPCOES_MODALIDADE,
+            key="modalidade"
+        )
 
                 with st.spinner("💾 Salvando jogo..."):
                     df_reg = load_registros()
