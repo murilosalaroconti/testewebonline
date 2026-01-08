@@ -4109,6 +4109,20 @@ if st.session_state["pagina"] == "dashboard":
         qtde_treinos = len(treinos_periodo)
 
         # ======================================================
+        # 🏋️ CARGA FÍSICA DOS TREINOS (7 DIAS)
+        # ======================================================
+
+        carga_treinos = 0
+
+        if not treinos_periodo.empty and "Tipo" in treinos_periodo.columns:
+            for _, t in treinos_periodo.iterrows():
+                modalidade_treino = t.get("Tipo", "")
+                carga_treinos += CARGA_TREINO_MODALIDADE.get(modalidade_treino, 5)
+        else:
+            # fallback seguro
+            carga_treinos = qtde_treinos * 5
+
+        # ======================================================
         # 🎮 CARGA FÍSICA DOS JOGOS (7 DIAS ANTERIORES)
         # ======================================================
 
@@ -4218,8 +4232,7 @@ if st.session_state["pagina"] == "dashboard":
 
             carga_jogos += minutos * peso * fator_repeticao
 
-        st.write("DEBUG - Carga jogos ajustada:", carga_jogos)
-        st.write("DEBUG - Jogos por dia:", jogos_por_dia)
+       
 
         # -------- SAÚDE --------
         df_saude = load_saude_df()
