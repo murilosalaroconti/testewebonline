@@ -810,135 +810,189 @@ if st.session_state["pagina"] == "jogos":
         # SCOUT AO VIVO (ADICIONADO – NÃO AFETA O FORMULÁRIO)
         # ------------------------------------------------------------------
 
+        # ===============================
+        # 🧠 SCOUT TEMPORÁRIO (ANTI-PERDA)
+        # ===============================
+        if "scout_temp" not in st.session_state:
+            st.session_state["scout_temp"] = {
+                "Chutes": 0,
+                "Chutes Errados": 0,
+                "Desarmes": 0,
+                "Passes-chave": 0,
+                "Passes Errados": 0,
+                "Faltas Sofridas": 0,
+                "Participações Indiretas": 0
+            }
+
         # ------------------ FORMULÁRIO ------------------
-        with st.form("form_jogo", clear_on_submit=True):
 
-            st.markdown("### 📊 Scout da Partida")
 
-            c1, c2, c3 = st.columns(3)
+        st.markdown("### 📊 Scout Ao Vivo")
 
-            with c1:
-                chutes = st.number_input("🥅 Chutes", min_value=0)
-                chutes_errados = st.number_input("❌ Chutes Errados", min_value=0)
-                desarmes = st.number_input("🛡️ Desarmes", min_value=0)
+        c1, c2, c3 = st.columns(3)
 
-            with c2:
-                passes_chave = st.number_input("🎯 Passes-chave", min_value=0)
-                passes_errados = st.number_input("❌ Passes Errados", min_value=0)
-                faltas_sofridas = st.number_input("⚡ Faltas Sofridas", min_value=0)
-
-            with c3:
-                part_indireta = st.number_input("🔁 Participações Indiretas", min_value=0)
-
-            data = st.date_input("Data do Jogo", format="DD/MM/YYYY", key="data")
-
-            horario = st.time_input(
-                "Horário",
-                value=time(20, 0),
-                key="horario"
-            )
-
-            horario_str = horario.strftime("%H:%M")
-
-            quadro = st.selectbox("Quadro Jogado", OPCOES_QUADRO, key="quadro")
-
-            minutos = st.number_input(
-                "Minutos Jogados",
+        with c1:
+            st.session_state["scout_temp"]["Chutes"] = st.number_input(
+                "🥅 Chutes",
                 min_value=0,
-                max_value=120,
-                step=1,
-                key="minutos"
+                value=st.session_state["scout_temp"]["Chutes"]
+            )
+            st.session_state["scout_temp"]["Chutes Errados"] = st.number_input(
+                "❌ Chutes Errados",
+                min_value=0,
+                value=st.session_state["scout_temp"]["Chutes Errados"]
+            )
+            st.session_state["scout_temp"]["Desarmes"] = st.number_input(
+                "🛡️ Desarmes",
+                min_value=0,
+                value=st.session_state["scout_temp"]["Desarmes"]
             )
 
-            gols = st.number_input(
-                "Gols Marcados",
+        with c2:
+            st.session_state["scout_temp"]["Passes-chave"] = st.number_input(
+                "🎯 Passes-chave",
+                min_value=0,
+                value=st.session_state["scout_temp"]["Passes-chave"]
+            )
+            st.session_state["scout_temp"]["Passes Errados"] = st.number_input(
+                "❌ Passes Errados",
+                min_value=0,
+                value=st.session_state["scout_temp"]["Passes Errados"]
+            )
+            st.session_state["scout_temp"]["Faltas Sofridas"] = st.number_input(
+                "⚡ Faltas Sofridas",
+                min_value=0,
+                value=st.session_state["scout_temp"]["Faltas Sofridas"]
+            )
+
+        with c3:
+            st.session_state["scout_temp"]["Participações Indiretas"] = st.number_input(
+                "🔁 Participações Indiretas",
+                min_value=0,
+                value=st.session_state["scout_temp"]["Participações Indiretas"]
+            )
+
+        data = st.date_input("Data do Jogo", format="DD/MM/YYYY", key="data")
+
+        horario = st.time_input(
+            "Horário",
+            value=time(20, 0),
+            key="horario"
+        )
+
+        horario_str = horario.strftime("%H:%M")
+
+        quadro = st.selectbox("Quadro Jogado", OPCOES_QUADRO, key="quadro")
+
+        minutos = st.number_input(
+            "Minutos Jogados",
+            min_value=0,
+            max_value=120,
+            step=1,
+            key="minutos"
+        )
+
+        gols = st.number_input(
+            "Gols Marcados",
+            min_value=0,
+            max_value=20,
+            step=1,
+            key="gols"
+        )
+
+        assistencias = st.number_input(
+            "Assistências",
+            min_value=0,
+            max_value=20,
+            step=1,
+            key="assistencias"
+        )
+
+        st.markdown("##### 🏁 Resultado da Partida")
+
+        c1, c2 = st.columns(2)
+
+        with c1:
+            gols_atleta = st.number_input(
+                "Gols Time do Atleta",
                 min_value=0,
                 max_value=20,
                 step=1,
-                key="gols"
+                key="gols_atleta"
             )
 
-            assistencias = st.number_input(
-                "Assistências",
+        with c2:
+            gols_adversario = st.number_input(
+                "Gols do Adversário",
                 min_value=0,
                 max_value=20,
                 step=1,
-                key="assistencias"
+                key="gols_adversario"
             )
 
-            st.markdown("##### 🏁 Resultado da Partida")
+        resultado = f"{gols_atleta}x{gols_adversario}"
+
+        modalidade = st.selectbox(
+            "Modalidade",
+            OPCOES_MODALIDADE,
+            key="modalidade"
+        )
+
+
+
+
+        st.markdown("---")
+        st.markdown("### 💾 Encerrar Partida")
+
+        with st.form("form_salvar_jogo"):
+
+            data = st.date_input("Data do Jogo", format="DD/MM/YYYY")
+            horario = st.time_input("Horário", value=time(20, 0))
+            quadro = st.selectbox("Quadro Jogado", OPCOES_QUADRO)
+            minutos = st.number_input("Minutos Jogados", min_value=0, max_value=120)
+            gols = st.number_input("Gols Marcados", min_value=0)
+            assistencias = st.number_input("Assistências", min_value=0)
 
             c1, c2 = st.columns(2)
-
             with c1:
-                gols_atleta = st.number_input(
-                    "Gols Time do Atleta",
-                    min_value=0,
-                    max_value=20,
-                    step=1,
-                    key="gols_atleta"
-                )
-
+                gols_atleta = st.number_input("Gols Time do Atleta", min_value=0)
             with c2:
-                gols_adversario = st.number_input(
-                    "Gols do Adversário",
-                    min_value=0,
-                    max_value=20,
-                    step=1,
-                    key="gols_adversario"
-                )
+                gols_adversario = st.number_input("Gols do Adversário", min_value=0)
 
-            resultado = f"{gols_atleta}x{gols_adversario}"
+            modalidade = st.selectbox("Modalidade", OPCOES_MODALIDADE)
 
-            modalidade = st.selectbox(
-                "Modalidade",
-                OPCOES_MODALIDADE,
-                key="modalidade"
-            )
+            salvar = st.form_submit_button("💾 Salvar Jogo")
 
-            submitted = st.form_submit_button("Adicionar Registro")
-
-            if submitted:
-
-                casa_final = novo_casa_input.strip() if novo_casa_input.strip() else casa_sel
-                visitante_final = novo_visitante_input.strip() if novo_visitante_input.strip() else visitante_sel
-                campeonato_final = novo_campeonato_input.strip() if novo_campeonato_input.strip() else campeonato_sel
-                local_final = novo_local_input.strip() if novo_local_input.strip() else local_sel
-
-                data_str = data.strftime("%d/%m/%Y")
+            if salvar:
 
                 novo = {
-                    "Casa": casa_final,
-                    "Visitante": visitante_final,
-                    "Data": data_str,
-                    "Horário": horario_str,
-                    "Campeonato": campeonato_final,
+                    "Casa": novo_casa_input.strip() if novo_casa_input.strip() else casa_sel,
+                    "Visitante": novo_visitante_input.strip() if novo_visitante_input.strip() else visitante_sel,
+                    "Campeonato": novo_campeonato_input.strip() if novo_campeonato_input.strip() else campeonato_sel,
+                    "Local": novo_local_input.strip() if novo_local_input.strip() else local_sel,
+                    "Data": data.strftime("%d/%m/%Y"),
+                    "Horário": horario.strftime("%H:%M"),
                     "Quadro Jogado": quadro,
                     "Minutos Jogados": minutos,
                     "Gols Marcados": gols,
                     "Assistências": assistencias,
-                    "Resultado": resultado,
-                    "Local": local_final,
+                    "Resultado": f"{gols_atleta}x{gols_adversario}",
                     "Condição do Campo": modalidade,
-
-                    # SCOUT AO VIVO
-                    "Chutes": chutes,
-                    "Chutes Errados": chutes_errados,
-                    "Desarmes": desarmes,
-                    "Passes-chave": passes_chave,
-                    "Passes Errados": passes_errados,
-                    "Faltas Sofridas": faltas_sofridas,
-                    "Participações Indiretas": part_indireta
-
+                    **st.session_state["scout_temp"]
                 }
 
-                # 🔄 FEEDBACK VISUAL (NÃO GASTA API)
                 with st.spinner("💾 Salvando jogo..."):
                     df_reg = load_registros()
                     adicionar_jogo(df_reg, novo)
 
-                # ✅ TOAST FLUTUANTE
-                st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
+                    st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
+
+                    # 🔥 LIMPA O SCOUT SÓ AGORA
+                    for k in st.session_state["scout_temp"]:
+                        st.session_state["scout_temp"][k] = 0
+
+
+
 
 
 
