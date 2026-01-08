@@ -826,53 +826,37 @@ if st.session_state["pagina"] == "jogos":
 
         # ------------------ FORMULÁRIO ------------------
 
-
         st.markdown("### 📊 Scout Ao Vivo")
 
-        c1, c2, c3 = st.columns(3)
 
-        with c1:
-            st.session_state["scout_temp"]["Chutes"] = st.number_input(
-                "🥅 Chutes",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Chutes"]
-            )
-            st.session_state["scout_temp"]["Chutes Errados"] = st.number_input(
-                "❌ Chutes Errados",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Chutes Errados"]
-            )
-            st.session_state["scout_temp"]["Desarmes"] = st.number_input(
-                "🛡️ Desarmes",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Desarmes"]
-            )
+        def contador(label, chave):
+            st.markdown(label)
+            c1, c2, c3 = st.columns([1, 2, 1])
 
-        with c2:
-            st.session_state["scout_temp"]["Passes-chave"] = st.number_input(
-                "🎯 Passes-chave",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Passes-chave"]
-            )
-            st.session_state["scout_temp"]["Passes Errados"] = st.number_input(
-                "❌ Passes Errados",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Passes Errados"]
-            )
-            st.session_state["scout_temp"]["Faltas Sofridas"] = st.number_input(
-                "⚡ Faltas Sofridas",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Faltas Sofridas"]
-            )
+            with c1:
+                if st.button("➖", key=f"{chave}_menos"):
+                    if st.session_state["scout_temp"][chave] > 0:
+                        st.session_state["scout_temp"][chave] -= 1
 
-        with c3:
-            st.session_state["scout_temp"]["Participações Indiretas"] = st.number_input(
-                "🔁 Participações Indiretas",
-                min_value=0,
-                value=st.session_state["scout_temp"]["Participações Indiretas"]
-            )
+            with c2:
+                st.markdown(
+                    f"<h2 style='text-align:center;'>{st.session_state['scout_temp'][chave]}</h2>",
+                    unsafe_allow_html=True
+                )
+
+            with c3:
+                if st.button("➕", key=f"{chave}_mais"):
+                    st.session_state["scout_temp"][chave] += 1
 
 
+        # ======== SCOUTS ========
+        contador("🥅 Chutes", "Chutes")
+        contador("❌ Chutes Errados", "Chutes Errados")
+        contador("🛡️ Desarmes", "Desarmes")
+        contador("🎯 Passes-chave", "Passes-chave")
+        contador("❌ Passes Errados", "Passes Errados")
+        contador("⚡ Faltas Sofridas", "Faltas Sofridas")
+        contador("🔁 Participações Indiretas", "Participações Indiretas")
 
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
