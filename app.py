@@ -4342,33 +4342,34 @@ if st.session_state["pagina"] == "dashboard":
         # -------- CARD VISUAL --------
         html_lista_jogos = "<br>".join(lista_jogos_txt) if lista_jogos_txt else "Nenhum jogo registrado no período."
 
-        st.markdown(
-            f"""<div style="background:#0B1220;
-        padding:16px;
-        border-radius:14px;
-        border-left:6px solid #FF9800;
-        box-shadow: 0 6px 18px rgba(0,0,0,0.4);">
+        html_card = (
+            "<div style='background:#0B1220;"
+            "padding:16px;"
+            "border-radius:14px;"
+            "border-left:6px solid #FF9800;"
+            "box-shadow: 0 6px 18px rgba(0,0,0,0.4);'>"
 
-        <strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>
+            "<strong>Baseado nos 7 dias anteriores ao jogo</strong><br><br>"
 
-        <strong>📆 Jogos considerados:</strong><br>
-        {html_lista_jogos}<br><br>
+            "<strong>📆 Jogos considerados:</strong><br>"
+            f"{html_lista_jogos}<br><br>"
 
-        ⏱️ <strong>Minutagem acumulada:</strong> {total_minutos_jogos} min<br>
-        🎮 <strong>Total de jogos:</strong> {len(lista_jogos_txt)}<br><br>
+            f"⏱️ <strong>Minutagem acumulada:</strong> {total_minutos_jogos} min<br>"
+            f"🎮 <strong>Total de jogos:</strong> {len(lista_jogos_txt)}<br><br>"
 
-        😴 Sono médio: <strong>{f"{media_sono:.1f}h" if media_sono else "N/D"}</strong><br>
-        {texto_horario_sono}
-        💪 Treinos: <strong>{qtde_treinos}</strong><br>
-        🍽️ Alimentação: <strong>{alimentacao}</strong><br>
-        🥵 Cansaço: <strong>{cansaco}</strong><br><br>
+            f"😴 Sono médio: <strong>{f'{media_sono:.1f}h' if media_sono else 'N/D'}</strong><br>"
+            f"{texto_horario_sono}"
+            f"💪 Treinos: <strong>{qtde_treinos}</strong><br>"
+            f"🍽️ Alimentação: <strong>{alimentacao}</strong><br>"
+            f"🥵 Cansaço: <strong>{cansaco}</strong><br><br>"
 
-        {f"<div style='margin-bottom:10px;'>{alerta_sequencia}</div>" if alerta_sequencia else ""}
-        <em>{interpretacao}</em>
+            f"{alerta_sequencia + '<br><br>' if alerta_sequencia else ''}"
+            f"<em>{interpretacao}</em>"
 
-        </div>""",
-            unsafe_allow_html=True
+            "</div>"
         )
+
+        st.markdown(html_card, unsafe_allow_html=True)
 
         # -------- VISUAL MODERNO DOS 4 PILARES --------
         st.markdown("#### 📊 Leitura Rápida do Contexto Físico")
