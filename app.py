@@ -896,7 +896,10 @@ if st.session_state["pagina"] == "jogos":
                     "Passes-chave", "Passes Errados",
                     "Faltas Sofridas", "Participações Indiretas"
                 ]:
-                    st.session_state[k] = 0
+                    if k in st.session_state:
+                        del st.session_state[k]
+
+                st.rerun()
 
     # ----------------------------------------------------------------------
     # COLUNA 2 - TABELA
