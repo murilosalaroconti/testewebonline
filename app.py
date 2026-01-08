@@ -4029,15 +4029,6 @@ if st.session_state["pagina"] == "dashboard":
         # Data do jogo selecionado
         data_jogo = jogo["Data_DT"].date()
 
-        # ===============================
-        # 🧠 PASSO 1 — CARGA FÍSICA POR JOGO
-        # ===============================
-
-        PESO_MODALIDADE = {
-            "Futsal": 1.4,  # Alta intensidade
-            "Society": 1.2,  # Mista
-            "Campo": 1.0  # Volume longo
-        }
 
         # Minutos jogados no jogo
         minutos_jogo = int(jogo.get("Minutos Jogados", 0))
@@ -4055,7 +4046,21 @@ if st.session_state["pagina"] == "dashboard":
         inicio_janela = data_jogo - pd.Timedelta(days=7)
         fim_janela = data_jogo - pd.Timedelta(days=1)
 
-        st.write("⚙️ DEBUG | Carga física do jogo:", carga_fisica_jogo)
+        # ======================================================
+        # ⚖️ PESOS DE CARGA FÍSICA (BASE FISIOLÓGICA)
+        # ======================================================
+
+        PESO_JOGO_MODALIDADE = {
+            "Futsal": 1.4,
+            "Society": 1.2,
+            "Campo": 1.0
+        }
+
+        CARGA_TREINO_MODALIDADE = {
+            "Futsal": 8,
+            "Society": 6,
+            "Campo": 6
+        }
 
         # -------- SONO --------
         sono_periodo = df_sono_full.copy()
@@ -4099,6 +4104,53 @@ if st.session_state["pagina"] == "dashboard":
             (treinos_periodo["Date_DT"].dt.date <= fim_janela)
             ]
         qtde_treinos = len(treinos_periodo)
+
+        # ======================================================
+        # 🎮 CARGA FÍSICA DOS JOGOS (7 DIAS ANTERIORES)
+        # ======================================================
+
+        jogos_periodo = df_jogos_full.copy()
+        jogos_periodo["Data_DT"] = pd.to_datetime(
+            jogos_periodo["Data"], dayfirst=True, errors="coerce"
+        )
+
+        jogos_periodo = jogos_periodo[
+            (jogos_periodo["Data_DT"].dt.date >= inicio_janela) &
+            (jogos_periodo["Data_DT"].dt.date <= fim_janela)
+            ]
+
+        carga_jogos = 0
+
+        for _, j in jogos_periodo.iterrows():
+            minutos = int(j.get("Minutos Jogados", 0))
+            modalidade_j = j.get("Condição do Campo", "")
+            peso = PESO_JOGO_MODALIDADE.get(modalidade_j, 1.0)
+
+            carga_jogos += minutos * peso
+
+        # ======================================================
+        # 💪 CARGA FÍSICA DOS TREINOS (7 DIAS ANTERIORES)
+        # ======================================================
+
+        carga_treinos = 0
+
+        for _, t in treinos_periodo.iterrows():
+            tipo = t.get("Tipo", "")
+            carga = CARGA_TREINO_MODALIDADE.get(tipo, 4)
+
+            carga_treinos += carga
+
+        # ======================================================
+        # 💪 CARGA FÍSICA DOS TREINOS (7 DIAS ANTERIORES)
+        # ======================================================
+
+        carga_treinos = 0
+
+        for _, t in treinos_periodo.iterrows():
+            tipo = t.get("Tipo", "")
+            carga = CARGA_TREINO_MODALIDADE.get(tipo, 4)
+
+            carga_treinos += carga
 
         # -------- SAÚDE --------
         df_saude = load_saude_df()
@@ -4164,62 +4216,62 @@ if st.session_state["pagina"] == "dashboard":
         cansaco_alto = status_cansaco[1] <= 40
         cansaco_moderado = status_cansaco[1] == 60
 
-        # -------- INTERPRETAÇÃO INTELIGENTE --------
+        # ======================================================
+        # 🧠 INTERPRETAÇÃO INTELIGENTE (COM CARGA REAL)
+        # ======================================================
+
+        # Flags auxiliares
+        sono_comprometido = (status_sono[1] <= 65)
+        alimentacao_ruim_flag = (status_alimentacao[1] <= 40)
+        cansaco_medio_ou_alto = (status_cansaco[1] <= 60)
+
+        carga_baixa = (status_carga[0] == "Baixa")
+        carga_moderada = (status_carga[0] == "Moderada")
+        carga_alta = (status_carga[0] == "Alta")
 
         # 🔴🔴 CENÁRIO 8 — RISCO FISIOLÓGICO CRÍTICO
-        if treino_alto and (sono_ruim or sono_irregular) and cansaco_alto and alimentacao_ruim:
+        if carga_alta and sono_comprometido and alimentacao_ruim_flag and status_cansaco[1] <= 40:
             interpretacao = (
-                "🚨🚨 O contexto físico pré-jogo indica alto risco fisiológico, com sinais claros de "
-                "sobrecarga, recuperação inadequada e falhas nutricionais. "
-                "Recomenda-se ajuste imediato da carga de treino e foco prioritário na recuperação."
+                "🚨🚨 O contexto físico pré-jogo indica risco fisiológico crítico, com carga elevada, "
+                "sono comprometido, alimentação inadequada e alto nível de cansaço. "
+                "Há forte indicativo de sobrecarga e maior risco de queda de desempenho ou lesão."
             )
 
         # 🔴 CENÁRIO 7 — SOBRECARGA INSTALADA
-        elif treino_alto and cansaco_alto:
+        elif carga_alta and cansaco_medio_ou_alto:
             interpretacao = (
-                "🚨 O atleta apresentou sinais claros de excesso de carga no período pré-jogo, "
-                "com impacto potencial negativo na recuperação e no desempenho."
+                "🚨 O atleta apresenta sinais consistentes de sobrecarga física, "
+                "com carga acumulada elevada nos últimos dias e fadiga perceptível. "
+                "Recomenda-se controle rigoroso da minutagem e da intensidade."
             )
 
-        # 🔴 CENÁRIO 6 — SOBRECARGA INICIAL
-        elif treino_alto and sono_irregular and cansaco_moderado:
+        # 🟠 CENÁRIO 6 — SOBRECARGA EM CONSTRUÇÃO
+        elif carga_moderada and sono_comprometido and cansaco_medio_ou_alto:
             interpretacao = (
-                "🚨 O contexto físico pré-jogo aponta sinais iniciais de sobrecarga, "
-                "associados a treinos intensos, sono irregular e aumento do cansaço."
+                "⚠️ O contexto físico pré-jogo sugere início de acúmulo de carga, "
+                "associado a recuperação incompleta e aumento progressivo do cansaço. "
+                "Atenção à gestão de esforço."
             )
 
-        # 🟠 CENÁRIO 4 — RISCO DE ACÚMULO
-        elif treino_alto and sono_irregular:
+        # 🟠 CENÁRIO 5 — RECUPERAÇÃO DEFICIENTE
+        elif carga_baixa and sono_comprometido:
             interpretacao = (
-                "⚠️ O atleta manteve boa carga de treinos, porém com sono irregular, "
-                "o que pode comprometer a recuperação e gerar risco de acúmulo físico."
+                "⚠️ Apesar da baixa carga física recente, o padrão de sono indica "
+                "recuperação insuficiente, o que pode impactar o rendimento em jogo."
             )
 
-        # 🔴 CENÁRIO 5 — PREPARAÇÃO INSUFICIENTE
-        elif sono_ruim and treino_baixo:
-            interpretacao = (
-                "🚨 Sono inadequado aliado à baixa carga de treinos indica risco elevado "
-                "por recuperação deficiente e preparo físico insuficiente."
-            )
-
-        # 🟠 CENÁRIO 3 — RECUPERAÇÃO E NUTRIÇÃO IRREGULARES
-        elif sono_irregular and alimentacao_ruim:
-            interpretacao = (
-                "⚠️ O atleta apresentou irregularidades no período pré-jogo, "
-                "especialmente relacionadas à recuperação e à qualidade da alimentação."
-            )
-
-        # 🟡 CENÁRIO 2 — ALERTA LEVE
-        elif sono_irregular or alimentacao_ruim:
+        # 🟡 CENÁRIO 4 — ALERTA LEVE
+        elif sono_comprometido or alimentacao_ruim_flag:
             interpretacao = (
                 "⚠️ Foram observadas pequenas irregularidades no período pré-jogo, "
-                "que merecem atenção para manutenção do rendimento."
+                "que merecem atenção para manutenção da performance."
             )
 
         # 🟢 CENÁRIO 1 — CONTEXTO EQUILIBRADO
         else:
             interpretacao = (
-                "✅ O atleta apresentou um contexto físico equilibrado no período pré-jogo."
+                "✅ O atleta apresentou um contexto físico equilibrado no período pré-jogo, "
+                "com boa gestão de carga, recuperação adequada e condições favoráveis de desempenho."
             )
 
         # -------- CARD VISUAL --------
