@@ -4201,6 +4201,7 @@ if st.session_state["pagina"] == "dashboard":
                     f"acumulando <b>{total_minutos_jogos} minutos</b>, "
                     f"o que exige controle da recuperação."
                 )
+            alerta_forte_carga = alerta_sequencia is not None
 
         # ======================================================
         # ======================================================
@@ -4232,7 +4233,7 @@ if st.session_state["pagina"] == "dashboard":
 
             carga_jogos += minutos * peso * fator_repeticao
 
-       
+
 
         # -------- SAÚDE --------
         df_saude = load_saude_df()
@@ -4349,6 +4350,14 @@ if st.session_state["pagina"] == "dashboard":
 
         # 🟠 CENÁRIO 6 — SOBRECARGA EM CONSTRUÇÃO
         elif carga_moderada and sono_comprometido and cansaco_medio_ou_alto:
+
+            elif carga_moderada and alerta_forte_carga:
+            interpretacao = (
+                "⚠️ A carga física recente foi moderada, impulsionada por jogos em dias próximos ou "
+                "acúmulo de minutagem. Mesmo com cansaço controlado, a recuperação deve ser monitorada "
+                "para evitar impacto no desempenho."
+            )
+
             interpretacao = (
                 "⚠️ O contexto físico pré-jogo sugere início de acúmulo de carga, "
                 "associado a recuperação incompleta e aumento progressivo do cansaço. "
@@ -4356,11 +4365,12 @@ if st.session_state["pagina"] == "dashboard":
             )
 
         # 🟠 CENÁRIO 5 — RECUPERAÇÃO DEFICIENTE
-        elif carga_baixa and sono_comprometido:
+        elif carga_baixa and sono_comprometido and not alerta_forte_carga:
             interpretacao = (
                 "⚠️ Apesar da baixa carga física recente, o padrão de sono indica "
                 "recuperação insuficiente, o que pode impactar o rendimento em jogo."
             )
+
 
         # 🟡 CENÁRIO 4 — ALERTA LEVE
         elif sono_comprometido or alimentacao_ruim_flag:
