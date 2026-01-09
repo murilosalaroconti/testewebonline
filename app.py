@@ -46,6 +46,10 @@ if "pagina" not in st.session_state:
     # tenta recuperar da URL
     st.session_state["pagina"] = query_params.get("pagina", "home")
 
+# 🔒 Garante que ao abrir o app sempre começa na Home
+if st.session_state.get("app_inicializado") is None:
+    st.session_state["pagina"] = "home"
+    st.session_state["app_inicializado"] = True
 
 
 # ----------------------
@@ -235,6 +239,10 @@ def load_registros():
     for col in EXPECTED_REGISTROS_COLUMNS:
         if col not in df.columns:
             df[col] = ""
+
+    # 🔒 NORMALIZAÇÃO PARA EVITAR ERRO DO PYARROW
+    if "Quadro Jogado" in df.columns:
+        df["Quadro Jogado"] = df["Quadro Jogado"].astype(str)
 
     return df[EXPECTED_REGISTROS_COLUMNS]
 
