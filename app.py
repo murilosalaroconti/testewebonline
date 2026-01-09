@@ -1484,6 +1484,16 @@ if st.session_state["pagina"] == "sono":
         # RECARREGA O DATAFRAME SALVO
         df_sono_atualizado = load_sono_df()
 
+        # Garantir coluna Data como datetime
+        df_sono_atualizado["Data_DT"] = pd.to_datetime(
+            df_sono_atualizado["Data"], dayfirst=True, errors="coerce"
+        )
+
+        # Ordena do mais recente para o mais antigo
+        df_sono_atualizado = df_sono_atualizado.sort_values(
+            "Data_DT", ascending=False
+        )
+
         # GARANTE AS COLUNAS NO DF CARREGADO PARA EXIBIÇÃO
         for col in COLUNAS_COCHILO_NAMES:
             if col not in df_sono_atualizado.columns:
