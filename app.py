@@ -816,39 +816,60 @@ if st.session_state["pagina"] == "jogos":
         st.markdown("---")
 
         st.markdown("##### ✈️ Time Visitante")
-        novo_visitante_input = st.text_input(
-            "Criar Novo Time Visitante (Deixe vazio para selecionar abaixo)",
-            key="novo_visitante"
-        )
+
         visitante_sel = st.selectbox(
-            "Ou Selecione Time Visitante Existente:",
+            "Selecione o Time Visitante",
             opcoes_times_sorted,
             key="visitante_sel"
         )
+
+        criar_novo_visitante = st.checkbox("➕ Criar novo time visitante")
+
+        novo_visitante_input = ""
+        if criar_novo_visitante:
+            novo_visitante_input = st.text_input(
+                "Nome do novo time visitante",
+                placeholder="Digite o nome do time visitante"
+            )
+
         st.markdown("---")
 
         st.markdown("##### 🏆 Campeonato")
-        novo_campeonato_input = st.text_input(
-            "Criar Novo Campeonato (Deixe vazio para selecionar abaixo)",
-            key="novo_campeonato"
-        )
+
         campeonato_sel = st.selectbox(
-            "Ou Selecione um Campeonato Existente:",
+            "Selecione o Campeonato",
             opcoes_campeonato,
             key="campeonato_sel"
         )
+
+        criar_novo_campeonato = st.checkbox("➕ Criar novo campeonato")
+
+        novo_campeonato_input = ""
+        if criar_novo_campeonato:
+            novo_campeonato_input = st.text_input(
+                "Nome do novo campeonato",
+                placeholder="Digite o nome do campeonato"
+            )
+
         st.markdown("---")
 
         st.markdown("##### 🏟️ Local")
-        novo_local_input = st.text_input(
-            "Criar Novo Local (Deixe vazio para selecionar abaixo)",
-            key="novo_local"
-        )
+
         local_sel = st.selectbox(
-            "Ou Selecione um Local Existente:",
+            "Selecione o Local",
             opcoes_local,
             key="local_sel"
         )
+
+        criar_novo_local = st.checkbox("➕ Criar novo local")
+
+        novo_local_input = ""
+        if criar_novo_local:
+            novo_local_input = st.text_input(
+                "Nome do novo local",
+                placeholder="Digite o nome do local"
+            )
+
         st.markdown("---")
 
         # ------------------------------------------------------------------
@@ -925,9 +946,21 @@ if st.session_state["pagina"] == "jogos":
                         else casa_sel
                     ),
 
-                    "Visitante": novo_visitante_input.strip() if novo_visitante_input.strip() else visitante_sel,
-                    "Campeonato": novo_campeonato_input.strip() if novo_campeonato_input.strip() else campeonato_sel,
-                    "Local": novo_local_input.strip() if novo_local_input.strip() else local_sel,
+                    "Visitante": (
+                        novo_visitante_input.strip()
+                        if criar_novo_visitante and novo_visitante_input.strip()
+                        else visitante_sel
+                    ),
+                    "Campeonato": (
+                        novo_campeonato_input.strip()
+                        if criar_novo_campeonato and novo_campeonato_input.strip()
+                        else campeonato_sel
+                    ),
+                    "Local": (
+                        novo_local_input.strip()
+                        if criar_novo_local and novo_local_input.strip()
+                        else local_sel
+                    ),
                     "Data": data.strftime("%d/%m/%Y"),
                     "Horário": horario.strftime("%H:%M"),
                     "Quadro Jogado": quadro,
