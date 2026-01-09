@@ -797,15 +797,28 @@ if st.session_state["pagina"] == "jogos":
     with col1:
 
         st.markdown("##### 🏠 Time Casa")
-        novo_casa_input = st.text_input(
-            "Criar Novo Time Casa (Deixe vazio para selecionar abaixo)",
-            key="novo_casa"
+
+        casa_sel = st.selectbox(
+            "Selecione o Time Casa",
+            opcoes_times_sorted,
+            key="casa_sel"
         )
+
         casa_sel = st.selectbox(
             "Ou Selecione Time Existente:",
             opcoes_times_sorted,
             key="casa_sel"
         )
+
+        criar_novo_casa = st.checkbox("➕ Criar novo time casa")
+
+        novo_casa_input = ""
+        if criar_novo_casa:
+            novo_casa_input = st.text_input(
+                "Nome do novo time casa",
+                placeholder="Digite o nome do time"
+            )
+
         st.markdown("---")
 
         st.markdown("##### ✈️ Time Visitante")
@@ -912,7 +925,12 @@ if st.session_state["pagina"] == "jogos":
             if salvar:
 
                 novo = {
-                    "Casa": novo_casa_input.strip() if novo_casa_input.strip() else casa_sel,
+                    "Casa": (
+                        novo_casa_input.strip()
+                        if criar_novo_casa and novo_casa_input.strip()
+                        else casa_sel
+                    ),
+
                     "Visitante": novo_visitante_input.strip() if novo_visitante_input.strip() else visitante_sel,
                     "Campeonato": novo_campeonato_input.strip() if novo_campeonato_input.strip() else campeonato_sel,
                     "Local": novo_local_input.strip() if novo_local_input.strip() else local_sel,
