@@ -27,6 +27,8 @@ from reportlab.platypus import (
     Table,
     TableStyle
 )
+import json
+
 
 
 BASE_DIR = Path(__file__).parent
@@ -113,10 +115,15 @@ OPCOES_MODALIDADE = ["Futsal", "Campo", "Society", "Areia"] # Nova lista
 # Garantir pasta Data
 DATA_DIR = BASE_DIR / "Data"
 DATA_DIR.mkdir(exist_ok=True)
+SCOUT_TEMP_PATH = DATA_DIR / "scout_temp.json"
 
 # ----------------------
 # Utilitários de planilha
+
 # ----------------------
+
+
+
 
 def conectar_google_sheets():
     scopes = [
@@ -236,6 +243,17 @@ def save_registros(df):
     sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
+
+def salvar_scout_temp(data: dict):
+    with open(SCOUT_TEMP_PATH, "w") as f:
+        json.dump(data, f)
+
+def carregar_scout_temp():
+    if SCOUT_TEMP_PATH.exists():
+        with open(SCOUT_TEMP_PATH, "r") as f:
+            return json.load(f)
+    return None
+
 
 EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
 
@@ -823,7 +841,8 @@ if st.session_state["pagina"] == "jogos":
         # 🧠 SCOUT TEMPORÁRIO (ANTI-PERDA)
         # ===============================
         if "scout_temp" not in st.session_state:
-            st.session_state["scout_temp"] = {
+            scout_salvo = carregar_scout_temp()
+            st.session_state["scout_temp"] = scout_salvo if scout_salvo else {
                 "Chutes": 0,
                 "Chutes Errados": 0,
                 "Desarmes": 0,
@@ -844,6 +863,18 @@ if st.session_state["pagina"] == "jogos":
         st.number_input("❌ Passes Errados", min_value=0, key="Passes Errados")
         st.number_input("⚡ Faltas Sofridas", min_value=0, key="Faltas Sofridas")
         st.number_input("🔁 Participações Indiretas", min_value=0, key="Participações Indiretas")
+
+        st.session_state["scout_temp"] = {
+            "Chutes": st.session_state["Chutes"],
+            "Chutes Errados": st.session_state["Chutes Errados"],
+            "Desarmes": st.session_state["Desarmes"],
+            "Passes-chave": st.session_state["Passes-chave"],
+            "Passes Errados": st.session_state["Passes Errados"],
+            "Faltas Sofridas": st.session_state["Faltas Sofridas"],
+            "Participações Indiretas": st.session_state["Participações Indiretas"]
+        }
+
+        salvar_scout_temp(st.session_state["scout_temp"])
 
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
@@ -882,13 +913,13 @@ if st.session_state["pagina"] == "jogos":
                     "Assistências": assistencias,
                     "Resultado": f"{gols_atleta}x{gols_adversario}",
                     "Condição do Campo": modalidade,
-                    "Chutes": st.session_state["Chutes"],
-                    "Chutes Errados": st.session_state["Chutes Errados"],
-                    "Desarmes": st.session_state["Desarmes"],
-                    "Passes-chave": st.session_state["Passes-chave"],
-                    "Passes Errados": st.session_state["Passes Errados"],
-                    "Faltas Sofridas": st.session_state["Faltas Sofridas"],
-                    "Participações Indiretas": st.session_state["Participações Indiretas"],
+                    "Chutes": st.session_state["scout_temp"]["Chutes"],
+                    "Chutes Errados": st.session_state["scout_temp"]["Chutes Errados"],
+                    "Desarmes": st.session_state["scout_temp"]["Desarmes"],
+                    "Passes-chave": st.session_state["scout_temp"]["Passes-chave"],
+                    "Passes Errados": st.session_state["scout_temp"]["Passes Errados"],
+                    "Faltas Sofridas": st.session_state["scout_temp"]["Faltas Sofridas"],
+                    "Participações Indiretas": st.session_state["scout_temp"]["Participações Indiretas"],
 
                 }
 
@@ -909,7 +940,8 @@ if st.session_state["pagina"] == "jogos":
                         del st.session_state[k]
 
                 st.rerun()
-
+        if SCOUT_TEMP_PATH.exists():
+            SCOUT_TEMP_PATH.unlink()
     # ----------------------------------------------------------------------
     # COLUNA 2 - TABELA
     # ----------------------------------------------------------------------
