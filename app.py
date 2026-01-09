@@ -593,6 +593,9 @@ def criar_logo_link_alinhado(col, path, width):
 
 #Pagina Home
 if st.session_state["pagina"] == "home":
+    if st.session_state["pagina"] == "home":
+        st.query_params.clear()
+
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
     st.markdown(
