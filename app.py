@@ -804,12 +804,6 @@ if st.session_state["pagina"] == "jogos":
             key="casa_sel"
         )
 
-        casa_sel = st.selectbox(
-            "Ou Selecione Time Existente:",
-            opcoes_times_sorted,
-            key="casa_sel"
-        )
-
         criar_novo_casa = st.checkbox("➕ Criar novo time casa")
 
         novo_casa_input = ""
