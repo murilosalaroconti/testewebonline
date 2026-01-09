@@ -803,6 +803,7 @@ if st.session_state["pagina"] == "jogos":
             opcoes_times_sorted,
             key="casa_sel"
         )
+        st.markdown("")
 
         criar_novo_casa = st.checkbox("➕ Criar novo time casa")
 
@@ -822,6 +823,7 @@ if st.session_state["pagina"] == "jogos":
             opcoes_times_sorted,
             key="visitante_sel"
         )
+        st.markdown("")
 
         criar_novo_visitante = st.checkbox("➕ Criar novo time visitante")
 
@@ -841,6 +843,7 @@ if st.session_state["pagina"] == "jogos":
             opcoes_campeonato,
             key="campeonato_sel"
         )
+        st.markdown("")
 
         criar_novo_campeonato = st.checkbox("➕ Criar novo campeonato")
 
@@ -860,6 +863,7 @@ if st.session_state["pagina"] == "jogos":
             opcoes_local,
             key="local_sel"
         )
+        st.markdown("")
 
         criar_novo_local = st.checkbox("➕ Criar novo local")
 
