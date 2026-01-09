@@ -918,6 +918,8 @@ if st.session_state["pagina"] == "jogos":
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
 
+        OPCAO_INVALIDA = "Selecione ou Crie Novo"
+
         with st.form("form_salvar_jogo"):
 
             data = st.date_input("Data do Jogo", format="DD/MM/YYYY")
@@ -938,6 +940,30 @@ if st.session_state["pagina"] == "jogos":
             salvar = st.form_submit_button("💾 Salvar Jogo")
 
             if salvar:
+
+                erros = []
+
+                # --- TIME CASA ---
+                if casa_sel == OPCAO_INVALIDA and not (criar_novo_casa and novo_casa_input.strip()):
+                    erros.append("Time Casa")
+
+                # --- TIME VISITANTE ---
+                if visitante_sel == OPCAO_INVALIDA and not (criar_novo_visitante and novo_visitante_input.strip()):
+                    erros.append("Time Visitante")
+
+                # --- CAMPEONATO ---
+                if campeonato_sel == OPCAO_INVALIDA and not (criar_novo_campeonato and novo_campeonato_input.strip()):
+                    erros.append("Campeonato")
+
+                # --- LOCAL ---
+                if local_sel == OPCAO_INVALIDA and not (criar_novo_local and novo_local_input.strip()):
+                    erros.append("Local")
+
+                if erros:
+                    st.error(
+                        "❌ Preencha corretamente:\n- " + "\n- ".join(erros)
+                    )
+                    st.stop()
 
                 novo = {
                     "Casa": (
