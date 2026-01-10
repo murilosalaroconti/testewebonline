@@ -4061,6 +4061,21 @@ if st.session_state["pagina"] == "dashboard":
 
         st.markdown("### 🧠 Contexto Físico Pré-Jogo")
 
+        st.markdown(f"""
+        <div style="
+            background:#0B1220;
+            padding:16px;
+            border-radius:14px;
+            border-left:6px solid #00E5FF;
+            margin-bottom:18px;
+        ">
+            <strong>🧠 Contexto Físico Pré-Jogo</strong><br>
+            Exposição física: <b>{status_carga[0]}</b><br>
+            Sono: <b>{status_sono[0]}</b><br>
+            Carga recente: <b>{"⚠️ Atenção" if alerta_forte_carga else "Controlada"}</b>
+        </div>
+        """, unsafe_allow_html=True)
+
         # Data do jogo selecionado
         data_jogo = jogo["Data_DT"].date()
 
@@ -4494,17 +4509,23 @@ if st.session_state["pagina"] == "dashboard":
                 "Qualidade da alimentação abaixo do ideal"
             )
 
-        if motivos_irregularidades:
-            leitura_sistema = (
-                    "🧠 <strong>Leitura do sistema</strong><br>"
-                    "⚠️ Irregularidades identificadas no período pré-jogo:<br>"
-                    + "<br>".join([f"• {m}" for m in motivos_irregularidades])
-            )
-        else:
-            leitura_sistema = (
-                "🧠 <strong>Leitura do sistema</strong><br>"
-                "✅ Nenhuma irregularidade relevante foi identificada no período pré-jogo."
-            )
+        st.markdown("""
+        <div style="
+            background:#0B1220;
+            padding:16px;
+            border-radius:14px;
+            border-left:6px solid #FFC107;
+            margin-bottom:20px;
+        ">
+            <strong>🧠 Leitura do Sistema</strong><br>
+            ⚠️ Irregularidades identificadas no período pré-jogo:<br><br>
+            {}
+        </div>
+        """.format(
+            "<br>".join([f"• {m}" for m in motivos_irregularidades])
+            if motivos_irregularidades
+            else "• Nenhuma irregularidade relevante identificada."
+        ), unsafe_allow_html=True)
 
         # -------- CARD VISUAL --------
         html_lista_jogos = "<br>".join(lista_jogos_txt) if lista_jogos_txt else "Nenhum jogo registrado no período."
@@ -4544,7 +4565,8 @@ if st.session_state["pagina"] == "dashboard":
             "</div>"
         )
 
-        st.markdown(html_card, unsafe_allow_html=True)
+        with st.expander("📊 Ver detalhes técnicos do contexto físico"):
+            st.markdown(html_card, unsafe_allow_html=True)
 
         # -------- VISUAL MODERNO DOS 4 PILARES --------
         st.markdown("#### 📊 Leitura Rápida do Contexto Físico")
