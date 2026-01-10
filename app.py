@@ -3795,7 +3795,7 @@ if st.session_state["pagina"] == "dashboard":
             st.markdown(f"""
                     <div class="scout-card bg-indiretas">
                         <div class="icon">🔁</div>
-                        <div class="scout-title">Participações</div>
+                        <div class="scout-title">Ações Ofensivas</div>
                         <div class="scout-value">{int(jogo["Participações Indiretas"])}</div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -3904,7 +3904,7 @@ if st.session_state["pagina"] == "dashboard":
         score_final = float(jogo["Score_Jogo"])
         score_formatado = f"{score_final:.1f}"
 
-       
+
         # ===============================
         # ⚖️ AJUSTE POR MODALIDADE
         # ===============================
