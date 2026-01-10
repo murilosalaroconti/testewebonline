@@ -4560,9 +4560,6 @@ if st.session_state["pagina"] == "dashboard":
 
             "<strong>🧠 Conclusão do sistema</strong><br>"
             f"<em>{interpretacao}</em><br><br>"
-            f"{leitura_sistema}"
-
-
             "</div>"
         )
 
