@@ -1034,8 +1034,7 @@ if st.session_state["pagina"] == "jogos":
         if SCOUT_TEMP_PATH.exists():
             SCOUT_TEMP_PATH.unlink()
 
-        # ✅ VOLTA PRA HOME (ESSENCIAL)
-        st.session_state["pagina"] = "home"
+
         st.rerun()
 
 
