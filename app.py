@@ -4061,20 +4061,6 @@ if st.session_state["pagina"] == "dashboard":
 
         st.markdown("### 🧠 Contexto Físico Pré-Jogo")
 
-        st.markdown(f"""
-        <div style="
-            background:#0B1220;
-            padding:16px;
-            border-radius:14px;
-            border-left:6px solid #00E5FF;
-            margin-bottom:18px;
-        ">
-            <strong>🧠 Contexto Físico Pré-Jogo</strong><br>
-            Exposição física: <b>{status_carga[0]}</b><br>
-            Sono: <b>{status_sono[0]}</b><br>
-            Carga recente: <b>{"⚠️ Atenção" if alerta_forte_carga else "Controlada"}</b>
-        </div>
-        """, unsafe_allow_html=True)
 
         # Data do jogo selecionado
         data_jogo = jogo["Data_DT"].date()
@@ -4414,6 +4400,21 @@ if st.session_state["pagina"] == "dashboard":
         carga_baixa = status_carga[0] == "Baixa"
         carga_moderada = status_carga[0] == "Moderada"
         carga_alta = status_carga[0] == "Alta"
+
+        st.markdown(f"""
+        <div style="
+            background:#0B1220;
+            padding:16px;
+            border-radius:14px;
+            border-left:6px solid #00E5FF;
+            margin-bottom:18px;
+        ">
+            <strong>🧠 Contexto Físico Pré-Jogo</strong><br>
+            Exposição física: <b>{status_carga[0]}</b><br>
+            Sono: <b>{status_sono[0]}</b><br>
+            Carga recente: <b>{"⚠️ Atenção" if alerta_forte_carga else "Controlada"}</b>
+        </div>
+        """, unsafe_allow_html=True)
 
         # ===============================
         # 📊 CAMADA OBJETIVA — CARGA REAL
