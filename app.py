@@ -527,6 +527,26 @@ if st.session_state["pagina"] == "home":
     if st.session_state["pagina"] == "home":
         st.query_params.clear()
 
+        # =========================
+        # 📌 SEGURANÇA DO SCORE
+        # =========================
+    if "Score_Jogo" not in df_jogos.columns:
+        df_jogos["Score_Jogo"] = df_jogos.apply(
+            calcular_score_jogo, axis=1
+        )
+
+        # =========================
+        # 🏟️ ÚLTIMO JOGO
+        # =========================
+    nota_ultimo_jogo = "—"
+    if not df_jogos.empty:
+        ultimo_jogo = (
+            df_jogos.dropna(subset=["Data_DT"])
+            .sort_values("Data_DT", ascending=False)
+            .iloc[0]
+        )
+        nota_ultimo_jogo = round(ultimo_jogo["Score_Jogo"], 1)
+
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
     st.markdown(
@@ -538,7 +558,6 @@ if st.session_state["pagina"] == "home":
     # =========================
     # 📌 CARREGAR DADOS
     # =========================
-    df_jogos = load_registros()
     df_treinos = load_treinos_df()
     df_sono = load_sono_df()
 
