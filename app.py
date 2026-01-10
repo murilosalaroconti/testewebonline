@@ -1030,12 +1030,9 @@ if st.session_state["pagina"] == "jogos":
                     if k in st.session_state:
                         del st.session_state[k]
 
-
+                st.rerun()
         if SCOUT_TEMP_PATH.exists():
             SCOUT_TEMP_PATH.unlink()
-
-
-        st.rerun()
 
 
     # ----------------------------------------------------------------------
