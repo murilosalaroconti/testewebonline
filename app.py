@@ -1098,6 +1098,9 @@ if "Score_Jogo" not in df_jogos.columns:
         calcular_score_real, axis=1
     )
 
+# ===============================
+# 🔒 FORÇA RETORNO PARA JOGOS SE PARTIDA ESTÁ ATIVA
+# ===============================
 if st.session_state.get("jogo_em_andamento", False):
     st.session_state["pagina"] = "jogos"
 
@@ -1105,7 +1108,7 @@ if st.session_state.get("jogo_em_andamento", False):
 #Pagina Home
 if st.session_state["pagina"] == "home":
 
-    
+
 
     # =========================
     # 🏟️ ÚLTIMO JOGO
@@ -1264,6 +1267,14 @@ if st.session_state["pagina"] == "home":
 elif st.session_state["pagina"] == "jogos":
     st.session_state["jogo_em_andamento"] = True
 
+    # ===============================
+    # 🔄 RETOMADA AUTOMÁTICA
+    # ===============================
+    scout_salvo = carregar_scout_temp()
+    if scout_salvo:
+        st.info("🔄 Jogo retomado automaticamente")
+
+
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
         st.rerun()
@@ -1401,6 +1412,18 @@ elif st.session_state["pagina"] == "jogos":
                 "Faltas Sofridas": 0,
                 "Participações Indiretas": 0
             }
+
+        # ===============================
+        # ♻️ RESTAURA VALORES DOS SCOUTS
+        # ===============================
+        scout_salvo = carregar_scout_temp()
+        if scout_salvo:
+            if "scout_temp" not in st.session_state:
+                st.session_state["scout_temp"] = scout_salvo
+
+            for k, v in scout_salvo.items():
+                if k not in st.session_state:
+                    st.session_state[k] = v
 
         # ------------------ FORMULÁRIO ------------------
 
