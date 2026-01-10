@@ -72,49 +72,11 @@ EXPECTED_SAUDE_COLUMNS = [
 ]
 
 
-# --- NOVOS CAMINHOS PARA LOGOS (Crie os arquivos nesta pasta) ---
-LOGO_PATH_1 = BASE_DIR / "logos" / "paulista.png"
-LOGO_PATH_2 = BASE_DIR / "logos" / "ligapta.png"
-LOGO_PATH_3 = BASE_DIR / "logos" / "gru.png"
-LOGO_PATH_4 = BASE_DIR / "logos" / "paulistacup.png"
-LOGO_PATH_5 = BASE_DIR / "logos" / "juventude.png"
-LOGO_PATH_6 = BASE_DIR / "logos" / "apf.png"
-LOGO_PATH_7 = BASE_DIR / "logos" / "nike.png"
-LOGO_PATH_8 = BASE_DIR / "logos" / "cuebla.png"
-
-#URLS DOS CAMPEONATOS
-CAMPEONATO_URLS = {
-    "paulista.png": "https://eventos.admfutsal.com.br/evento/873/jogos",
-    "ligapta.png": "https://ligapaulistafutsal.com.br/evento/178/liga-paulista-de-futsal-sub-09-2025",
-    "gru.png": "https://copafacil.com/-vpxn9@4rbd",
-    "paulistacup.png": "https://paulistacup.com.br/campeonatos/6706-paulistinha-cup---sub-09",
-    "juventude.png": "https://url-da-liga-juventude.com.br/tabela",
-    "apf.png": "https://url-da-apf.com.br/tabela",
-    "nike.png": "https://url-da-nike.com.br/eventos",
-    "cuebla.png": "https://instituto-esporte-e-cidadania.ritmodoesporte.com.br/futebol-de-campo/campeonato-cuebla/1-edicao-ano-2025/4915/categoria/sub-09-masculino/18228",
-}
-
-# --- RÓTULOS CURTOS PARA OS BOTÕES ---
-CAMPEONATO_LABELS = {
-    "paulista.png": "Federação Paulista",
-    "ligapta.png": "Liga Paulista Futsal",
-    "gru.png": "Liga Kids Guarulhos",
-    "paulistacup.png": "Paulista CUP",
-    "juventude.png": "Liga da Juventude",
-    "apf.png": "Copa São Paulo",
-    "nike.png": "Copa Nike Campo",
-    "cuebla.png": "Copa Cuebla",
-}
-
-
-# -------------------------------------------------------------
-
 # ----------------------
 OPCOES_QUADRO = ["Principal", "Reserva", "Misto", "Não Aplicável"]
 # Removida OPCOES_RESULTADO pois será texto livre (ex: 4x1)
 OPCOES_MODALIDADE = ["Futsal", "Campo", "Society", "Areia"] # Nova lista
 # ------------------------------------------------------------------
-
 
 # Garantir pasta Data
 DATA_DIR = BASE_DIR / "Data"
@@ -125,8 +87,6 @@ SCOUT_TEMP_PATH = DATA_DIR / "scout_temp.json"
 # Utilitários de planilha
 
 # ----------------------
-
-
 
 
 def conectar_google_sheets():
@@ -226,7 +186,6 @@ def parse_duration_to_hours(dur_str):
         return float(dur_str) if pd.notna(dur_str) else 0.0
     except:
         return 0.0
-# FIM DA FUNÇÃO QUE PRECISA SER DEFINIDA PRIMEIRO.
 
 
 @st.cache_data(ttl=300)  # TTL = 300 segundos = 5 minutos
@@ -560,34 +519,6 @@ with st.sidebar:
 
 # ---------------------------------------------
 
-# --- FUNÇÃO HELPER PARA CRIAR LOGO + LINK DE TEXTO CENTRALIZADO ---
-def criar_logo_link_alinhado(col, path, width):
-    """Função Helper para exibir a imagem e forçar o texto do link a centralizar."""
-    import os
-    logo_filename = os.path.basename(path)
-    url = CAMPEONATO_URLS.get(logo_filename)
-    label = CAMPEONATO_LABELS.get(logo_filename, "Acessar")
-
-    with col:
-        # Exibe o logo (Mantido simples, dependendo do CSS global anterior para centralizar o logo)
-        if os.path.exists(path):
-            st.image(path, width=width)
-
-            # Cria o link de texto usando Markdown/HTML para forçar o alinhamento
-            if url:
-                # O segredo está aqui: A div tem 100% de largura e o texto é alinhado ao centro.
-                link_html = f"""
-                <div style='
-                    width: 100%;                  /* Ocupa a largura total da coluna */
-                    text-align: center !important; /* FORÇA o texto do link a centralizar */
-                    font-size: 10px; 
-                    margin-top: -10px;            /* Puxa para cima para ficar mais perto do logo */
-                '>
-                    <a href='{url}' target='_blank'>{label}</a>
-                </div>
-                """
-                st.markdown(link_html, unsafe_allow_html=True)
-
 #----------------------------------------------
 
 
@@ -633,7 +564,8 @@ if st.session_state["pagina"] == "home":
             .sort_values("Data_DT", ascending=False)
             .iloc[0]
         )
-        nota_ultimo_jogo = round(calcular_score_jogo(ultimo_jogo), 1)
+        nota_ultimo_jogo = round(ultimo_jogo["Score_Jogo"], 1)
+
 
     # =========================
     # 😴 SONO DE ONTEM
@@ -664,8 +596,8 @@ if st.session_state["pagina"] == "home":
     tendencia = "Sem dados"
     if len(df_jogos) >= 5:
         df_jogos_ord = df_jogos.sort_values("Data_DT")
-        df_jogos_ord["Score"] = df_jogos_ord.apply(calcular_score_jogo, axis=1)
-        ultimos = df_jogos_ord.tail(5)["Score"].tolist()
+        df_jogos_ord = df_jogos.sort_values("Data_DT")
+        ultimos = df_jogos_ord.tail(5)["Score_Jogo"].tolist()
 
         if ultimos[-1] > ultimos[0]:
             tendencia = "Em evolução 📈"
@@ -750,7 +682,6 @@ if st.session_state["pagina"] == "home":
 
     st.markdown("---")
     st.info("💡 Disciplina hoje vira desempenho amanhã.")
-
 
 # --------------------------
 # Aba Jogos
