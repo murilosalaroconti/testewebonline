@@ -3904,10 +3904,7 @@ if st.session_state["pagina"] == "dashboard":
         score_final = float(jogo["Score_Jogo"])
         score_formatado = f"{score_final:.1f}"
 
-        # 🔒 PISO PARA JOGO PARTICIPATIVO
-        if volume_ofensivo >= 4 and score_final < 5.0:
-            score_final = 5.0
-
+       
         # ===============================
         # ⚖️ AJUSTE POR MODALIDADE
         # ===============================
