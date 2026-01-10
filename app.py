@@ -30,7 +30,6 @@ from reportlab.platypus import (
 import json
 
 
-
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
@@ -71,7 +70,6 @@ EXPECTED_SAUDE_COLUMNS = [
     "Observação"
 ]
 
-
 # ----------------------
 OPCOES_QUADRO = ["Principal", "Reserva", "Misto", "Não Aplicável"]
 # Removida OPCOES_RESULTADO pois será texto livre (ex: 4x1)
@@ -85,9 +83,7 @@ SCOUT_TEMP_PATH = DATA_DIR / "scout_temp.json"
 
 # ----------------------
 # Utilitários de planilha
-
 # ----------------------
-
 
 def conectar_google_sheets():
     scopes = [
@@ -121,15 +117,12 @@ def conectar_google_sheets_test():
 def get_client():
     return conectar_google_sheets()
 
-
-
 # Botão para atualizar dados
 # ------------------------------
 if st.session_state.get("pagina") != "home":
     if st.button("Atualizar planilha"):
         st.cache_data.clear()
         st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
-
 
 def safe_int(value):
     try:
@@ -185,9 +178,6 @@ def calcular_score_real(row):
 
     return round(max(0, min(10, score / fator)), 1)
 
-
-
-
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
     try:
@@ -199,7 +189,6 @@ def parse_duration_to_hours(dur_str):
         return float(dur_str) if pd.notna(dur_str) else 0.0
     except:
         return 0.0
-
 
 @st.cache_data(ttl=300)  # TTL = 300 segundos = 5 minutos
 def load_registros():
@@ -233,7 +222,6 @@ def carregar_scout_temp():
         with open(SCOUT_TEMP_PATH, "r") as f:
             return json.load(f)
     return None
-
 
 EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
 
@@ -482,7 +470,6 @@ def update_sono_cochilo_detalhado(df, date_str, duracao_novo_cochilo_str):
     save_sono_df(df)
     return df
 
-
 # ----------------------
 # Visual / Layout (Streamlit)
 # ----------------------
@@ -546,14 +533,8 @@ if "Score_Jogo" not in df_jogos.columns:
     df_jogos["Score_Jogo"] = df_jogos.apply(
         calcular_score_real, axis=1
     )
-# =====================================================
 
-
-# ---------------------------------------------
-
-#----------------------------------------------
-
-
+#--------------------------------------------
 #Pagina Home
 if st.session_state["pagina"] == "home":
 
@@ -3918,74 +3899,9 @@ if st.session_state["pagina"] == "dashboard":
 
         st.markdown("### ⭐ Score Geral do Jogo")
 
-        # 📌 Dados do jogo
-        gols = int(jogo.get("Gols Marcados", 0))
-        assistencias = int(jogo.get("Assistências", 0))
-        passes_chave = int(jogo.get("Passes-chave", 0))
-        desarmes = int(jogo.get("Desarmes", 0))
-        faltas = int(jogo.get("Faltas Sofridas", 0))
-        participacoes = int(jogo.get("Participações Indiretas", 0))
-
-        chutes_certos = int(jogo.get("Chutes", 0))
-        chutes_errados = int(jogo.get("Chutes Errados", 0))
-        finalizacoes = chutes_certos + chutes_errados
-
-        passes_errados = int(jogo.get("Passes Errados", 0))
-        erros_total = chutes_errados + passes_errados
-
-
-        # ===============================
-        # 🔥 VOLUME OFENSIVO (BASE DO JOGO)
-        # ===============================
-        volume_ofensivo = (
-                finalizacoes * 0.3 +
-                passes_chave * 0.7 +
-                faltas * 0.5 +
-                participacoes * 0.8
-        )
-
-        # BÔNUS POR PARTICIPAÇÃO REAL
-        bonus_volume = 0
-        if volume_ofensivo >= 6:
-            bonus_volume = 2.0
-        elif volume_ofensivo >= 4:
-            bonus_volume = 1.2
-        elif volume_ofensivo >= 2:
-            bonus_volume = 0.6
-
-        # ⚽ IMPACTO DIRETO
-        score_gols = gols * 2.2
-        score_assistencia = assistencias * 1.8
-
-        # 🎯 CRIAÇÃO
-        score_passes_chave = passes_chave * 0.6
-        score_faltas = faltas * 0.3
-
-        # 🛡️ DEFESA
-        score_defesa = desarmes * 0.4
-
-        # ⚡ EFICIÊNCIA (MENOS PUNITIVA)
-        score_eficiencia = 0
-        if finalizacoes >= 3:
-            eficiencia = gols / finalizacoes if finalizacoes > 0 else 0
-            score_eficiencia = eficiencia * 1.2
-
-        # ❌ ERROS (PENALIZA MENOS)
-        penalidade_erros = erros_total * 0.25
-
-        # ===============================
-        # ⭐ SCORE FINAL
-        # ===============================
-        score_final = (
-                score_gols +
-                score_assistencia +
-                score_passes_chave +
-                score_faltas +
-                score_defesa +
-                score_eficiencia +
-                bonus_volume -
-                penalidade_erros
-        )
+        # ⭐ SCORE OFICIAL (MESMO DO HOME)
+        score_final = float(jogo["Score_Jogo"])
+        score_formatado = f"{score_final:.1f}"
 
         # 🔒 PISO PARA JOGO PARTICIPATIVO
         if volume_ofensivo >= 4 and score_final < 5.0:
