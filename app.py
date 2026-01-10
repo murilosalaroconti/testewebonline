@@ -29,6 +29,16 @@ from reportlab.platypus import (
 )
 import json
 
+# ===============================
+# 🔒 ESTADOS GLOBAIS DO APP
+# ===============================
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "home"
+
+if "jogo_em_andamento" not in st.session_state:
+    st.session_state["jogo_em_andamento"] = False
+
+
 
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
@@ -136,8 +146,6 @@ def calcular_score_real(row):
     passes_chave = safe_int(row.get("Passes-chave"))
     desarmes = safe_int(row.get("Desarmes"))
     faltas = safe_int(row.get("Faltas Sofridas"))
-
-    # 🔥 AÇÕES OFENSIVAS (SÓ CONTEXTO, NÃO PONTUA)
     participacoes = safe_int(row.get("Participações Indiretas"))
 
     chutes = safe_int(row.get("Chutes"))
@@ -159,10 +167,25 @@ def calcular_score_real(row):
     )
 
     # ===============================
-    # ⚖️ AJUSTE DE JUSTIÇA (CONTEXTO)
+    # ⚖️ VOLUME OFENSIVO REAL (CONTEXTO)
     # ===============================
-    if participacoes >= 3 and score < 5.0:
+    finalizacoes = chutes + chutes_errados
+
+    volume_ofensivo = (
+        finalizacoes * 0.4 +
+        faltas * 0.6 +
+        participacoes * 0.8
+    )
+
+    # ===============================
+    # ⚖️ PROTEÇÃO DE JUSTIÇA
+    # ===============================
+    if volume_ofensivo >= 3 and score < 5.0:
         score = 5.0
+
+    # Reduz punição se houve iniciativa
+    if volume_ofensivo >= 3:
+        score += 0.3  # bônus simbólico de iniciativa
 
     # ===============================
     # ⚖️ AJUSTE POR MODALIDADE
@@ -176,6 +199,12 @@ def calcular_score_real(row):
     score_final = score / fator
 
     return round(max(0, min(10, score_final)), 1)
+
+def garantir_score_jogo(df):
+    if "Score_Jogo" not in df.columns:
+        df = df.copy()
+        df["Score_Jogo"] = df.apply(calcular_score_real, axis=1)
+    return df
 
 
 def parse_duration_to_hours(dur_str):
@@ -694,6 +723,15 @@ if st.session_state["pagina"] == "home":
 # --------------------------
 # Aba Jogos
 # --------------------------
+# ===============================
+# 🔒 TRAVA DE JOGO ATIVO (ANTI-SAÍDA NO MOBILE)
+# ===============================
+if st.session_state.get("jogo_em_andamento", False):
+    st.session_state["pagina"] = "jogos"
+
+if st.session_state["pagina"] == "jogos":
+    st.session_state["jogo_em_andamento"] = True
+
 if st.session_state["pagina"] == "jogos":
 
     if st.button("⬅️ Voltar para Início"):
@@ -968,6 +1006,15 @@ if st.session_state["pagina"] == "jogos":
                 ]:
                     if k in st.session_state:
                         del st.session_state[k]
+
+                # ===============================
+                # 🏁 FINALIZA PARTIDA (LIBERA NAVEGAÇÃO)
+                # ===============================
+                st.session_state["jogo_em_andamento"] = False
+
+                # 🧹 LIMPA SCOUT TEMPORÁRIO
+                if "scout_temp" in st.session_state:
+                    del st.session_state["scout_temp"]
 
                 st.rerun()
         if SCOUT_TEMP_PATH.exists():
@@ -3086,7 +3133,7 @@ if st.session_state["pagina"] == "dashboard":
     st.markdown("---")
 
     # --- 2. CARREGAR DADOS COMPLETOS ---
-    df_jogos_full = load_registros()
+    df_jogos_full = garantir_score_jogo(load_registros())
     df_treinos_full = load_treinos_df()
     df_sono_full = load_sono_df()
 
@@ -3164,6 +3211,8 @@ if st.session_state["pagina"] == "dashboard":
     df_jogos_f = filter_df_by_date(df_jogos_full, 'Data', data_inicio, data_fim)
     df_treinos_f = filter_df_by_date(df_treinos_full, 'Date', data_inicio, data_fim)
     df_sono_f = filter_df_by_date(df_sono_full, 'Data', data_inicio, data_fim)
+
+    df_jogos_f = garantir_score_jogo(df_jogos_f)
 
     # --- PREPARAR DADOS DE SONO PARA USO IMEDIATO ---
     if not df_sono_f.empty and 'Duração do Sono (h:min)' in df_sono_f.columns:
@@ -4596,45 +4645,43 @@ if st.session_state["pagina"] == "dashboard":
             unsafe_allow_html=True
         )
 
+
         # ======================================================
-        # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS) — ANÁLISE REAL
+        # 📈 TENDÊNCIA RECENTE (ÚLTIMOS 5 JOGOS)
         # ======================================================
 
-        # Modalidade do jogo selecionado
         modalidade_jogo = jogo["Condição do Campo"]
 
-        st.markdown(
-            f"### 📈 Tendência Recente — {modalidade_jogo} (Últimos 5 Jogos)"
-        )
-
-        # Filtra SOMENTE jogos da mesma modalidade
         df_tend = df_jogos_full[
             df_jogos_full["Condição do Campo"] == modalidade_jogo
             ].copy()
 
-        if not df_tend.empty and len(df_tend) >= 5:
+        # 🔒 GARANTE O SCORE (AQUI É O LUGAR CERTO)
+        df_tend = garantir_score_jogo(df_tend)
 
+        if df_tend.empty or "Score_Jogo" not in df_tend.columns:
+            st.info("Dados insuficientes para análise de tendência.")
+        else:
             df_tend["Data_DT"] = pd.to_datetime(
                 df_tend["Data"], dayfirst=True, errors="coerce"
             )
-
             df_tend = df_tend.sort_values("Data_DT")
 
+            if len(df_tend) < 5:
+                st.info("São necessários pelo menos 5 jogos para análise de tendência.")
+            else:
+                scores = df_tend.tail(5)["Score_Jogo"].tolist()
 
+                ultimo = scores[-1]
+                penultimo = scores[-2]
+                antepenultimo = scores[-3]
+                media_5 = sum(scores) / len(scores)
 
-            # 🔍 Últimos 5 jogos (ordem cronológica)
-            scores = df_tend.tail(5)["Score_Jogo"].values.tolist()
+                jogos_ruins = sum(1 for s in scores if s < 4.5)
+                jogos_bons = sum(1 for s in scores if s >= 6)
 
-            ultimo = scores[-1]
-            penultimo = scores[-2]
-            antepenultimo = scores[-3]
-            media_5 = sum(scores) / len(scores)
-
-            jogos_ruins = sum(1 for s in scores if s < 4.5)
-            jogos_bons = sum(1 for s in scores if s >= 6)
-
-            queda_continua = ultimo < penultimo < antepenultimo
-            subida_continua = ultimo > penultimo > antepenultimo
+                queda_continua = ultimo < penultimo < antepenultimo
+                subida_continua = ultimo > penultimo > antepenultimo
 
             oscilacao = (
                     max(scores) - min(scores) >= 3
@@ -4736,11 +4783,6 @@ if st.session_state["pagina"] == "dashboard":
                 unsafe_allow_html=True
             )
 
-        else:
-            st.info(
-                f"Dados insuficientes para análise de tendência em **{modalidade_jogo}** "
-                "(mínimo 5 jogos)."
-            )
 
         st.write("")
 
