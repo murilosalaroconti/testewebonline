@@ -3902,20 +3902,6 @@ if st.session_state["pagina"] == "dashboard":
         score_final = float(jogo["Score_Jogo"])
         score_formatado = f"{score_final:.1f}"
 
-
-        # ===============================
-        # ⚖️ AJUSTE POR MODALIDADE
-        # ===============================
-        modalidade = jogo["Condição do Campo"]
-
-        fator = {
-            "Futsal": 1.0,
-            "Society": 0.9,
-            "Campo": 0.8
-        }.get(modalidade, 1.0)
-
-        score_final = score_final / fator
-
         # Normaliza 0–10
         score_final = max(0, min(10, score_final))
         score_formatado = f"{score_final:.1f}"
