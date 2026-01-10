@@ -517,6 +517,25 @@ with st.sidebar:
     st.markdown("---")
     st.write("📊 Desenvolvido para fins estatísticos 📊")
 
+# =====================================================
+# 📌 DATAFRAME GLOBAL DE JOGOS (FONTE ÚNICA)
+# =====================================================
+df_jogos = load_registros()
+
+# Garante coluna de data
+if "Data" in df_jogos.columns:
+    df_jogos["Data_DT"] = pd.to_datetime(
+        df_jogos["Data"], dayfirst=True, errors="coerce"
+    )
+
+# Garante score UMA vez
+if "Score_Jogo" not in df_jogos.columns:
+    df_jogos["Score_Jogo"] = df_jogos.apply(
+        calcular_score_jogo, axis=1
+    )
+# =====================================================
+
+
 # ---------------------------------------------
 
 #----------------------------------------------
@@ -524,20 +543,12 @@ with st.sidebar:
 
 #Pagina Home
 if st.session_state["pagina"] == "home":
-    if st.session_state["pagina"] == "home":
-        st.query_params.clear()
 
-        # =========================
-        # 📌 SEGURANÇA DO SCORE
-        # =========================
-    if "Score_Jogo" not in df_jogos.columns:
-        df_jogos["Score_Jogo"] = df_jogos.apply(
-            calcular_score_jogo, axis=1
-        )
+    st.query_params.clear()
 
-        # =========================
-        # 🏟️ ÚLTIMO JOGO
-        # =========================
+    # =========================
+    # 🏟️ ÚLTIMO JOGO
+    # =========================
     nota_ultimo_jogo = "—"
     if not df_jogos.empty:
         ultimo_jogo = (
@@ -556,14 +567,10 @@ if st.session_state["pagina"] == "home":
     st.markdown("---")
 
     # =========================
-    # 📌 CARREGAR DADOS
+    # 📌 CARREGAR OUTROS DADOS
     # =========================
     df_treinos = load_treinos_df()
     df_sono = load_sono_df()
-
-    # Garantir datas
-    if "Data" in df_jogos.columns:
-        df_jogos["Data_DT"] = pd.to_datetime(df_jogos["Data"], dayfirst=True, errors="coerce")
 
     if "Date" in df_treinos.columns:
         df_treinos["Date_DT"] = pd.to_datetime(df_treinos["Date"], dayfirst=True, errors="coerce")
@@ -614,7 +621,6 @@ if st.session_state["pagina"] == "home":
     # =========================
     tendencia = "Sem dados"
     if len(df_jogos) >= 5:
-        df_jogos_ord = df_jogos.sort_values("Data_DT")
         df_jogos_ord = df_jogos.sort_values("Data_DT")
         ultimos = df_jogos_ord.tail(5)["Score_Jogo"].tolist()
 
