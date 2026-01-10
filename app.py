@@ -905,7 +905,12 @@ if st.session_state["pagina"] == "jogos":
         st.number_input("🎯 Passes-chave", min_value=0, key="Passes-chave")
         st.number_input("❌ Passes Errados", min_value=0, key="Passes Errados")
         st.number_input("⚡ Faltas Sofridas", min_value=0, key="Faltas Sofridas")
-        st.number_input("🔁 Participações Indiretas", min_value=0, key="Participações Indiretas")
+        st.number_input(
+            "🔥 Ações Ofensivas Relevantes",
+            min_value=0,
+            help="Dribles que quebram linha, conduções ofensivas, início de jogadas perigosas",
+            key="Participações Indiretas"
+        )
 
         st.session_state["scout_temp"] = {
             "Chutes": st.session_state["Chutes"],
@@ -3968,30 +3973,45 @@ if st.session_state["pagina"] == "dashboard":
         passes_errados = int(jogo.get("Passes Errados", 0))
         erros_total = chutes_errados + passes_errados
 
-        # ===============================
-        # 🔢 COMPONENTES DO SCORE
-        # ===============================
 
-        # ⚽ ATAQUE (peso alto)
+        # ===============================
+        # 🔥 VOLUME OFENSIVO (BASE DO JOGO)
+        # ===============================
+        volume_ofensivo = (
+                finalizacoes * 0.3 +
+                passes_chave * 0.7 +
+                faltas * 0.5 +
+                participacoes * 0.8
+        )
+
+        # BÔNUS POR PARTICIPAÇÃO REAL
+        bonus_volume = 0
+        if volume_ofensivo >= 6:
+            bonus_volume = 2.0
+        elif volume_ofensivo >= 4:
+            bonus_volume = 1.2
+        elif volume_ofensivo >= 2:
+            bonus_volume = 0.6
+
+        # ⚽ IMPACTO DIRETO
         score_gols = gols * 2.2
         score_assistencia = assistencias * 1.8
 
-        # 🎯 CRIAÇÃO DE JOGO
+        # 🎯 CRIAÇÃO
         score_passes_chave = passes_chave * 0.6
-        score_participacoes = participacoes * 0.4
         score_faltas = faltas * 0.3
 
         # 🛡️ DEFESA
-        score_defesa = desarmes * 0.5
+        score_defesa = desarmes * 0.4
 
-        # ⚡ EFICIÊNCIA NAS FINALIZAÇÕES
+        # ⚡ EFICIÊNCIA (MENOS PUNITIVA)
         score_eficiencia = 0
-        if finalizacoes > 0:
-            eficiencia = gols / finalizacoes
-            score_eficiencia = eficiencia * 1.5
+        if finalizacoes >= 3:
+            eficiencia = gols / finalizacoes if finalizacoes > 0 else 0
+            score_eficiencia = eficiencia * 1.2
 
-        # ❌ ERROS (penalidade CONTROLADA)
-        penalidade_erros = erros_total * 0.35
+        # ❌ ERROS (PENALIZA MENOS)
+        penalidade_erros = erros_total * 0.25
 
         # ===============================
         # ⭐ SCORE FINAL
@@ -4000,12 +4020,16 @@ if st.session_state["pagina"] == "dashboard":
                 score_gols +
                 score_assistencia +
                 score_passes_chave +
-                score_participacoes +
                 score_faltas +
                 score_defesa +
-                score_eficiencia -
+                score_eficiencia +
+                bonus_volume -
                 penalidade_erros
         )
+
+        # 🔒 PISO PARA JOGO PARTICIPATIVO
+        if volume_ofensivo >= 4 and score_final < 5.0:
+            score_final = 5.0
 
         # ===============================
         # ⚖️ AJUSTE POR MODALIDADE
