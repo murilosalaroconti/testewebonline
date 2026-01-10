@@ -131,49 +131,57 @@ if st.session_state.get("pagina") != "home":
         st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
 
 
-def calcular_score_jogo(row):
-    # 🔢 Garante valores numéricos seguros
-    gols = pd.to_numeric(row.get("Gols Marcados", 0), errors="coerce") or 0
-    assistencias = pd.to_numeric(row.get("Assistências", 0), errors="coerce") or 0
-    passes_chave = pd.to_numeric(row.get("Passes-chave", 0), errors="coerce") or 0
-    desarmes = pd.to_numeric(row.get("Desarmes", 0), errors="coerce") or 0
-    faltas = pd.to_numeric(row.get("Faltas Sofridas", 0), errors="coerce") or 0
-    participacoes = pd.to_numeric(row.get("Participações Indiretas", 0), errors="coerce") or 0
 
-    chutes = pd.to_numeric(row.get("Chutes", 0), errors="coerce") or 0
-    chutes_errados = pd.to_numeric(row.get("Chutes Errados", 0), errors="coerce") or 0
-    passes_errados = pd.to_numeric(row.get("Passes Errados", 0), errors="coerce") or 0
+def calcular_score_real(row):
+    gols = int(row.get("Gols Marcados", 0))
+    assistencias = int(row.get("Assistências", 0))
+    passes_chave = int(row.get("Passes-chave", 0))
+    desarmes = int(row.get("Desarmes", 0))
+    faltas = int(row.get("Faltas Sofridas", 0))
+
+    # ⚠️ aqui está o ponto crítico
+    acoes_ofensivas = int(
+        row.get("Participações Indiretas", row.get("Ações Ofensivas Relevantes", 0))
+    )
+
+    chutes = int(row.get("Chutes", 0))
+    chutes_errados = int(row.get("Chutes Errados", 0))
+    passes_errados = int(row.get("Passes Errados", 0))
 
     finalizacoes = chutes + chutes_errados
     erros_total = chutes_errados + passes_errados
 
-    # ⭐ SCORE BASE
+    volume_ofensivo = (
+        finalizacoes * 0.3 +
+        passes_chave * 0.7 +
+        faltas * 0.5 +
+        acoes_ofensivas * 0.8
+    )
+
+    bonus_volume = 0
+    if volume_ofensivo >= 6:
+        bonus_volume = 2.0
+    elif volume_ofensivo >= 4:
+        bonus_volume = 1.2
+    elif volume_ofensivo >= 2:
+        bonus_volume = 0.6
+
     score = (
         gols * 2.2 +
         assistencias * 1.8 +
         passes_chave * 0.6 +
-        participacoes * 0.4 +
+        desarmes * 0.4 +
         faltas * 0.3 +
-        desarmes * 0.5
+        bonus_volume -
+        erros_total * 0.25
     )
 
-    # ⚡ Eficiência
-    if finalizacoes > 0:
-        score += (gols / finalizacoes) * 1.5
-
-    # ❌ Penalidade
-    score -= erros_total * 0.35
-
-    # ⚖️ AJUSTE POR MODALIDADE
-    fator = {
-        "Futsal": 1.0,
-        "Society": 0.9,
-        "Campo": 0.8
-    }.get(row.get("Condição do Campo"), 1.0)
-
+    modalidade = row.get("Condição do Campo", "")
+    fator = {"Futsal":1.0, "Society":0.9, "Campo":0.8}.get(modalidade, 1.0)
     score = score / fator
 
-    return max(0, min(10, score))
+    return round(max(0, min(10, score)), 1)
+
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
@@ -531,7 +539,7 @@ if "Data" in df_jogos.columns:
 # Garante score UMA vez
 if "Score_Jogo" not in df_jogos.columns:
     df_jogos["Score_Jogo"] = df_jogos.apply(
-        calcular_score_jogo, axis=1
+        calcular_score_real, axis=1
     )
 # =====================================================
 
@@ -580,17 +588,6 @@ if st.session_state["pagina"] == "home":
 
     hoje = pd.to_datetime("today").date()
 
-    # =========================
-    # 🏟️ ÚLTIMO JOGO
-    # =========================
-    nota_ultimo_jogo = "—"
-    if not df_jogos.empty:
-        ultimo_jogo = (
-            df_jogos.dropna(subset=["Data_DT"])
-            .sort_values("Data_DT", ascending=False)
-            .iloc[0]
-        )
-        nota_ultimo_jogo = round(ultimo_jogo["Score_Jogo"], 1)
 
 
     # =========================
@@ -4701,7 +4698,7 @@ if st.session_state["pagina"] == "dashboard":
             df_tend = df_tend.sort_values("Data_DT")
 
             # 👉 Score técnico por jogo
-            df_tend["Score_Jogo"] = df_tend.apply(calcular_score_jogo, axis=1)
+            df_tend["Score_Jogo"] = df_tend.apply(calcular_score_real, axis=1)
 
             # 🔍 Últimos 5 jogos (ordem cronológica)
             scores = df_tend.tail(5)["Score_Jogo"].values.tolist()
