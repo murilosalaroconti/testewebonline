@@ -308,7 +308,6 @@ def save_sono_df(df):
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
 # ----------------------
-
 def safe_extract_date_part(date_val, part='year'):
     """Helper para extrair ano ou mês de datas em formatos variados (dd/mm/YYYY ou datetime)."""
     if pd.isna(date_val) or date_val == "":
@@ -375,7 +374,6 @@ def adicionar_treino(df, treino, date, tipo):
     save_treinos_df(df)
     st.success("Treino adicionado.")
     return df
-
 
 def to_minutes(dur_str):
     """Converte H:MM para minutos totais, tratando None/NaN/vazio."""
@@ -498,6 +496,556 @@ def update_sono_cochilo_detalhado(df, date_str, duracao_novo_cochilo_str):
 
     save_sono_df(df)
     return df
+
+def safe_parse_hour(hora_str):
+    """
+    Converte 'HH:MM' em hora decimal.
+    Retorna None se inválido.
+    """
+    try:
+        if not hora_str or ":" not in str(hora_str):
+            return None
+        h, m = str(hora_str).split(":")
+        return int(h) + int(m) / 60
+    except:
+        return None
+
+@st.cache_data(ttl=300)
+def load_saude_df():
+    client = get_client()
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
+    dados = sheet.get_all_records()
+    df = pd.DataFrame(dados)
+
+    for col in EXPECTED_SAUDE_COLUMNS:
+        if col not in df.columns:
+            df[col] = ""
+
+    return df[EXPECTED_SAUDE_COLUMNS]
+
+def save_saude_df(df):
+    client = get_client()
+    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
+    sheet.clear()
+    sheet.update([df.columns.tolist()] + df.values.tolist())
+
+def gerar_pdf_jogo(jogo, score_formatado, analise_texto, img_barra, img_radar):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+        caminho_pdf = tmp.name
+
+    doc = SimpleDocTemplate(
+        caminho_pdf,
+        pagesize=A4,
+        rightMargin=2 * cm,
+        leftMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm
+    )
+
+    styles = getSampleStyleSheet()
+    story = []
+
+    # 🔹 TÍTULO
+    story.append(Paragraph("<b>Relatório de Desempenho do Jogo</b>", styles["Title"]))
+    story.append(Spacer(1, 12))
+
+    # 🔹 DADOS DO JOGO
+    dados_jogo = f"""
+    <b>Data:</b> {jogo['Data']}<br/>
+    <b>Jogo:</b> {jogo['Casa']} x {jogo['Visitante']}<br/>
+    <b>Modalidade:</b> {jogo.get('Condição do Campo', '-')}<br/>
+    <b>Minutagem:</b> {jogo.get('Minutos', 0)} min
+    """
+    story.append(Paragraph(dados_jogo, styles["Normal"]))
+    story.append(Spacer(1, 14))
+
+    # 🔹 SCORE
+    story.append(Paragraph(f"<b>Score Geral do Jogo:</b> {score_formatado}", styles["Heading2"]))
+    story.append(Spacer(1, 14))
+
+    # 🔹 SCOUTS
+    tabela_dados = [
+        ["Scout", "Valor"],
+        ["Chutes Certos", jogo["Chutes"]],
+        ["Chutes Errados", jogo.get("Chutes Errados", 0)],
+        ["Passes-chave", jogo["Passes-chave"]],
+        ["Passes Errados", jogo.get("Passes Errados", 0)],
+        ["Desarmes", jogo["Desarmes"]],
+        ["Faltas Sofridas", jogo["Faltas Sofridas"]],
+        ["Participações", jogo["Participações Indiretas"]],
+    ]
+
+    tabela = Table(tabela_dados, colWidths=[9 * cm, 3 * cm])
+    tabela.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0E1117")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), white),
+        ("GRID", (0, 0), (-1, -1), 0.5, white),
+        ("ALIGN", (1, 1), (-1, -1), "CENTER")
+    ]))
+
+    story.append(tabela)
+    story.append(Spacer(1, 16))
+
+    # 🔹 GRÁFICOS
+    story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
+    story.append(Image(img_barra, width=16 * cm, height=7 * cm))
+    story.append(Spacer(1, 16))
+
+    story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
+    story.append(Image(img_radar, width=14 * cm, height=14 * cm))
+    story.append(Spacer(1, 18))
+
+    # 🔹 ANÁLISE TÉCNICA
+    story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
+    story.append(Paragraph(analise_texto.replace("\n", "<br/>"), styles["Normal"]))
+
+    doc.build(story)
+
+    return caminho_pdf
+
+def gerar_barra_pdf(jogo, scout_cols):
+    fig, ax = plt.subplots(figsize=(8, 4))
+
+    valores = jogo[scout_cols].values
+    cores = [SCOUT_COLORS[s] for s in scout_cols]
+
+    ax.bar(scout_cols, valores, color=cores)
+
+    ax.set_facecolor("#0E1117")
+    fig.patch.set_facecolor("#0E1117")
+
+    ax.tick_params(colors="white", rotation=45)
+    ax.set_title("Distribuição de Scouts", color="white")
+    ax.grid(axis="y", linestyle=":", alpha=0.3)
+
+    for i, val in enumerate(valores):
+        ax.text(i, val + 0.1, str(int(val)), ha="center", color="white", fontsize=9)
+
+    caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plt.tight_layout()
+    plt.savefig(caminho, dpi=200)
+    plt.close(fig)
+
+    return caminho
+
+def gerar_radar_pdf(jogo, scout_cols, df):
+    radar_vals = []
+    for scout in scout_cols:
+        max_val = df_jogos_full[scout].max()
+        valor = jogo[scout]
+        radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+
+    radar_vals += radar_vals[:1]
+    labels = scout_cols + [scout_cols[0]]
+
+    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(6, 6))
+
+    ax.plot(labels, radar_vals, color="#00E5FF", linewidth=2)
+    ax.fill(labels, radar_vals, color="#00E5FF", alpha=0.35)
+
+    ax.set_facecolor("#0E1117")
+    fig.patch.set_facecolor("#0E1117")
+
+    ax.tick_params(colors="white")
+    ax.set_title("Radar de Scouts (estilo FIFA)", color="white", pad=20)
+
+    caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
+    plt.tight_layout()
+    plt.savefig(caminho, dpi=200)
+    plt.close(fig)
+
+    return caminho
+
+def parse_duration_to_hours(dur_str):
+    """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
+    try:
+        parts = str(dur_str).split(":")
+        if len(parts) >= 2:
+            hours = float(parts[0])
+            minutes = float(parts[1])
+            return hours + (minutes / 60)
+        return float(dur_str) if pd.notna(dur_str) else 0.0
+    except:
+        return 0.0
+
+def filter_df_by_date(df, date_col, start_date, end_date):
+    """Filtra o DataFrame por um período de data, tratando a data como string DD/MM/YYYY."""
+    try:
+        df_temp = df.copy()
+        date_format = '%d/%m/%Y'
+        # Garante que a coluna de data é string antes da conversão para evitar ArrowTypeError
+        df_temp[date_col] = df_temp[date_col].astype(str)
+
+        df_temp['Data_DT'] = pd.to_datetime(df_temp[date_col], format=date_format, errors='coerce', dayfirst=True)
+
+        df_temp = df_temp.dropna(subset=['Data_DT'])
+
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+
+        df_filtrado = df_temp[
+            (df_temp['Data_DT'] >= start_dt) &
+            (df_temp['Data_DT'] <= end_dt)
+            ]
+        return df_filtrado
+    except Exception as e:
+        # st.error(f"Erro ao filtrar dados por data: {e}")
+        return pd.DataFrame(columns=df.columns)
+
+def safe_sum(series):
+    return pd.to_numeric(series, errors='coerce').fillna(0).sum()
+
+def calculate_metrics(df_jogos, df_treinos, df_sono):
+    """Calcula todas as métricas para os cards."""
+
+    total_jogos = len(df_jogos)
+    total_gols = int(safe_sum(df_jogos['Gols Marcados']))
+    total_assistencias = int(safe_sum(df_jogos['Assistências']))
+    total_minutos = int(safe_sum(df_jogos['Minutos Jogados']))
+
+    total_treinos = len(df_treinos)
+
+    if not df_sono.empty and 'Duração do Sono (h:min)' in df_sono.columns:
+        df_sono['Duração_Horas'] = df_sono['Duração do Sono (h:min)'].apply(parse_duration_to_hours)
+        media_sono_decimal = df_sono['Duração_Horas'].mean() if len(df_sono) > 0 else 0.0
+    else:
+        media_sono_decimal = 0.0
+
+    horas = int(media_sono_decimal)
+    minutos = int((media_sono_decimal - horas) * 60)
+    media_sono_formatada = f"{horas}h{minutos:02d}m"
+
+    return total_jogos, total_gols, total_assistencias, total_minutos, total_treinos, media_sono_formatada, media_sono_decimal
+
+def analisar_resultado(df):
+    """Calcula o total de Vitórias, Empates e Derrotas com base na coluna 'Resultado'."""
+    vitorias, empates, derrotas = 0, 0, 0
+    total_jogos = len(df)
+
+    if total_jogos == 0 or 'Resultado' not in df.columns:
+        return 0, 0, 0, 0
+
+    for resultado_str in df['Resultado'].astype(str):
+        if pd.isna(resultado_str) or 'x' not in resultado_str:
+            continue
+        try:
+            gols_atleta = int(resultado_str.split('x')[0].strip())
+            gols_adversario = int(resultado_str.split('x')[1].strip())
+
+            if gols_atleta > gols_adversario:
+                vitorias += 1
+            elif gols_atleta == gols_adversario:
+                empates += 1
+            else:
+                derrotas += 1
+        except ValueError:
+            continue
+
+    return total_jogos, vitorias, empates, derrotas
+
+def calculate_avaliacao_tecnica(df_jogos_f, modalidade_filter, time_filter):
+    """
+    Calcula a Avaliação Técnica (índice ponderado) e gera uma conclusão explicativa.
+    Retorna: (nota_formatada, conclusao_texto)
+    """
+
+    if df_jogos_f.empty:
+        return "N/A", "Não há dados de jogos para o período/filtros selecionados."
+
+    # 1. PARAMETROS DE BASE POR MODALIDADE (Ajuste conforme o nível esperado)
+    modalidade = modalidade_filter.lower()
+
+    # Bases Futsal (Mais gols, menos minutos por jogo)
+    if 'futsal' in modalidade:
+        BASE_GOLS_POR_JOGO = 0.80
+        BASE_ASSISTENCIAS_POR_JOGO = 0.30
+        BASE_MINUTAGEM_POR_JOGO = 15  # Em minutos por jogo
+        PESO_GOLS = 0.45  # Mais foco em gols no futsal
+        PESO_ASSISTENCIAS = 0.25
+        PESO_MINUTAGEM = 0.20
+        PESO_VITORIAS = 0.10
+
+    # Bases Campo (Menos gols, mais minutos por jogo)
+    elif 'campo' in modalidade:
+        BASE_GOLS_POR_JOGO = 0.50
+        BASE_ASSISTENCIAS_POR_JOGO = 0.20
+        BASE_MINUTAGEM_POR_JOGO = 30  # Em minutos por jogo
+        PESO_GOLS = 0.40
+        PESO_ASSISTENCIAS = 0.20
+        PESO_MINUTAGEM = 0.30
+        PESO_VITORIAS = 0.10
+
+    # Bases Padrão/Outros (Fallback)
+    else:
+        BASE_GOLS_POR_JOGO = 0.50
+        BASE_ASSISTENCIAS_POR_JOGO = 0.20
+        BASE_MINUTAGEM_POR_JOGO = 20
+        PESO_GOLS = 0.35
+        PESO_ASSISTENCIAS = 0.25
+        PESO_MINUTAGEM = 0.30
+        PESO_VITORIAS = 0.10
+
+    # 2. OBTENÇÃO DOS VALORES
+    total_jogos = len(df_jogos_f)
+    total_gols = safe_sum(df_jogos_f['Gols Marcados'])
+    total_assistencias = safe_sum(df_jogos_f['Assistências'])
+    total_minutagem = safe_sum(df_jogos_f['Minutos Jogados'])
+
+    # Calculo da % de vitórias
+    total_jogos_vd, vitorias_vd, _, _ = analisar_resultado(df_jogos_f)
+    vitorias_percent = (vitorias_vd / total_jogos_vd) if total_jogos_vd > 0 else 0.0
+
+    # 3. CÁLCULO E NORMALIZAÇÃO DAS MÉTRICAS
+    gols_por_jogo = total_gols / total_jogos
+    assistencias_por_jogo = total_assistencias / total_jogos
+    minutagem_por_jogo = total_minutagem / total_jogos
+
+    # Usamos min() para limitar o score a um valor máximo (ex: 1.5) para evitar notas muito distorcidas
+    score_gols = min(gols_por_jogo / BASE_GOLS_POR_JOGO, 1.5)
+    score_assistencias = min(assistencias_por_jogo / BASE_ASSISTENCIAS_POR_JOGO, 1.5)
+    score_minutagem = min(minutagem_por_jogo / BASE_MINUTAGEM_POR_JOGO, 1.5)
+    score_vitorias = vitorias_percent
+
+    # 4. CÁLCULO PONDERADO
+    nota_ponderada = (
+            (PESO_GOLS * score_gols) +
+            (PESO_ASSISTENCIAS * score_assistencias) +
+            (PESO_MINUTAGEM * score_minutagem) +
+            (PESO_VITORIAS * score_vitorias)
+    )
+
+    nota_final = min(nota_ponderada * 10, 10.0)
+
+    # 5. GERAÇÃO DA CONCLUSÃO (LÓGICA DO TEXTO)
+
+    # a. Identifica o foco
+    foco = time_filter if time_filter != "Todos" else modalidade_filter
+
+    # b. Encontra o Ponto Forte (Score > 1.0 ou Score mais alto)
+    scores = {'Gols': score_gols, 'Assistências': score_assistencias, 'Minutagem': score_minutagem}
+    ponto_forte_key = max(scores, key=scores.get)
+    ponto_forte_score = scores[ponto_forte_key]
+
+    # c. Encontra o Ponto a Desenvolver (Score mais baixo)
+    ponto_desenvolver_key = min(scores, key=scores.get)
+    ponto_desenvolver_score = scores[ponto_desenvolver_key]
+
+    # d. Monta a Conclusão
+
+    if nota_final >= 9.0:
+        texto_inicial = "Excelente Performance!"
+        texto_principal = f"O atleta demonstrou um desempenho de altíssimo nível em {foco}. Sua nota é impulsionada pela excelência em **{ponto_forte_key}** (Score: {ponto_forte_score:.2f})."
+    elif nota_final >= 7.0:
+        texto_inicial = "Boa Performance Geral."
+        texto_principal = f"O desempenho em {foco} é sólido. O ponto forte está em **{ponto_forte_key}** (Score: {ponto_forte_score:.2f}), mas há espaço para crescimento, especialmente em **{ponto_desenvolver_key}** (Score: {ponto_desenvolver_score:.2f})."
+    elif nota_final >= 5.0:
+        texto_inicial = "Performance Moderada."
+        texto_principal = f"A performance em {foco} é mediana. A contribuição ofensiva e a minutagem precisam ser ajustadas, com o ponto mais fraco em **{ponto_desenvolver_key}** (Score: {ponto_desenvolver_score:.2f})."
+    else:
+        texto_inicial = "Atenção Necessária."
+        texto_principal = f"O desempenho em {foco} está abaixo do esperado. O fator que mais puxa a nota para baixo é **{ponto_desenvolver_key}** (Score: {ponto_desenvolver_score:.2f}), indicando necessidade de foco urgente nesta área."
+
+    conclusao_texto = f"**{texto_inicial}** A nota ({nota_final:.1f}) reflete: {texto_principal}"
+
+    return f"{nota_final:.1f}", conclusao_texto
+
+def calculate_engajamento(df_treinos_f, df_sono_f, total_dias_periodo, media_sono_decimal):
+    """Calcula o Engajamento baseado em Treinos (Presença) e Sono (Qualidade)."""
+
+    # 1. PARAMETROS E PESOS
+    PESO_TREINO = 0.5
+    PESO_SONO = 0.5
+    META_SONO_DIARIO = 7.0  # Exemplo: 7 horas é a meta
+    TREINOS_ESPERADOS = 15  # Exemplo: 15 treinos esperados no período
+
+    # 2. CÁLCULO DE ADERÊNCIA AO TREINO (Disciplina)
+    total_treinos_realizados = len(df_treinos_f)
+
+    # Se não houver treinos no período, assume 100% (ou 0%) dependendo da regra do clube.
+    # Vamos assumir 100% para não penalizar se não houver treinos agendados.
+    if TREINOS_ESPERADOS == 0:
+        score_treino = 100.0
+    else:
+        # Calcula a porcentagem de treinos feitos
+        score_treino = min(100.0, (total_treinos_realizados / TREINOS_ESPERADOS) * 100.0)
+
+    # 3. CÁLCULO DE QUALIDADE DO SONO (Saúde)
+
+    # Penalidade de sono:
+    # Se a média de sono estiver abaixo da meta, o score cai.
+    if total_dias_periodo > 0 and media_sono_decimal > 0.0:
+        # Penaliza se a média estiver abaixo da meta (7.0h)
+        if media_sono_decimal < META_SONO_DIARIO:
+            # Penalidade proporcional:
+            # Ex: Se a meta é 7h e a média é 6h (desvio de 1h), score cai 10%.
+            desvio_percentual = (META_SONO_DIARIO - media_sono_decimal) / META_SONO_DIARIO
+            score_sono = max(0.0, 100.0 - (desvio_percentual * 100.0))
+        else:
+            score_sono = 100.0  # Bônus se a média for igual ou superior à meta
+    else:
+        score_sono = 100.0  # Não penaliza se não houver dados de sono
+
+    # 4. CÁLCULO FINAL PONDERADO
+
+    engajamento_ponderado = (score_treino * PESO_TREINO) + (score_sono * PESO_SONO)
+
+    return f"{engajamento_ponderado:.0f}%"
+
+# --------------------------------------------------------------------------
+# 0. CONFIGURAÇÃO DE ESTILO (CSS - TEMA ESCURO E CARDS PERSONALIZADOS)
+# --------------------------------------------------------------------------
+def inject_custom_css():
+    st.markdown(
+        f"""
+        <style>
+        /* 2. Estilo Base dos Cards */
+        .card-jogos, .card-gols, .card-assistencias, 
+        .card-minutos, .card-treinos, .card-sono, .card-derrotas,
+        .card-vitorias, .card-avaliacao, .card-engajamento, .card-modalidade, .card-media-gols {{
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.5); 
+            transition: 0.3s;
+            color: white; 
+            margin-bottom: 10px; 
+            height: 100%; 
+            text-align: left; 
+            font-size: 1em; 
+            line-height: 1.2; 
+        }}
+
+        /* 3. Estilo dos Títulos (o texto em negrito com o ícone) */
+        .card-jogos strong, .card-gols strong, .card-assistencias strong,
+        .card-minutos strong, .card-treinos strong, .card-sono strong,
+        .card-derrotas strong, .card-vitorias strong, .card-avaliacao strong,
+        .card-engajamento strong, .card-modalidade strong, .card-media-gols strong {{
+            font-size: 1.1em; 
+            color: white;
+            display: block; 
+            margin-bottom: 0.5em; 
+        }}
+
+        /* 4. Estilo dos valores principais (o NÚMERO GRANDE) */
+        .card-jogos p, .card-gols p, .card-assistencias p, 
+        .card-minutos p, .card-treinos p, .card-sono p, 
+        .card-derrotas p, .card-vitorias p, .card-avaliacao p,
+        .card-engajamento p, .card-modalidade p, .card-media-gols p {{
+            font-size: 2.2em; /* Aumentado o tamanho da fonte */
+            font-weight: bold; /* Garante que seja negrito */
+            margin: 0.1em 0; 
+            color: white; 
+            text-align: center; /* Centraliza o número */
+            line-height: 1.1; /* Ajuste para espaçamento vertical */
+        }}
+
+        /* 5. Estilo do rótulo/subtexto (o texto cinza pequeno da segunda linha) */
+        .card-jogos label, .card-gols label, .card-assistencias label, 
+        .card-minutos label, .card-treinos label, .card-sono label,
+        .card-derrotas label, .card-vitorias label, .card-avaliacao label,
+        .card-engajamento label, .card-modalidade label, .card-media-gols label {{
+            font-size: 0.75em; 
+            font-weight: normal;
+            color: rgba(255, 255, 255, 0.7); 
+            display: block; 
+            margin-top: 0.1em; 
+            text-align: center; /* Centraliza o subtexto também para consistência */
+        }}
+
+        /* 6. Cores Individuais para os Cards (FUNDO COMPLETO) */
+        .card-jogos {{ background-color: #00BCD4; }}
+        .card-gols {{ background-color: #4CAF50; }}
+        .card-assistencias {{ background-color: #FF9800; }}
+        .card-minutos {{ background-color: #2196F3; }}
+        .card-treinos {{ background-color: #9C27B0; }}
+        .card-sono {{ background-color: #009688; }}
+        .card-derrotas {{ background-color: #C62828; }} /* Vermelho Escuro */
+        .card-vitorias {{ background-color: #009688; }} /* Verde Água (Igual ao sono, se preferir outra cor, ajuste) */
+        .card-avaliacao {{ background-color: #9C27B0; }} /* Roxo (Igual ao treinos, se preferir outra cor, ajuste) */
+        .card-engajamento {{ background-color: #2196F3; }} /* Azul Escuro (Igual ao minutos, se preferir outra cor, ajuste) */
+        .card-modalidade {{ background-color: #00BCD4; }} /* Azul Claro (Igual ao jogos, se preferir outra cor, ajuste) */
+        .card-media-gols {{ background-color: #4CAF50; }} /* Verde Claro (Igual ao gols, se preferir outra cor, ajuste) */
+
+        /* 7. Estilo dos títulos dos gráficos e outros textos no Dark Mode */
+        h3 {{ color: #E0E0E0; }}
+
+        /* Otimização de Margens - Remove as margens do p e label dentro do div, deixando o controle para o CSS acima */
+        .card-jogos > p, .card-gols > p, .card-assistencias > p, 
+        .card-minutos > p, .card-treinos > p, .card-sono > p,
+        .card-derrotas > p, .card-vitorias > p, .card-avaliacao > p,
+        .card-engajamento > p, .card-modalidade > p, .card-media-gols > p {{
+            margin-bottom: 0;
+            margin-top: 0;
+        }}
+        .card-jogos > label, .card-gols > label, .card-assistencias > label, 
+        .card-minutos > label, .card-treinos > label, .card-sono > label,
+        .card-derrotas > label, .card-vitorias > label, .card-avaliacao > label,
+        .card-engajamento > label, .card-modalidade > label, .card-media-gols > label {{
+            margin-top: 0;
+            margin-bottom: 0;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+# Chamar o CSS antes de construir a tab (se for chamado dentro do with tab[5], só afetará essa tab)
+# Se você tiver um bloco de setup no topo do seu script, chame lá para afetar toda a aplicação.
+inject_custom_css()
+
+
+st.markdown("""
+<style>
+.scout-card {
+    border-radius: 18px;
+    padding: 18px;
+    text-align: center;
+    color: white;
+    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+    height: 100%;
+}
+
+.scout-title {
+    font-size: 14px;
+    opacity: 0.85;
+}
+
+.scout-value {
+    font-size: 42px;
+    font-weight: bold;
+    margin-top: 6px;
+}
+
+/* === MESMAS CORES DO GRÁFICO === */
+
+.bg-chutes {
+    background: linear-gradient(135deg, #00E5FF, #0288D1);
+}
+
+.bg-chutes-errados {
+    background: linear-gradient(135deg, #FF1744, #B71C1C);
+}
+
+.bg-passes {
+    background: linear-gradient(135deg, #00E676, #2E7D32);
+}
+
+
+.bg-passes-errados {
+    background: linear-gradient(135deg, #9E9E9E, #616161);
+}
+
+.bg-desarmes {
+    background: linear-gradient(135deg, #7C4DFF, #512DA8);
+}
+
+.bg-faltas {
+    background: linear-gradient(135deg, #FF9100, #E65100);
+}
+
+.bg-indiretas {
+    background: linear-gradient(135deg, #FF5252, #B71C1C);
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ----------------------
 # Visual / Layout (Streamlit)
@@ -694,8 +1242,7 @@ if st.session_state["pagina"] == "home":
     with col_a:
         if st.button("⚽ Registrar Jogo", use_container_width=True):
             st.session_state["pagina"] = "jogos"
-            st.query_params["pagina"] = "jogos"
-            st.rerun()
+
 
     with col_b:
         if st.button("💪 Registrar Treino", use_container_width=True):
@@ -723,16 +1270,8 @@ if st.session_state["pagina"] == "home":
 # --------------------------
 # Aba Jogos
 # --------------------------
-# ===============================
-# 🔒 TRAVA DE JOGO ATIVO (ANTI-SAÍDA NO MOBILE)
-# ===============================
-if st.session_state.get("jogo_em_andamento", False):
-    st.session_state["pagina"] = "jogos"
 
-if st.session_state["pagina"] == "jogos":
-    st.session_state["jogo_em_andamento"] = True
-
-if st.session_state["pagina"] == "jogos":
+elif st.session_state["pagina"] == "jogos":
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -1055,7 +1594,7 @@ if st.session_state["pagina"] == "jogos":
 
 # Aba Treinos
 # --------------------------
-if st.session_state["pagina"] == "treinos":
+elif st.session_state["pagina"] == "treinos":
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -1392,21 +1931,8 @@ if st.session_state["pagina"] == "treinos":
 
 # Aba Sono
 # --------------------------
-def safe_parse_hour(hora_str):
-    """
-    Converte 'HH:MM' em hora decimal.
-    Retorna None se inválido.
-    """
-    try:
-        if not hora_str or ":" not in str(hora_str):
-            return None
-        h, m = str(hora_str).split(":")
-        return int(h) + int(m) / 60
-    except:
-        return None
 
-
-if st.session_state["pagina"] == "sono":
+elif st.session_state["pagina"] == "sono":
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -1778,30 +2304,7 @@ if st.session_state["pagina"] == "sono":
                 plt.close(fig)
 
 
-# --------------------------
-# Aba Análises (resumo / gráficos rápidos)
-# --------------------------
-
-@st.cache_data(ttl=300)
-def load_saude_df():
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
-    dados = sheet.get_all_records()
-    df = pd.DataFrame(dados)
-
-    for col in EXPECTED_SAUDE_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-
-    return df[EXPECTED_SAUDE_COLUMNS]
-
-def save_saude_df(df):
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
-    sheet.clear()
-    sheet.update([df.columns.tolist()] + df.values.tolist())
-
-if st.session_state["pagina"] == "saude":
+elif st.session_state["pagina"] == "saude":
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -2536,594 +3039,8 @@ if st.session_state["pagina"] == "saude":
     #                     st.info(
     #                         f"Nenhum Adversário resultou em Gols ou Assistências em {modalidade_filter} neste período.")
 
-#-------------------------------------
-# Aba Campeonatos BLOCO: LOGOS DOS CAMPEONATOS (AGORA DENTRO DA NOVA ABA)
-# ----------------------------------------------------------------------
-if st.session_state["pagina"] == "campeonatos":
 
-    if st.button("⬅️ Voltar para Início"):
-        st.session_state["pagina"] = "home"
-        st.rerun()
-
-    # --- NOVO BLOCO: CSS ESPECÍFICO PARA CENTRALIZAR O LOGO E O LINK ---
-    st.markdown("""
-            <style>
-            /* Centraliza o cabeçalho (H1/H2) da aba */
-            [data-testid="stHeader"] h1,
-            [data-testid="stMarkdownContainer"] h1,
-            [data-testid="stMarkdownContainer"] h2,
-            [data-testid="stHeader"] {
-                text-align: center;
-                width: 100%; /* Garante que o container ocupe toda a largura */
-            }
-
-            /* Regra específica para centralizar o st.header */
-            [data-testid="stHeader"] > div > div:nth-child(1) {
-                justify-content: center;
-            }
-
-            /* Centraliza o texto normal (o subtítulo "Acesse as tabelas...") */
-            [data-testid="stMarkdownContainer"] p {
-                 text-align: center;
-                 width: 100%;
-            }
-            </style>
-        """, unsafe_allow_html=True)
-    # FIM DO NOVO BLOCO CSS
-#--------------------------------------------------
-
-    st.header("🏆 Acesso Rápido aos Campeonatos")
-    st.markdown("Acesse as tabelas e resultados oficiais das competições:")
-
-    # --- ESPAÇAMENTO PARA AFASTAR DO PRIMEIRO LOGO ---
-    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
-
-    # ---------------------------------------------
-    # Se você tem muitos logos, use uma coluna maior (ex: 3 colunas) para que não quebre no celular
-    col_logo1, col_logo2, col_logo3, col_logo4 = st.columns(4)
-    col_logo5, col_logo6, col_logo7, col_logo8 = st.columns(4)
-    # ---------------------------------------------
-
-    TAMANHO_LOGO = 80  # Define o tamanho padrão
-
-    # Linha 1 de logos (4 colunas)
-    criar_logo_link_alinhado(col_logo1, LOGO_PATH_1, TAMANHO_LOGO)
-    criar_logo_link_alinhado(col_logo2, LOGO_PATH_2, TAMANHO_LOGO)
-    criar_logo_link_alinhado(col_logo3, LOGO_PATH_3, TAMANHO_LOGO)
-    criar_logo_link_alinhado(col_logo4, LOGO_PATH_4, TAMANHO_LOGO)
-
-    st.markdown("---")  # Separador visual
-
-    # Linha 2 de logos (4 colunas)
-    criar_logo_link_alinhado(col_logo5, LOGO_PATH_5, TAMANHO_LOGO)
-    criar_logo_link_alinhado(col_logo6, LOGO_PATH_6, TAMANHO_LOGO)
-    criar_logo_link_alinhado(col_logo7, LOGO_PATH_7, TAMANHO_LOGO)
-    criar_logo_link_alinhado(col_logo8, LOGO_PATH_8, TAMANHO_LOGO)
-
-def parse_duration_to_hours(dur_str):
-    """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
-    try:
-        parts = str(dur_str).split(":")
-        if len(parts) >= 2:
-            hours = float(parts[0])
-            minutes = float(parts[1])
-            return hours + (minutes / 60)
-        return float(dur_str) if pd.notna(dur_str) else 0.0
-    except:
-        return 0.0
-
-def filter_df_by_date(df, date_col, start_date, end_date):
-    """Filtra o DataFrame por um período de data, tratando a data como string DD/MM/YYYY."""
-    try:
-        df_temp = df.copy()
-        date_format = '%d/%m/%Y'
-        # Garante que a coluna de data é string antes da conversão para evitar ArrowTypeError
-        df_temp[date_col] = df_temp[date_col].astype(str)
-
-        df_temp['Data_DT'] = pd.to_datetime(df_temp[date_col], format=date_format, errors='coerce', dayfirst=True)
-
-        df_temp = df_temp.dropna(subset=['Data_DT'])
-
-        start_dt = pd.to_datetime(start_date)
-        end_dt = pd.to_datetime(end_date)
-
-        df_filtrado = df_temp[
-            (df_temp['Data_DT'] >= start_dt) &
-            (df_temp['Data_DT'] <= end_dt)
-            ]
-        return df_filtrado
-    except Exception as e:
-        # st.error(f"Erro ao filtrar dados por data: {e}")
-        return pd.DataFrame(columns=df.columns)
-
-def safe_sum(series):
-    return pd.to_numeric(series, errors='coerce').fillna(0).sum()
-
-def calculate_metrics(df_jogos, df_treinos, df_sono):
-    """Calcula todas as métricas para os cards."""
-
-    total_jogos = len(df_jogos)
-    total_gols = int(safe_sum(df_jogos['Gols Marcados']))
-    total_assistencias = int(safe_sum(df_jogos['Assistências']))
-    total_minutos = int(safe_sum(df_jogos['Minutos Jogados']))
-
-    total_treinos = len(df_treinos)
-
-    if not df_sono.empty and 'Duração do Sono (h:min)' in df_sono.columns:
-        df_sono['Duração_Horas'] = df_sono['Duração do Sono (h:min)'].apply(parse_duration_to_hours)
-        media_sono_decimal = df_sono['Duração_Horas'].mean() if len(df_sono) > 0 else 0.0
-    else:
-        media_sono_decimal = 0.0
-
-    horas = int(media_sono_decimal)
-    minutos = int((media_sono_decimal - horas) * 60)
-    media_sono_formatada = f"{horas}h{minutos:02d}m"
-
-    return total_jogos, total_gols, total_assistencias, total_minutos, total_treinos, media_sono_formatada, media_sono_decimal
-
-def analisar_resultado(df):
-    """Calcula o total de Vitórias, Empates e Derrotas com base na coluna 'Resultado'."""
-    vitorias, empates, derrotas = 0, 0, 0
-    total_jogos = len(df)
-
-    if total_jogos == 0 or 'Resultado' not in df.columns:
-        return 0, 0, 0, 0
-
-    for resultado_str in df['Resultado'].astype(str):
-        if pd.isna(resultado_str) or 'x' not in resultado_str:
-            continue
-        try:
-            gols_atleta = int(resultado_str.split('x')[0].strip())
-            gols_adversario = int(resultado_str.split('x')[1].strip())
-
-            if gols_atleta > gols_adversario:
-                vitorias += 1
-            elif gols_atleta == gols_adversario:
-                empates += 1
-            else:
-                derrotas += 1
-        except ValueError:
-            continue
-
-    return total_jogos, vitorias, empates, derrotas
-
-
-def calculate_avaliacao_tecnica(df_jogos_f, modalidade_filter, time_filter):
-    """
-    Calcula a Avaliação Técnica (índice ponderado) e gera uma conclusão explicativa.
-    Retorna: (nota_formatada, conclusao_texto)
-    """
-
-    if df_jogos_f.empty:
-        return "N/A", "Não há dados de jogos para o período/filtros selecionados."
-
-    # 1. PARAMETROS DE BASE POR MODALIDADE (Ajuste conforme o nível esperado)
-    modalidade = modalidade_filter.lower()
-
-    # Bases Futsal (Mais gols, menos minutos por jogo)
-    if 'futsal' in modalidade:
-        BASE_GOLS_POR_JOGO = 0.80
-        BASE_ASSISTENCIAS_POR_JOGO = 0.30
-        BASE_MINUTAGEM_POR_JOGO = 15  # Em minutos por jogo
-        PESO_GOLS = 0.45  # Mais foco em gols no futsal
-        PESO_ASSISTENCIAS = 0.25
-        PESO_MINUTAGEM = 0.20
-        PESO_VITORIAS = 0.10
-
-    # Bases Campo (Menos gols, mais minutos por jogo)
-    elif 'campo' in modalidade:
-        BASE_GOLS_POR_JOGO = 0.50
-        BASE_ASSISTENCIAS_POR_JOGO = 0.20
-        BASE_MINUTAGEM_POR_JOGO = 30  # Em minutos por jogo
-        PESO_GOLS = 0.40
-        PESO_ASSISTENCIAS = 0.20
-        PESO_MINUTAGEM = 0.30
-        PESO_VITORIAS = 0.10
-
-    # Bases Padrão/Outros (Fallback)
-    else:
-        BASE_GOLS_POR_JOGO = 0.50
-        BASE_ASSISTENCIAS_POR_JOGO = 0.20
-        BASE_MINUTAGEM_POR_JOGO = 20
-        PESO_GOLS = 0.35
-        PESO_ASSISTENCIAS = 0.25
-        PESO_MINUTAGEM = 0.30
-        PESO_VITORIAS = 0.10
-
-    # 2. OBTENÇÃO DOS VALORES
-    total_jogos = len(df_jogos_f)
-    total_gols = safe_sum(df_jogos_f['Gols Marcados'])
-    total_assistencias = safe_sum(df_jogos_f['Assistências'])
-    total_minutagem = safe_sum(df_jogos_f['Minutos Jogados'])
-
-    # Calculo da % de vitórias
-    total_jogos_vd, vitorias_vd, _, _ = analisar_resultado(df_jogos_f)
-    vitorias_percent = (vitorias_vd / total_jogos_vd) if total_jogos_vd > 0 else 0.0
-
-    # 3. CÁLCULO E NORMALIZAÇÃO DAS MÉTRICAS
-    gols_por_jogo = total_gols / total_jogos
-    assistencias_por_jogo = total_assistencias / total_jogos
-    minutagem_por_jogo = total_minutagem / total_jogos
-
-    # Usamos min() para limitar o score a um valor máximo (ex: 1.5) para evitar notas muito distorcidas
-    score_gols = min(gols_por_jogo / BASE_GOLS_POR_JOGO, 1.5)
-    score_assistencias = min(assistencias_por_jogo / BASE_ASSISTENCIAS_POR_JOGO, 1.5)
-    score_minutagem = min(minutagem_por_jogo / BASE_MINUTAGEM_POR_JOGO, 1.5)
-    score_vitorias = vitorias_percent
-
-    # 4. CÁLCULO PONDERADO
-    nota_ponderada = (
-            (PESO_GOLS * score_gols) +
-            (PESO_ASSISTENCIAS * score_assistencias) +
-            (PESO_MINUTAGEM * score_minutagem) +
-            (PESO_VITORIAS * score_vitorias)
-    )
-
-    nota_final = min(nota_ponderada * 10, 10.0)
-
-    # 5. GERAÇÃO DA CONCLUSÃO (LÓGICA DO TEXTO)
-
-    # a. Identifica o foco
-    foco = time_filter if time_filter != "Todos" else modalidade_filter
-
-    # b. Encontra o Ponto Forte (Score > 1.0 ou Score mais alto)
-    scores = {'Gols': score_gols, 'Assistências': score_assistencias, 'Minutagem': score_minutagem}
-    ponto_forte_key = max(scores, key=scores.get)
-    ponto_forte_score = scores[ponto_forte_key]
-
-    # c. Encontra o Ponto a Desenvolver (Score mais baixo)
-    ponto_desenvolver_key = min(scores, key=scores.get)
-    ponto_desenvolver_score = scores[ponto_desenvolver_key]
-
-    # d. Monta a Conclusão
-
-    if nota_final >= 9.0:
-        texto_inicial = "Excelente Performance!"
-        texto_principal = f"O atleta demonstrou um desempenho de altíssimo nível em {foco}. Sua nota é impulsionada pela excelência em **{ponto_forte_key}** (Score: {ponto_forte_score:.2f})."
-    elif nota_final >= 7.0:
-        texto_inicial = "Boa Performance Geral."
-        texto_principal = f"O desempenho em {foco} é sólido. O ponto forte está em **{ponto_forte_key}** (Score: {ponto_forte_score:.2f}), mas há espaço para crescimento, especialmente em **{ponto_desenvolver_key}** (Score: {ponto_desenvolver_score:.2f})."
-    elif nota_final >= 5.0:
-        texto_inicial = "Performance Moderada."
-        texto_principal = f"A performance em {foco} é mediana. A contribuição ofensiva e a minutagem precisam ser ajustadas, com o ponto mais fraco em **{ponto_desenvolver_key}** (Score: {ponto_desenvolver_score:.2f})."
-    else:
-        texto_inicial = "Atenção Necessária."
-        texto_principal = f"O desempenho em {foco} está abaixo do esperado. O fator que mais puxa a nota para baixo é **{ponto_desenvolver_key}** (Score: {ponto_desenvolver_score:.2f}), indicando necessidade de foco urgente nesta área."
-
-    conclusao_texto = f"**{texto_inicial}** A nota ({nota_final:.1f}) reflete: {texto_principal}"
-
-    return f"{nota_final:.1f}", conclusao_texto
-
-def calculate_engajamento(df_treinos_f, df_sono_f, total_dias_periodo, media_sono_decimal):
-    """Calcula o Engajamento baseado em Treinos (Presença) e Sono (Qualidade)."""
-
-    # 1. PARAMETROS E PESOS
-    PESO_TREINO = 0.5
-    PESO_SONO = 0.5
-    META_SONO_DIARIO = 7.0  # Exemplo: 7 horas é a meta
-    TREINOS_ESPERADOS = 15  # Exemplo: 15 treinos esperados no período
-
-    # 2. CÁLCULO DE ADERÊNCIA AO TREINO (Disciplina)
-    total_treinos_realizados = len(df_treinos_f)
-
-    # Se não houver treinos no período, assume 100% (ou 0%) dependendo da regra do clube.
-    # Vamos assumir 100% para não penalizar se não houver treinos agendados.
-    if TREINOS_ESPERADOS == 0:
-        score_treino = 100.0
-    else:
-        # Calcula a porcentagem de treinos feitos
-        score_treino = min(100.0, (total_treinos_realizados / TREINOS_ESPERADOS) * 100.0)
-
-    # 3. CÁLCULO DE QUALIDADE DO SONO (Saúde)
-
-    # Penalidade de sono:
-    # Se a média de sono estiver abaixo da meta, o score cai.
-    if total_dias_periodo > 0 and media_sono_decimal > 0.0:
-        # Penaliza se a média estiver abaixo da meta (7.0h)
-        if media_sono_decimal < META_SONO_DIARIO:
-            # Penalidade proporcional:
-            # Ex: Se a meta é 7h e a média é 6h (desvio de 1h), score cai 10%.
-            desvio_percentual = (META_SONO_DIARIO - media_sono_decimal) / META_SONO_DIARIO
-            score_sono = max(0.0, 100.0 - (desvio_percentual * 100.0))
-        else:
-            score_sono = 100.0  # Bônus se a média for igual ou superior à meta
-    else:
-        score_sono = 100.0  # Não penaliza se não houver dados de sono
-
-    # 4. CÁLCULO FINAL PONDERADO
-
-    engajamento_ponderado = (score_treino * PESO_TREINO) + (score_sono * PESO_SONO)
-
-    return f"{engajamento_ponderado:.0f}%"
-
-# --------------------------------------------------------------------------
-# 0. CONFIGURAÇÃO DE ESTILO (CSS - TEMA ESCURO E CARDS PERSONALIZADOS)
-# --------------------------------------------------------------------------
-def inject_custom_css():
-    st.markdown(
-        f"""
-        <style>
-        /* 2. Estilo Base dos Cards */
-        .card-jogos, .card-gols, .card-assistencias, 
-        .card-minutos, .card-treinos, .card-sono, .card-derrotas,
-        .card-vitorias, .card-avaliacao, .card-engajamento, .card-modalidade, .card-media-gols {{
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px 0 rgba(0,0,0,0.5); 
-            transition: 0.3s;
-            color: white; 
-            margin-bottom: 10px; 
-            height: 100%; 
-            text-align: left; 
-            font-size: 1em; 
-            line-height: 1.2; 
-        }}
-
-        /* 3. Estilo dos Títulos (o texto em negrito com o ícone) */
-        .card-jogos strong, .card-gols strong, .card-assistencias strong,
-        .card-minutos strong, .card-treinos strong, .card-sono strong,
-        .card-derrotas strong, .card-vitorias strong, .card-avaliacao strong,
-        .card-engajamento strong, .card-modalidade strong, .card-media-gols strong {{
-            font-size: 1.1em; 
-            color: white;
-            display: block; 
-            margin-bottom: 0.5em; 
-        }}
-
-        /* 4. Estilo dos valores principais (o NÚMERO GRANDE) */
-        .card-jogos p, .card-gols p, .card-assistencias p, 
-        .card-minutos p, .card-treinos p, .card-sono p, 
-        .card-derrotas p, .card-vitorias p, .card-avaliacao p,
-        .card-engajamento p, .card-modalidade p, .card-media-gols p {{
-            font-size: 2.2em; /* Aumentado o tamanho da fonte */
-            font-weight: bold; /* Garante que seja negrito */
-            margin: 0.1em 0; 
-            color: white; 
-            text-align: center; /* Centraliza o número */
-            line-height: 1.1; /* Ajuste para espaçamento vertical */
-        }}
-
-        /* 5. Estilo do rótulo/subtexto (o texto cinza pequeno da segunda linha) */
-        .card-jogos label, .card-gols label, .card-assistencias label, 
-        .card-minutos label, .card-treinos label, .card-sono label,
-        .card-derrotas label, .card-vitorias label, .card-avaliacao label,
-        .card-engajamento label, .card-modalidade label, .card-media-gols label {{
-            font-size: 0.75em; 
-            font-weight: normal;
-            color: rgba(255, 255, 255, 0.7); 
-            display: block; 
-            margin-top: 0.1em; 
-            text-align: center; /* Centraliza o subtexto também para consistência */
-        }}
-
-        /* 6. Cores Individuais para os Cards (FUNDO COMPLETO) */
-        .card-jogos {{ background-color: #00BCD4; }}
-        .card-gols {{ background-color: #4CAF50; }}
-        .card-assistencias {{ background-color: #FF9800; }}
-        .card-minutos {{ background-color: #2196F3; }}
-        .card-treinos {{ background-color: #9C27B0; }}
-        .card-sono {{ background-color: #009688; }}
-        .card-derrotas {{ background-color: #C62828; }} /* Vermelho Escuro */
-        .card-vitorias {{ background-color: #009688; }} /* Verde Água (Igual ao sono, se preferir outra cor, ajuste) */
-        .card-avaliacao {{ background-color: #9C27B0; }} /* Roxo (Igual ao treinos, se preferir outra cor, ajuste) */
-        .card-engajamento {{ background-color: #2196F3; }} /* Azul Escuro (Igual ao minutos, se preferir outra cor, ajuste) */
-        .card-modalidade {{ background-color: #00BCD4; }} /* Azul Claro (Igual ao jogos, se preferir outra cor, ajuste) */
-        .card-media-gols {{ background-color: #4CAF50; }} /* Verde Claro (Igual ao gols, se preferir outra cor, ajuste) */
-
-        /* 7. Estilo dos títulos dos gráficos e outros textos no Dark Mode */
-        h3 {{ color: #E0E0E0; }}
-
-        /* Otimização de Margens - Remove as margens do p e label dentro do div, deixando o controle para o CSS acima */
-        .card-jogos > p, .card-gols > p, .card-assistencias > p, 
-        .card-minutos > p, .card-treinos > p, .card-sono > p,
-        .card-derrotas > p, .card-vitorias > p, .card-avaliacao > p,
-        .card-engajamento > p, .card-modalidade > p, .card-media-gols > p {{
-            margin-bottom: 0;
-            margin-top: 0;
-        }}
-        .card-jogos > label, .card-gols > label, .card-assistencias > label, 
-        .card-minutos > label, .card-treinos > label, .card-sono > label,
-        .card-derrotas > label, .card-vitorias > label, .card-avaliacao > label,
-        .card-engajamento > label, .card-modalidade > label, .card-media-gols > label {{
-            margin-top: 0;
-            margin-bottom: 0;
-        }}
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-# Chamar o CSS antes de construir a tab (se for chamado dentro do with tab[5], só afetará essa tab)
-# Se você tiver um bloco de setup no topo do seu script, chame lá para afetar toda a aplicação.
-inject_custom_css()
-
-# --------------------------------------------------------------------------
-# INÍCIO DO CÓDIGO DENTRO DO with tab[5] - DASHBOARD
-
-st.markdown("""
-<style>
-.scout-card {
-    border-radius: 18px;
-    padding: 18px;
-    text-align: center;
-    color: white;
-    box-shadow: 0 6px 18px rgba(0,0,0,0.45);
-    height: 100%;
-}
-
-.scout-title {
-    font-size: 14px;
-    opacity: 0.85;
-}
-
-.scout-value {
-    font-size: 42px;
-    font-weight: bold;
-    margin-top: 6px;
-}
-
-/* === MESMAS CORES DO GRÁFICO === */
-
-.bg-chutes {
-    background: linear-gradient(135deg, #00E5FF, #0288D1);
-}
-
-.bg-chutes-errados {
-    background: linear-gradient(135deg, #FF1744, #B71C1C);
-}
-
-.bg-passes {
-    background: linear-gradient(135deg, #00E676, #2E7D32);
-}
-
-
-.bg-passes-errados {
-    background: linear-gradient(135deg, #9E9E9E, #616161);
-}
-
-.bg-desarmes {
-    background: linear-gradient(135deg, #7C4DFF, #512DA8);
-}
-
-.bg-faltas {
-    background: linear-gradient(135deg, #FF9100, #E65100);
-}
-
-.bg-indiretas {
-    background: linear-gradient(135deg, #FF5252, #B71C1C);
-}
-</style>
-""", unsafe_allow_html=True)
-
-
-def gerar_pdf_jogo(jogo, score_formatado, analise_texto, img_barra, img_radar):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-        caminho_pdf = tmp.name
-
-    doc = SimpleDocTemplate(
-        caminho_pdf,
-        pagesize=A4,
-        rightMargin=2 * cm,
-        leftMargin=2 * cm,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm
-    )
-
-    styles = getSampleStyleSheet()
-    story = []
-
-    # 🔹 TÍTULO
-    story.append(Paragraph("<b>Relatório de Desempenho do Jogo</b>", styles["Title"]))
-    story.append(Spacer(1, 12))
-
-    # 🔹 DADOS DO JOGO
-    dados_jogo = f"""
-    <b>Data:</b> {jogo['Data']}<br/>
-    <b>Jogo:</b> {jogo['Casa']} x {jogo['Visitante']}<br/>
-    <b>Modalidade:</b> {jogo.get('Condição do Campo', '-')}<br/>
-    <b>Minutagem:</b> {jogo.get('Minutos', 0)} min
-    """
-    story.append(Paragraph(dados_jogo, styles["Normal"]))
-    story.append(Spacer(1, 14))
-
-    # 🔹 SCORE
-    story.append(Paragraph(f"<b>Score Geral do Jogo:</b> {score_formatado}", styles["Heading2"]))
-    story.append(Spacer(1, 14))
-
-    # 🔹 SCOUTS
-    tabela_dados = [
-        ["Scout", "Valor"],
-        ["Chutes Certos", jogo["Chutes"]],
-        ["Chutes Errados", jogo.get("Chutes Errados", 0)],
-        ["Passes-chave", jogo["Passes-chave"]],
-        ["Passes Errados", jogo.get("Passes Errados", 0)],
-        ["Desarmes", jogo["Desarmes"]],
-        ["Faltas Sofridas", jogo["Faltas Sofridas"]],
-        ["Participações", jogo["Participações Indiretas"]],
-    ]
-
-    tabela = Table(tabela_dados, colWidths=[9 * cm, 3 * cm])
-    tabela.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), HexColor("#0E1117")),
-        ("TEXTCOLOR", (0, 0), (-1, 0), white),
-        ("GRID", (0, 0), (-1, -1), 0.5, white),
-        ("ALIGN", (1, 1), (-1, -1), "CENTER")
-    ]))
-
-    story.append(tabela)
-    story.append(Spacer(1, 16))
-
-    # 🔹 GRÁFICOS
-    story.append(Paragraph("<b>Distribuição de Scouts</b>", styles["Heading2"]))
-    story.append(Image(img_barra, width=16 * cm, height=7 * cm))
-    story.append(Spacer(1, 16))
-
-    story.append(Paragraph("<b>Radar de Desempenho</b>", styles["Heading2"]))
-    story.append(Image(img_radar, width=14 * cm, height=14 * cm))
-    story.append(Spacer(1, 18))
-
-    # 🔹 ANÁLISE TÉCNICA
-    story.append(Paragraph("<b>Análise Técnica do Jogo</b>", styles["Heading2"]))
-    story.append(Paragraph(analise_texto.replace("\n", "<br/>"), styles["Normal"]))
-
-    doc.build(story)
-
-    return caminho_pdf
-
-def gerar_barra_pdf(jogo, scout_cols):
-    fig, ax = plt.subplots(figsize=(8, 4))
-
-    valores = jogo[scout_cols].values
-    cores = [SCOUT_COLORS[s] for s in scout_cols]
-
-    ax.bar(scout_cols, valores, color=cores)
-
-    ax.set_facecolor("#0E1117")
-    fig.patch.set_facecolor("#0E1117")
-
-    ax.tick_params(colors="white", rotation=45)
-    ax.set_title("Distribuição de Scouts", color="white")
-    ax.grid(axis="y", linestyle=":", alpha=0.3)
-
-    for i, val in enumerate(valores):
-        ax.text(i, val + 0.1, str(int(val)), ha="center", color="white", fontsize=9)
-
-    caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-    plt.tight_layout()
-    plt.savefig(caminho, dpi=200)
-    plt.close(fig)
-
-    return caminho
-
-def gerar_radar_pdf(jogo, scout_cols, df):
-    radar_vals = []
-    for scout in scout_cols:
-        max_val = df_jogos_full[scout].max()
-        valor = jogo[scout]
-        radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
-
-    radar_vals += radar_vals[:1]
-    labels = scout_cols + [scout_cols[0]]
-
-    fig, ax = plt.subplots(subplot_kw=dict(polar=True), figsize=(6, 6))
-
-    ax.plot(labels, radar_vals, color="#00E5FF", linewidth=2)
-    ax.fill(labels, radar_vals, color="#00E5FF", alpha=0.35)
-
-    ax.set_facecolor("#0E1117")
-    fig.patch.set_facecolor("#0E1117")
-
-    ax.tick_params(colors="white")
-    ax.set_title("Radar de Scouts (estilo FIFA)", color="white", pad=20)
-
-    caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
-    plt.tight_layout()
-    plt.savefig(caminho, dpi=200)
-    plt.close(fig)
-
-    return caminho
-
-
-if st.session_state["pagina"] == "dashboard":
+elif st.session_state["pagina"] == "dashboard":
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
