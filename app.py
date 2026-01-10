@@ -45,20 +45,7 @@ IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
 
-# -------------------------------
-# CONTROLE DE PÁGINA (ANTI-RESET)
-# -------------------------------
 
-query_params = st.query_params
-
-if "pagina" not in st.session_state:
-    # tenta recuperar da URL
-    st.session_state["pagina"] = query_params.get("pagina", "home")
-
-# 🔒 Garante que ao abrir o app sempre começa na Home
-if st.session_state.get("app_inicializado") is None:
-    st.session_state["pagina"] = "home"
-    st.session_state["app_inicializado"] = True
 
 
 # ----------------------
@@ -1111,11 +1098,14 @@ if "Score_Jogo" not in df_jogos.columns:
         calcular_score_real, axis=1
     )
 
+if st.session_state.get("jogo_em_andamento", False):
+    st.session_state["pagina"] = "jogos"
+
 #--------------------------------------------
 #Pagina Home
 if st.session_state["pagina"] == "home":
 
-    st.query_params.clear()
+    
 
     # =========================
     # 🏟️ ÚLTIMO JOGO
@@ -1272,6 +1262,7 @@ if st.session_state["pagina"] == "home":
 # --------------------------
 
 elif st.session_state["pagina"] == "jogos":
+    st.session_state["jogo_em_andamento"] = True
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
