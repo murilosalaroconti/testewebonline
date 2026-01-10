@@ -3711,7 +3711,8 @@ if st.session_state["pagina"] == "dashboard":
     if modo_scout == "🎯 Scout por jogo":
 
         df_jogos = df_jogos_full.copy()
-
+        if "Score_Jogo" not in df_jogos.columns:
+            df_jogos["Score_Jogo"] = df_jogos.apply(calcular_score_real, axis=1)
 
         df_jogos["Data_DT"] = pd.to_datetime(
             df_jogos["Data"], dayfirst=True, errors="coerce"
