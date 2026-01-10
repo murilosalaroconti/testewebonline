@@ -1570,8 +1570,7 @@ elif st.session_state["pagina"] == "jogos":
                     del st.session_state["scout_temp"]
 
                 st.rerun()
-        if SCOUT_TEMP_PATH.exists():
-            SCOUT_TEMP_PATH.unlink()
+        
 
 
     # ----------------------------------------------------------------------
@@ -5065,5 +5064,6 @@ st.markdown(
     "<p style='text-align:center; color:#6B7280; font-size:13px;'>ScoutMind • Desenvolvido para evolução contínua do atleta.</p>",
     unsafe_allow_html=True
 )
+
 
 
