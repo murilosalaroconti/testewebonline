@@ -131,22 +131,25 @@ if st.session_state.get("pagina") != "home":
         st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
 
 
+def safe_int(value):
+    try:
+        return int(float(value))
+    except:
+        return 0
 
 def calcular_score_real(row):
-    gols = int(row.get("Gols Marcados", 0))
-    assistencias = int(row.get("Assistências", 0))
-    passes_chave = int(row.get("Passes-chave", 0))
-    desarmes = int(row.get("Desarmes", 0))
-    faltas = int(row.get("Faltas Sofridas", 0))
+    gols = safe_int(row.get("Gols Marcados"))
+    assistencias = safe_int(row.get("Assistências"))
+    passes_chave = safe_int(row.get("Passes-chave"))
+    desarmes = safe_int(row.get("Desarmes"))
+    faltas = safe_int(row.get("Faltas Sofridas"))
 
-    # ⚠️ aqui está o ponto crítico
-    acoes_ofensivas = int(
-        row.get("Participações Indiretas", row.get("Ações Ofensivas Relevantes", 0))
-    )
+    # 🔥 FONTE ÚNICA
+    acoes_ofensivas = safe_int(row.get("Participações Indiretas"))
 
-    chutes = int(row.get("Chutes", 0))
-    chutes_errados = int(row.get("Chutes Errados", 0))
-    passes_errados = int(row.get("Passes Errados", 0))
+    chutes = safe_int(row.get("Chutes"))
+    chutes_errados = safe_int(row.get("Chutes Errados"))
+    passes_errados = safe_int(row.get("Passes Errados"))
 
     finalizacoes = chutes + chutes_errados
     erros_total = chutes_errados + passes_errados
@@ -176,11 +179,13 @@ def calcular_score_real(row):
         erros_total * 0.25
     )
 
-    modalidade = row.get("Condição do Campo", "")
-    fator = {"Futsal":1.0, "Society":0.9, "Campo":0.8}.get(modalidade, 1.0)
-    score = score / fator
+    fator = {"Futsal": 1.0, "Society": 0.9, "Campo": 0.8}.get(
+        row.get("Condição do Campo"), 1.0
+    )
 
-    return round(max(0, min(10, score)), 1)
+    return round(max(0, min(10, score / fator)), 1)
+
+
 
 
 def parse_duration_to_hours(dur_str):
