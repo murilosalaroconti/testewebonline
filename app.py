@@ -137,46 +137,46 @@ def calcular_score_real(row):
     desarmes = safe_int(row.get("Desarmes"))
     faltas = safe_int(row.get("Faltas Sofridas"))
 
-    # 🔥 FONTE ÚNICA
-    acoes_ofensivas = safe_int(row.get("Participações Indiretas"))
+    # 🔥 AÇÕES OFENSIVAS (SÓ CONTEXTO, NÃO PONTUA)
+    participacoes = safe_int(row.get("Participações Indiretas"))
 
     chutes = safe_int(row.get("Chutes"))
     chutes_errados = safe_int(row.get("Chutes Errados"))
     passes_errados = safe_int(row.get("Passes Errados"))
 
-    finalizacoes = chutes + chutes_errados
     erros_total = chutes_errados + passes_errados
 
-    volume_ofensivo = (
-        finalizacoes * 0.3 +
-        passes_chave * 0.7 +
-        faltas * 0.5 +
-        acoes_ofensivas * 0.8
-    )
-
-    bonus_volume = 0
-    if volume_ofensivo >= 6:
-        bonus_volume = 2.0
-    elif volume_ofensivo >= 4:
-        bonus_volume = 1.2
-    elif volume_ofensivo >= 2:
-        bonus_volume = 0.6
-
+    # ===============================
+    # ⭐ SCORE TÉCNICO PURO
+    # ===============================
     score = (
         gols * 2.2 +
         assistencias * 1.8 +
         passes_chave * 0.6 +
         desarmes * 0.4 +
-        faltas * 0.3 +
-        bonus_volume -
+        faltas * 0.3 -
         erros_total * 0.25
     )
 
-    fator = {"Futsal": 1.0, "Society": 0.9, "Campo": 0.8}.get(
-        row.get("Condição do Campo"), 1.0
-    )
+    # ===============================
+    # ⚖️ AJUSTE DE JUSTIÇA (CONTEXTO)
+    # ===============================
+    if participacoes >= 3 and score < 5.0:
+        score = 5.0
 
-    return round(max(0, min(10, score / fator)), 1)
+    # ===============================
+    # ⚖️ AJUSTE POR MODALIDADE
+    # ===============================
+    fator = {
+        "Futsal": 1.0,
+        "Society": 0.9,
+        "Campo": 0.8
+    }.get(row.get("Condição do Campo"), 1.0)
+
+    score_final = score / fator
+
+    return round(max(0, min(10, score_final)), 1)
+
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
