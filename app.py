@@ -229,15 +229,6 @@ def save_registros(df):
     sheet.clear()
     sheet.update([df.columns.tolist()] + df.values.tolist())
 
-def salvar_scout_temp(data: dict):
-    with open(SCOUT_TEMP_PATH, "w") as f:
-        json.dump(data, f)
-
-def carregar_scout_temp():
-    if SCOUT_TEMP_PATH.exists():
-        with open(SCOUT_TEMP_PATH, "r") as f:
-            return json.load(f)
-    return None
 
 EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
 
@@ -1098,11 +1089,7 @@ if "Score_Jogo" not in df_jogos.columns:
         calcular_score_real, axis=1
     )
 
-# ===============================
-# 🔒 FORÇA RETORNO PARA JOGOS SE PARTIDA ESTÁ ATIVA
-# ===============================
-if st.session_state.get("jogo_em_andamento", False):
-    st.session_state["pagina"] = "jogos"
+
 
 #--------------------------------------------
 #Pagina Home
@@ -1265,14 +1252,6 @@ if st.session_state["pagina"] == "home":
 # --------------------------
 
 elif st.session_state["pagina"] == "jogos":
-    st.session_state["jogo_em_andamento"] = True
-
-    # ===============================
-    # 🔄 RETOMADA AUTOMÁTICA
-    # ===============================
-    scout_salvo = carregar_scout_temp()
-    if scout_salvo:
-        st.info("🔄 Jogo retomado automaticamente")
 
 
     if st.button("⬅️ Voltar para Início"):
@@ -1394,36 +1373,18 @@ elif st.session_state["pagina"] == "jogos":
 
         st.markdown("---")
 
-        # ------------------------------------------------------------------
-        # SCOUT AO VIVO (ADICIONADO – NÃO AFETA O FORMULÁRIO)
-        # ------------------------------------------------------------------
+        # ===============================
+        # 🧠 SCOUT – MVP CLEAN
+        # ===============================
+        SCOUT_KEYS = [
+            "Chutes", "Chutes Errados", "Desarmes",
+            "Passes-chave", "Passes Errados",
+            "Faltas Sofridas", "Participações Indiretas"
+        ]
 
-        # ===============================
-        # 🧠 SCOUT TEMPORÁRIO (ANTI-PERDA)
-        # ===============================
-        if "scout_temp" not in st.session_state:
-            scout_salvo = carregar_scout_temp()
-            st.session_state["scout_temp"] = scout_salvo if scout_salvo else {
-                "Chutes": 0,
-                "Chutes Errados": 0,
-                "Desarmes": 0,
-                "Passes-chave": 0,
-                "Passes Errados": 0,
-                "Faltas Sofridas": 0,
-                "Participações Indiretas": 0
-            }
-
-        # ===============================
-        # ♻️ RESTAURA VALORES DOS SCOUTS
-        # ===============================
-        scout_salvo = carregar_scout_temp()
-        if scout_salvo:
-            if "scout_temp" not in st.session_state:
-                st.session_state["scout_temp"] = scout_salvo
-
-            for k, v in scout_salvo.items():
-                if k not in st.session_state:
-                    st.session_state[k] = v
+        for k in SCOUT_KEYS:
+            if k not in st.session_state:
+                st.session_state[k] = 0
 
         # ------------------ FORMULÁRIO ------------------
 
@@ -1442,17 +1403,7 @@ elif st.session_state["pagina"] == "jogos":
             key="Participações Indiretas"
         )
 
-        st.session_state["scout_temp"] = {
-            "Chutes": st.session_state["Chutes"],
-            "Chutes Errados": st.session_state["Chutes Errados"],
-            "Desarmes": st.session_state["Desarmes"],
-            "Passes-chave": st.session_state["Passes-chave"],
-            "Passes Errados": st.session_state["Passes Errados"],
-            "Faltas Sofridas": st.session_state["Faltas Sofridas"],
-            "Participações Indiretas": st.session_state["Participações Indiretas"]
-        }
 
-        salvar_scout_temp(st.session_state["scout_temp"])
 
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
@@ -1534,13 +1485,14 @@ elif st.session_state["pagina"] == "jogos":
                     "Assistências": assistencias,
                     "Resultado": f"{gols_atleta}x{gols_adversario}",
                     "Condição do Campo": modalidade,
-                    "Chutes": st.session_state["scout_temp"]["Chutes"],
-                    "Chutes Errados": st.session_state["scout_temp"]["Chutes Errados"],
-                    "Desarmes": st.session_state["scout_temp"]["Desarmes"],
-                    "Passes-chave": st.session_state["scout_temp"]["Passes-chave"],
-                    "Passes Errados": st.session_state["scout_temp"]["Passes Errados"],
-                    "Faltas Sofridas": st.session_state["scout_temp"]["Faltas Sofridas"],
-                    "Participações Indiretas": st.session_state["scout_temp"]["Participações Indiretas"],
+                    "Chutes": st.session_state["Chutes"],
+                    "Chutes Errados": st.session_state["Chutes Errados"],
+                    "Desarmes": st.session_state["Desarmes"],
+                    "Passes-chave": st.session_state["Passes-chave"],
+                    "Passes Errados": st.session_state["Passes Errados"],
+                    "Faltas Sofridas": st.session_state["Faltas Sofridas"],
+                    "Participações Indiretas": st.session_state["Participações Indiretas"],
+
 
                 }
 
@@ -1557,20 +1509,12 @@ elif st.session_state["pagina"] == "jogos":
                     "Passes-chave", "Passes Errados",
                     "Faltas Sofridas", "Participações Indiretas"
                 ]:
-                    if k in st.session_state:
-                        del st.session_state[k]
+                    st.session_state[k] = 0
 
-                # ===============================
-                # 🏁 FINALIZA PARTIDA (LIBERA NAVEGAÇÃO)
-                # ===============================
-                st.session_state["jogo_em_andamento"] = False
-
-                # 🧹 LIMPA SCOUT TEMPORÁRIO
-                if "scout_temp" in st.session_state:
-                    del st.session_state["scout_temp"]
+        
 
                 st.rerun()
-        
+
 
 
     # ----------------------------------------------------------------------
@@ -5064,6 +5008,5 @@ st.markdown(
     "<p style='text-align:center; color:#6B7280; font-size:13px;'>ScoutMind • Desenvolvido para evolução contínua do atleta.</p>",
     unsafe_allow_html=True
 )
-
 
 
