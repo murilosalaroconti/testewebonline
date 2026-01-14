@@ -1,16 +1,18 @@
 streamlit
 pandas
-gspread
-google-auth
-matplotlib
-openpyxl
 numpy
+matplotlib
 plotly
-reportlab
+altair
 kaleido
-google-api-python-client
+
+firebase-admin
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
+google-api-python-client
 
+openpyxl
+reportlab
+Pillow
 
