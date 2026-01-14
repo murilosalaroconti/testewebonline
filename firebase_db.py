@@ -10,8 +10,7 @@ if not firebase_admin._apps:
 
     if "firebase_key" in st.secrets:
         # ☁️ STREAMLIT CLOUD (Secrets)
-        firebase_key = json.loads(st.secrets["firebase_key"])
-        cred = credentials.Certificate(firebase_key)
+        cred = credentials.Certificate(dict(st.secrets["firebase_key"]))
     else:
         # 🖥️ LOCAL (arquivo – NÃO subir no GitHub)
         cred = credentials.Certificate("firebase_key.json")
