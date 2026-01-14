@@ -9,8 +9,6 @@ import numpy as np
 import matplotlib.patches as mpatches
 import altair as alt
 from pathlib import Path
-from google.oauth2.service_account import Credentials
-import gspread
 import plotly.express as px
 import plotly.graph_objects as go
 from reportlab.lib.styles import getSampleStyleSheet
@@ -28,6 +26,238 @@ from reportlab.platypus import (
     TableStyle
 )
 import json
+from firebase_admin import firestore
+from data_treinos import load_treinos_df_firestore
+from firebase_db import carregar_jogos_firestore, salvar_jogo_firestore
+from firebase_db import salvar_treino_firestore
+from data_sono import load_sono_df_firestore
+from firebase_db import salvar_sono_firestore
+from data_saude import load_saude_df_firestore
+from firebase_db import salvar_saude_firestore
+import unicodedata
+from firebase_auth import login_firebase, criar_usuario_firebase
+from firebase_atletas import listar_atletas, criar_atleta
+
+
+
+def tela_login():
+    st.markdown(
+        """
+        <style>
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 85vh;
+        }
+        .login-card {
+            background-color: #0E1117;
+            padding: 40px;
+            border-radius: 18px;
+            width: 420px;
+            box-shadow: 0 12px 30px rgba(0,0,0,0.7);
+            text-align: center;
+        }
+        .login-title {
+            font-size: 32px;
+            font-weight: bold;
+            color: #00E5FF;
+            margin-bottom: 10px;
+        }
+        .login-subtitle {
+            font-size: 14px;
+            color: #AAAAAA;
+            margin-bottom: 25px;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+    st.markdown(
+        """
+        <div class="login-container">
+            <div class="login-card">
+                <div class="login-title">⚽ ScoutMind</div>
+                <div class="login-subtitle">
+                    Inteligência de performance esportiva
+                </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+    modo = st.radio(
+        "Acesso",
+        ["Já tenho cadastro", "Criar conta"],
+        horizontal=True
+    )
+
+    email = st.text_input("Email", placeholder="seu@email.com")
+    senha = st.text_input("Senha", type="password", placeholder="••••••••")
+
+    senha_confirma = None
+    if modo == "Criar conta":
+        senha_confirma = st.text_input(
+            "Confirmar senha",
+            type="password",
+            placeholder="••••••••"
+        )
+
+    entrar = st.button("🔐 Entrar", use_container_width=True)
+
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+    if entrar:
+        if not email or not senha:
+            st.error("Preencha email e senha")
+            return False
+
+        if modo == "Criar conta":
+            if senha != senha_confirma:
+                st.error("As senhas não coincidem")
+                return False
+
+            user = criar_usuario_firebase(email, senha)
+
+            if not user:
+                st.error("Erro ao criar conta (email pode já existir)")
+                return False
+
+        else:  # Já tenho cadastro
+            user = login_firebase(email, senha)
+
+            if not user:
+                st.error("Usuário não encontrado")
+                return False
+
+        st.session_state["user_logado"] = True
+        st.session_state["user_uid"] = user["uid"]
+        st.session_state["user_email"] = user["email"]
+
+        st.rerun()
+
+    return False
+
+
+def tela_selecao_atleta():
+    st.markdown("## 👤 Selecione um Atleta")
+
+    user_uid = st.session_state["user_uid"]
+    atletas = listar_atletas(user_uid)
+
+    if atletas:
+        opcoes = {a["nome"]: a["id"] for a in atletas}
+
+        atleta_nome = st.selectbox(
+            "Atletas cadastrados",
+            list(opcoes.keys())
+        )
+
+        if st.button("✅ Entrar com este atleta"):
+            st.session_state["atleta_ativo"] = opcoes[atleta_nome]
+            st.rerun()
+
+        st.markdown("---")
+
+    st.markdown("### ➕ Criar novo atleta")
+    nome_novo = st.text_input("Nome do atleta")
+
+    if st.button("Criar atleta"):
+        if not nome_novo.strip():
+            st.error("Digite um nome válido")
+        else:
+            atleta_id = criar_atleta(user_uid, nome_novo.strip())
+            st.session_state["atleta_ativo"] = atleta_id
+            st.rerun()
+
+def normalizar_jogos_firestore_base(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    df = df.copy()
+
+    # 1️⃣ NORMALIZAÇÃO BRUTA ABSOLUTA
+    def _limpar_coluna(c):
+        c = c.strip().lower()
+        c = unicodedata.normalize("NFKD", c).encode("ascii", "ignore").decode("utf-8")
+        c = "".join(c.split())
+        return c
+
+    df.columns = [_limpar_coluna(c) for c in df.columns.astype(str)]
+
+    # 2️⃣ UNIFICA DATA (qualquer variação → data)
+    if "dados" in df.columns:
+        df["data"] = df["dados"]
+        df.drop(columns=["dados"], inplace=True)
+
+    # 3️⃣ REMOVE DUPLICADAS DE VEZ
+    df = df.loc[:, ~df.columns.duplicated(keep="first")]
+
+    # 4️⃣ MAPA FINAL
+    MAPA = {
+        # Dados do jogo
+        "casa": "Casa",
+        "visitante": "Visitante",
+        "data": "Data",
+        "horario": "Horário",
+        "campeonato": "Campeonato",
+        "quadrojogado": "Quadro Jogado",
+        "minutosjogados": "Minutos Jogados",
+        "resultado": "Resultado",
+        "local": "Local",
+        "condicaodocampo": "Condição do Campo",
+
+        # Scouts (🔥 AGORA COM PREFIXO)
+        "scout_chutes": "Chutes",
+        "scout_chuteserrados": "Chutes Errados",
+        "scout_desarmes": "Desarmes",
+        "scout_passeschave": "Passes-chave",
+        "scout_passeserrados": "Passes Errados",
+        "scout_faltassofridas": "Faltas Sofridas",
+        "scout_participacoesindiretas": "Participações Indiretas",
+    }
+
+    df = df.rename(columns=MAPA)
+
+    # 5️⃣ CONTRATO FINAL
+    ORDEM_FINAL = [
+        "Casa","Visitante","Data","Horário","Campeonato",
+        "Quadro Jogado","Minutos Jogados","Gols Marcados",
+        "Assistências","Chutes","Chutes Errados","Desarmes",
+        "Passes-chave","Passes Errados","Faltas Sofridas",
+        "Participações Indiretas","Resultado","Local",
+        "Condição do Campo"
+    ]
+
+    for col in ORDEM_FINAL:
+        if col not in df.columns:
+            df[col] = ""
+
+    df = df[ORDEM_FINAL]
+
+    # 🚨 ASSERT FINAL — SE QUEBRAR, É FIRESTORE
+    assert "Dados" not in df.columns, "🔥 AINDA EXISTE 'Dados'"
+
+    return df
+
+
+def ordenar_jogos(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+
+    df = df.copy()
+
+    if "criado_em" in df.columns and df["criado_em"].notna().any():
+        return df.sort_values("criado_em", ascending=False)
+
+    if "Data_DT" not in df.columns:
+        df = garantir_coluna_data_dt(df)
+
+    if "Data_DT" in df.columns:
+        return df.sort_values("Data_DT", ascending=False)
+
+    return df
+
 
 # ===============================
 # 🔒 ESTADOS GLOBAIS DO APP
@@ -35,9 +265,34 @@ import json
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "home"
 
+if "atleta_ativo" not in st.session_state:
+    st.session_state["atleta_ativo"] = None
+
+
+if "user_logado" not in st.session_state:
+    st.session_state["user_logado"] = False
+
+
+# ===============================
+# 🧠 SCOUT TEMPORÁRIO (GARANTIA)
+# ===============================
+if "scout_temp" not in st.session_state:
+    st.session_state["scout_temp"] = {
+        "Chutes": 0,
+        "Chutes Errados": 0,
+        "Desarmes": 0,
+        "Passes-chave": 0,
+        "Passes Errados": 0,
+        "Faltas Sofridas": 0,
+        "Participações Indiretas": 0
+    }
+
+
 if "jogo_em_andamento" not in st.session_state:
     st.session_state["jogo_em_andamento"] = False
 
+# 🔐 Atleta ativo (MVP)
+ATLETA_ID = st.session_state["atleta_ativo"]
 
 
 BASE_DIR = Path(__file__).parent
@@ -51,13 +306,13 @@ st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_si
 # ----------------------
 # Configurações de arquivos
 # ----------------------
-EXPECTED_REGISTROS_COLUMNS = [
-    "Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
-    "Minutos Jogados", "Gols Marcados", "Assistências",
-    "Chutes","Chutes Errados", "Desarmes", "Passes-chave","Passes Errados", "Faltas Sofridas", "Participações Indiretas",
-    "Resultado", "Local", "Condição do Campo",
-    "Treino", "Date", "Hora"
-]
+#EXPECTED_REGISTROS_COLUMNS = [
+    #"Casa", "Visitante", "Data", "Horário", "Campeonato", "Quadro Jogado",
+    #"Minutos Jogados", "Gols Marcados", "Assistências",
+    #"Chutes","Chutes Errados", "Desarmes", "Passes-chave","Passes Errados", "Faltas Sofridas", "Participações Indiretas",
+    #"Resultado", "Local", "Condição do Campo",
+    #"Treino", "Date", "Hora"
+#]
 
 EXPECTED_SAUDE_COLUMNS = [
     "Data",
@@ -78,51 +333,13 @@ DATA_DIR = BASE_DIR / "Data"
 DATA_DIR.mkdir(exist_ok=True)
 SCOUT_TEMP_PATH = DATA_DIR / "scout_temp.json"
 
-# ----------------------
-# Utilitários de planilha
-# ----------------------
-
-def conectar_google_sheets():
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    creds = Credentials.from_service_account_info(
-        st.secrets["gcp_service_account"],
-        scopes=scopes
-    )
-    client = gspread.authorize(creds)
-    return client
-
-def conectar_google_sheets_test():
-    try:
-        client = conectar_google_sheets()
-        # Testa cada aba
-        for aba in ["registros", "treino", "sono"]:
-            client.open("Registro_Atleta_Bernardo").worksheet(aba)
-        st.success("Conexão com Google Sheets OK em todas as abas!")
-        return client
-    except Exception as e:
-        st.error(f"Erro na conexão com Google Sheets: {e}")
-        return None
-
-# ----------------------
-# Cria o client apenas uma vez
-# ----------------------
-
-@st.cache_resource
-def get_client():
-    return conectar_google_sheets()
-
-# Botão para atualizar dados
-# ------------------------------
-if st.session_state.get("pagina") != "home":
-    if st.button("Atualizar planilha"):
-        st.cache_data.clear()
-        st.success("Cache limpo! Os dados serão atualizados na próxima leitura.")
 
 def safe_int(value):
     try:
+        if value is None:
+            return 0
+        if isinstance(value, float) and pd.isna(value):
+            return 0
         return int(float(value))
     except:
         return 0
@@ -177,22 +394,77 @@ def calcular_score_real(row):
     # ===============================
     # ⚖️ AJUSTE POR MODALIDADE
     # ===============================
+    modalidade = str(row.get("Condição do Campo", "")).strip()
+
     fator = {
         "Futsal": 1.0,
         "Society": 0.9,
         "Campo": 0.8
-    }.get(row.get("Condição do Campo"), 1.0)
+    }.get(modalidade, 1.0)
+
+    # proteção contra divisão inválida
+    if fator <= 0:
+        fator = 1.0
 
     score_final = score / fator
 
     return round(max(0, min(10, score_final)), 1)
 
 def garantir_score_jogo(df):
-    if "Score_Jogo" not in df.columns:
-        df = df.copy()
-        df["Score_Jogo"] = df.apply(calcular_score_real, axis=1)
+    if df.empty:
+        return df
+
+    if "Score_Jogo" in df.columns:
+        return df
+
+    df = df.copy()
+
+    # garante colunas mínimas
+    colunas_minimas = [
+        "Gols Marcados", "Assistências", "Passes-chave",
+        "Desarmes", "Faltas Sofridas", "Participações Indiretas",
+        "Chutes", "Chutes Errados", "Passes Errados", "Condição do Campo"
+    ]
+
+    for col in colunas_minimas:
+        if col not in df.columns:
+            df[col] = 0
+
+    df["Score_Jogo"] = df.apply(calcular_score_real, axis=1)
     return df
 
+def garantir_coluna_data_dt(df):
+    if df.empty:
+        return df
+
+    df = df.copy()
+
+    # 🔥 REMOVE QUALQUER DUPLICAÇÃO DE COLUNAS
+    df.columns = df.columns.str.strip()
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    # 🔒 PRIORIDADE DE DATA (1 fonte só)
+    if "Data" in df.columns:
+        base = df["Data"]
+
+    elif "data" in df.columns:
+        base = df["data"]
+
+    elif "Date" in df.columns:
+        base = df["Date"]
+
+    else:
+        df["Data_DT"] = pd.NaT
+        return df
+
+    # 🔹 CONVERSÃO SEGURA
+    df["Data_DT"] = pd.to_datetime(
+        base.astype(str),
+        dayfirst=True,
+        errors="coerce"
+    )
+
+    return df
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
@@ -205,85 +477,6 @@ def parse_duration_to_hours(dur_str):
         return float(dur_str) if pd.notna(dur_str) else 0.0
     except:
         return 0.0
-
-@st.cache_data(ttl=300)  # TTL = 300 segundos = 5 minutos
-def load_registros():
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
-    dados = sheet.get_all_records()
-    df = pd.DataFrame(dados)
-
-    for col in EXPECTED_REGISTROS_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-
-    # 🔒 NORMALIZAÇÃO PARA EVITAR ERRO DO PYARROW
-    if "Quadro Jogado" in df.columns:
-        df["Quadro Jogado"] = df["Quadro Jogado"].astype(str)
-
-    return df[EXPECTED_REGISTROS_COLUMNS]
-
-def save_registros(df):
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("registros")
-    sheet.clear()
-    sheet.update([df.columns.tolist()] + df.values.tolist())
-
-
-EXPECTED_TREINOS_COLUMNS = ["Treino", "Date", "Tipo"]
-
-@st.cache_data(ttl=300)
-def load_treinos_df():
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
-    dados = sheet.get_all_records()
-    df = pd.DataFrame(dados)
-
-    for col in EXPECTED_TREINOS_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-
-    return df[EXPECTED_TREINOS_COLUMNS]
-
-def save_treinos_df(df):
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("treino")
-    sheet.clear()
-    sheet.update([df.columns.tolist()] + df.values.tolist())
-
-# 1. Definição das Constantes de Cochilo
-COL_DURACAO_COCHILO = 'Duração do Cochilo'
-COL_HOUVE_COCHILO = 'Houve Cochilo'
-
-# 2. Definição da Lista de Todas as Colunas (que usa as constantes)
-# ESTA DEVE SER A PRÓXIMA SEÇÃO DE CÓDIGO APÓS AS CONSTANTES
-ALL_COLUMNS = [
-    "Data",
-    "Hora Dormir",
-    "Hora Acordar",
-    "Duração do Sono (h:min)",
-    "Duração do Cochilo",
-    "Houve Cochilo"
-]
-
-@st.cache_data(ttl=300)
-def load_sono_df():
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
-    dados = sheet.get_all_records()
-    df = pd.DataFrame(dados)
-
-    for col in ALL_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-
-    return df[ALL_COLUMNS]
-
-def save_sono_df(df):
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("sono")
-    sheet.clear()
-    sheet.update([df.columns.tolist()] + df.values.tolist())
 
 # ----------------------
 def safe_extract_date_part(date_val, part='year'):
@@ -306,52 +499,6 @@ def safe_extract_date_part(date_val, part='year'):
         return None
 # Funções de negócio
 # ----------------------
-def adicionar_jogo(df, novo):
-    """novo é dict com campos: Casa, Visitante, Data, Horário, Campeonato, Quadro Jogado,
-       Minutos Jogados, Gols Marcados, Assistências, Resultado, Local"""
-    # Validação básica
-    required = ["Casa","Visitante","Data","Horário","Campeonato","Quadro Jogado","Minutos Jogados","Gols Marcados","Assistências","Resultado","Local"]
-    if not all(novo.get(k) not in (None,"") for k in required):
-        st.warning("Preencha todos os campos antes de adicionar o registro.")
-        return df
-    # Evitar duplicata exata Casa+Visitante+Data
-    mask = (df["Casa"].astype(str) == str(novo["Casa"])) & (df["Visitante"].astype(str) == str(novo["Visitante"])) & (df["Data"].astype(str) == str(novo["Data"]))
-    if mask.any():
-        st.warning("Registro já existe com a mesma Casa, Visitante e Data — não foi inserido duplicado.")
-        return df
-    # Append e salvar
-    row = {k:novo.get(k,"") for k in df.columns}
-    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True, sort=False)
-    save_registros(df)
-    st.success("Registro de jogo adicionado.")
-    return df
-
-def adicionar_treino(df, treino, date, tipo):
-    if not (treino and date and tipo):
-        st.warning("Preencha todos os campos de treino.")
-        return df
-    # Tenta normalizar a data
-    try:
-        # permite dd/mm/yyyy ou yyyy-mm-dd
-        if isinstance(date, str):
-            # se formato dd/mm/YYYY
-            if "/" in date:
-                d = datetime.strptime(date, "%d/%m/%Y")
-                date_str = d.strftime("%d/%m/%Y")
-            else:
-                # tenta parse automático
-                d = pd.to_datetime(date)
-                date_str = d.strftime("%d/%m/%Y")
-        else:
-            date_str = pd.to_datetime(date).strftime("%d/%m/%Y")
-    except Exception:
-        st.warning("Formato de data inválido. Use dd/mm/YYYY ou selecione usando o seletor.")
-        return df
-    row = {"Treino": treino, "Date": date_str, "Tipo": tipo}
-    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True, sort=False)
-    save_treinos_df(df)
-    st.success("Treino adicionado.")
-    return df
 
 def to_minutes(dur_str):
     """Converte H:MM para minutos totais, tratando None/NaN/vazio."""
@@ -488,25 +635,6 @@ def safe_parse_hour(hora_str):
     except:
         return None
 
-@st.cache_data(ttl=300)
-def load_saude_df():
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
-    dados = sheet.get_all_records()
-    df = pd.DataFrame(dados)
-
-    for col in EXPECTED_SAUDE_COLUMNS:
-        if col not in df.columns:
-            df[col] = ""
-
-    return df[EXPECTED_SAUDE_COLUMNS]
-
-def save_saude_df(df):
-    client = get_client()
-    sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude")
-    sheet.clear()
-    sheet.update([df.columns.tolist()] + df.values.tolist())
-
 def gerar_pdf_jogo(jogo, score_formatado, analise_texto, img_barra, img_radar):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         caminho_pdf = tmp.name
@@ -608,9 +736,10 @@ def gerar_barra_pdf(jogo, scout_cols):
 
 def gerar_radar_pdf(jogo, scout_cols, df):
     radar_vals = []
+
     for scout in scout_cols:
-        max_val = df_jogos_full[scout].max()
-        valor = jogo[scout]
+        max_val = df[scout].max() if scout in df.columns else 0
+        valor = jogo.get(scout, 0)
         radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
 
     radar_vals += radar_vals[:1]
@@ -623,9 +752,7 @@ def gerar_radar_pdf(jogo, scout_cols, df):
 
     ax.set_facecolor("#0E1117")
     fig.patch.set_facecolor("#0E1117")
-
     ax.tick_params(colors="white")
-    ax.set_title("Radar de Scouts (estilo FIFA)", color="white", pad=20)
 
     caminho = tempfile.NamedTemporaryFile(delete=False, suffix=".png").name
     plt.tight_layout()
@@ -633,6 +760,7 @@ def gerar_radar_pdf(jogo, scout_cols, df):
     plt.close(fig)
 
     return caminho
+
 
 def parse_duration_to_hours(dur_str):
     """Converte a duração de sono (ex: '7:30', '7:30:00') em horas decimais (ex: 7.5)."""
@@ -654,7 +782,7 @@ def filter_df_by_date(df, date_col, start_date, end_date):
         # Garante que a coluna de data é string antes da conversão para evitar ArrowTypeError
         df_temp[date_col] = df_temp[date_col].astype(str)
 
-        df_temp['Data_DT'] = pd.to_datetime(df_temp[date_col], format=date_format, errors='coerce', dayfirst=True)
+
 
         df_temp = df_temp.dropna(subset=['Data_DT'])
 
@@ -869,6 +997,17 @@ def calculate_engajamento(df_treinos_f, df_sono_f, total_dias_periodo, media_son
 
     return f"{engajamento_ponderado:.0f}%"
 
+def normalizar_data_timezone(df, coluna):
+    if coluna in df.columns:
+        df[coluna] = pd.to_datetime(df[coluna], errors="coerce")
+
+        # 🔥 REMOVE TIMEZONE SE EXISTIR
+        if df[coluna].dt.tz is not None:
+            df[coluna] = df[coluna].dt.tz_localize(None)
+
+    return df
+
+
 # --------------------------------------------------------------------------
 # 0. CONFIGURAÇÃO DE ESTILO (CSS - TEMA ESCURO E CARDS PERSONALIZADOS)
 # --------------------------------------------------------------------------
@@ -1025,9 +1164,54 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ----------------------
-# Visual / Layout (Streamlit)
-# ----------------------
+# ==========================================
+# 🔥 FONTE ÚNICA DE DADOS — FIRESTORE
+# (SEMPRE EXECUTA AO INICIAR O APP)
+# ==========================================
+
+jogos_firestore = carregar_jogos_firestore(ATLETA_ID)
+df_jogos_full = pd.DataFrame(jogos_firestore)
+
+
+# 🔥 EXPLODE SCOUT
+if "scout" in df_jogos_full.columns:
+    scouts_df = pd.json_normalize(df_jogos_full["scout"])
+    scouts_df.columns = [f"scout_{c}" for c in scouts_df.columns]
+    df_jogos_full = df_jogos_full.drop(columns=["scout"])
+    df_jogos_full = pd.concat([df_jogos_full, scouts_df], axis=1)
+
+# 🔥 NORMALIZA NOMES
+df_jogos_full = normalizar_jogos_firestore_base(df_jogos_full)
+
+# 🔥 CORREÇÃO DA MODALIDADE  ← 🔴 ESTE ERA O FALTANTE
+if "Condição do Campo" in df_jogos_full.columns:
+    df_jogos_full["Condição do Campo"] = (
+        df_jogos_full["Condição do Campo"]
+        .astype(str)
+        .str.strip()
+        .replace({"nan": "", "None": ""})
+    )
+
+# 🔥 DATA
+df_jogos_full = garantir_coluna_data_dt(df_jogos_full)
+
+# 🔥 NUMÉRICOS
+SCOUT_NUM_COLS = [
+    "Chutes", "Chutes Errados", "Desarmes",
+    "Passes-chave", "Passes Errados",
+    "Faltas Sofridas", "Participações Indiretas"
+]
+
+for col in SCOUT_NUM_COLS:
+    if col in df_jogos_full.columns:
+        df_jogos_full[col] = pd.to_numeric(
+            df_jogos_full[col], errors="coerce"
+        ).fillna(0)
+
+# 🔥 SCORE
+df_jogos_full = garantir_score_jogo(df_jogos_full)
+
+
 
 # Sidebar com imagem e informações
 with st.sidebar:
@@ -1072,23 +1256,9 @@ with st.sidebar:
     st.markdown("---")
     st.write("📊 Desenvolvido para fins estatísticos 📊")
 
-# =====================================================
-# 📌 DATAFRAME GLOBAL DE JOGOS (FONTE ÚNICA)
-# =====================================================
-df_jogos = load_registros()
-
-# Garante coluna de data
-if "Data" in df_jogos.columns:
-    df_jogos["Data_DT"] = pd.to_datetime(
-        df_jogos["Data"], dayfirst=True, errors="coerce"
-    )
-
-# Garante score UMA vez
-if "Score_Jogo" not in df_jogos.columns:
-    df_jogos["Score_Jogo"] = df_jogos.apply(
-        calcular_score_real, axis=1
-    )
-
+if not st.session_state["user_logado"]:
+    tela_login()
+    st.stop()
 
 
 #--------------------------------------------
@@ -1101,13 +1271,15 @@ if st.session_state["pagina"] == "home":
     # 🏟️ ÚLTIMO JOGO
     # =========================
     nota_ultimo_jogo = "—"
-    if not df_jogos.empty:
-        ultimo_jogo = (
-            df_jogos.dropna(subset=["Data_DT"])
-            .sort_values("Data_DT", ascending=False)
-            .iloc[0]
-        )
-        nota_ultimo_jogo = round(ultimo_jogo["Score_Jogo"], 1)
+
+    if not df_jogos_full.empty:
+        df_jogos_ord = ordenar_jogos(df_jogos_full)
+
+        if not df_jogos_ord.empty:
+            ultimo_jogo = df_jogos_ord.iloc[0]
+            nota_ultimo_jogo = ultimo_jogo.get("Score_Jogo", "—")
+    else:
+        nota_ultimo_jogo = "—"
 
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
@@ -1120,8 +1292,8 @@ if st.session_state["pagina"] == "home":
     # =========================
     # 📌 CARREGAR OUTROS DADOS
     # =========================
-    df_treinos = load_treinos_df()
-    df_sono = load_sono_df()
+    df_treinos = load_treinos_df_firestore(ATLETA_ID)
+    df_sono = load_sono_df_firestore(ATLETA_ID)
 
     if "Date" in df_treinos.columns:
         df_treinos["Date_DT"] = pd.to_datetime(df_treinos["Date"], dayfirst=True, errors="coerce")
@@ -1157,16 +1329,19 @@ if st.session_state["pagina"] == "home":
         ].shape[0]
 
     # =========================
+    # =========================
     # 📈 TENDÊNCIA (5 JOGOS)
     # =========================
     tendencia = "Sem dados"
-    if len(df_jogos) >= 5:
-        df_jogos_ord = df_jogos.sort_values("Data_DT")
-        ultimos = df_jogos_ord.tail(5)["Score_Jogo"].tolist()
 
-        if ultimos[-1] > ultimos[0]:
+    df_jogos_ord = ordenar_jogos(df_jogos_full)
+
+    if len(df_jogos_ord) >= 5:
+        ultimos = df_jogos_ord.head(5)["Score_Jogo"].tolist()
+
+        if ultimos[0] > ultimos[-1]:
             tendencia = "Em evolução 📈"
-        elif ultimos[-1] < ultimos[0]:
+        elif ultimos[0] < ultimos[-1]:
             tendencia = "Queda 📉"
         else:
             tendencia = "Estável ➖"
@@ -1247,10 +1422,6 @@ if st.session_state["pagina"] == "home":
     st.markdown("---")
     st.info("💡 Disciplina hoje vira desempenho amanhã.")
 
-# --------------------------
-# Aba Jogos
-# --------------------------
-
 elif st.session_state["pagina"] == "jogos":
 
 
@@ -1265,10 +1436,11 @@ elif st.session_state["pagina"] == "jogos":
     # ----------------------------------------------------------------------
     # Pré-carregar opções dinâmicas antes do formulário
     # ----------------------------------------------------------------------
-    df_temp = load_registros()
+    df_temp = df_jogos_full.copy()
 
-    times_casa = df_temp['Casa'].astype(str).unique()
-    times_visitante = df_temp['Visitante'].astype(str).unique()
+    times_casa = df_temp["Casa"].astype(str).unique()
+    times_visitante = df_temp["Visitante"].astype(str).unique()
+
 
     opcoes_times = set(
         t.strip() for t in list(times_casa) + list(times_visitante)
@@ -1386,29 +1558,70 @@ elif st.session_state["pagina"] == "jogos":
             if k not in st.session_state:
                 st.session_state[k] = 0
 
+
+
         # ------------------ FORMULÁRIO ------------------
+
+        def incrementar_scout(nome):
+            st.session_state["scout_temp"][nome] += 1
+
+
+        def decrementar_scout(nome):
+            if st.session_state["scout_temp"][nome] > 0:
+                st.session_state["scout_temp"][nome] -= 1
+
 
         st.markdown("### 📊 Scout Ao Vivo")
 
-        st.number_input("🥅 Chutes", min_value=0, key="Chutes")
-        st.number_input("❌ Chutes Errados", min_value=0, key="Chutes Errados")
-        st.number_input("🛡️ Desarmes", min_value=0, key="Desarmes")
-        st.number_input("🎯 Passes-chave", min_value=0, key="Passes-chave")
-        st.number_input("❌ Passes Errados", min_value=0, key="Passes Errados")
-        st.number_input("⚡ Faltas Sofridas", min_value=0, key="Faltas Sofridas")
-        st.number_input(
-            "🔥 Ações Ofensivas Relevantes",
-            min_value=0,
-            help="Dribles que quebram linha, conduções ofensivas, início de jogadas perigosas",
-            key="Participações Indiretas"
-        )
+        SCOUT_LAYOUT = [
+            ("Chutes", "bg-chutes"),
+            ("Chutes Errados", "bg-chutes-errados"),
+            ("Passes-chave", "bg-passes"),
+            ("Passes Errados", "bg-passes-errados"),
+            ("Desarmes", "bg-desarmes"),
+            ("Faltas Sofridas", "bg-faltas"),
+            ("Participações Indiretas", "bg-indiretas")
+        ]
 
+        cols = st.columns(2)
+
+        for i, (scout, classe) in enumerate(SCOUT_LAYOUT):
+            with cols[i % 2]:
+                st.markdown(
+                    f"""
+                    <div class="scout-card {classe}">
+                        <div class="scout-title">{scout}</div>
+                        <div class="scout-value">
+                            {st.session_state["scout_temp"][scout]}
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.button("➕", key=f"mais_{scout}", on_click=incrementar_scout, args=(scout,))
+                with c2:
+                    st.button("➖", key=f"menos_{scout}", on_click=decrementar_scout, args=(scout,))
 
 
         st.markdown("---")
         st.markdown("### 💾 Encerrar Partida")
 
+        if "jogo_salvo_sucesso" not in st.session_state:
+            st.session_state["jogo_salvo_sucesso"] = False
+
+        # placeholder da mensagem
+        msg_sucesso = st.empty()
+
+        # mostra a mensagem uma única vez
+        if st.session_state["jogo_salvo_sucesso"]:
+            msg_sucesso.success("⚽ Jogo registrado com sucesso!")
+            st.session_state["jogo_salvo_sucesso"] = False
+
         OPCAO_INVALIDA = "Selecione ou Crie Novo"
+
 
         with st.form("form_salvar_jogo"):
 
@@ -1477,62 +1690,75 @@ elif st.session_state["pagina"] == "jogos":
                         if criar_novo_local and novo_local_input.strip()
                         else local_sel
                     ),
-                    "Data": data.strftime("%d/%m/%Y"),
-                    "Horário": horario.strftime("%H:%M"),
-                    "Quadro Jogado": quadro,
-                    "Minutos Jogados": minutos,
-                    "Gols Marcados": gols,
-                    "Assistências": assistencias,
-                    "Resultado": f"{gols_atleta}x{gols_adversario}",
-                    "Condição do Campo": modalidade,
-                    "Chutes": st.session_state["Chutes"],
-                    "Chutes Errados": st.session_state["Chutes Errados"],
-                    "Desarmes": st.session_state["Desarmes"],
-                    "Passes-chave": st.session_state["Passes-chave"],
-                    "Passes Errados": st.session_state["Passes Errados"],
-                    "Faltas Sofridas": st.session_state["Faltas Sofridas"],
-                    "Participações Indiretas": st.session_state["Participações Indiretas"],
-
 
                 }
+                jogo_firestore = {
+                    "Data": data.strftime("%d/%m/%Y"),
+                    "Campeonato": novo["Campeonato"],
+                    "Casa": novo["Casa"],
+                    "Visitante": novo["Visitante"],
+                    "Condição do Campo": modalidade,
+                    "Local": novo["Local"],
+                    "Minutos Jogados": minutos,
+                    "Resultado": f"{gols_atleta}x{gols_adversario}",
 
+                    # 🔥 ORGANIZAÇÃO DEFINITIVA
+                    "criado_em": firestore.SERVER_TIMESTAMP,
+
+                    # 🎯 SCOUT (ÚNICA FONTE DE VERDADE)
+                    "scout": st.session_state["scout_temp"].copy()
+                }
 
                 with st.spinner("💾 Salvando jogo..."):
-                    df_reg = load_registros()
-                    adicionar_jogo(df_reg, novo)
+                    salvar_jogo_firestore(ATLETA_ID, jogo_firestore)
 
-                    st.toast("⚽ Jogo registrado com sucesso!", icon="✅")
+                # 🔥 LIMPA APENAS O SCOUT BACKEND
+                for k in st.session_state["scout_temp"]:
+                    st.session_state["scout_temp"][k] = 0
 
-                # 🔥 LIMPA O SCOUT SÓ AGORA
-                for k in [
-                    "Chutes", "Chutes Errados", "Desarmes",
-                    "Passes-chave", "Passes Errados",
-                    "Faltas Sofridas", "Participações Indiretas"
-                ]:
-                    st.session_state[k] = 0
+                # ✅ FLAG DE SUCESSO
+                st.session_state["jogo_salvo_sucesso"] = True
 
-        
-
+                # 🔄 RERUN LIMPA A TELA E OS INPUTS
                 st.rerun()
-
-
 
     # ----------------------------------------------------------------------
     # COLUNA 2 - TABELA
     # ----------------------------------------------------------------------
     with col2:
-        st.markdown("### 📋 Tabela dos Jogos")
-        df = load_registros()
+        st.markdown("### 📋 Jogos Registrados (Banco de Dados)")
 
-        df_exibicao = df.iloc[::-1].copy()
-        df_exibicao.index += 1
-        df_exibicao.insert(0, 'Nº', df_exibicao.index)
-        df_exibicao.index.name = None
+        if df_jogos_full.empty:
+            st.info("Nenhum jogo registrado ainda.")
+        else:
+            df_view = ordenar_jogos(df_jogos_full).copy()
 
-        st.dataframe(df_exibicao, use_container_width=True)
+            # Limita colunas para visualização
+            colunas_exibir = [
+                "Data", "Casa", "Visitante",
+                "Campeonato", "Condição do Campo",
+                "Minutos Jogados", "Resultado",
+
+                # 🔥 SCOUTS
+                "Chutes",
+                "Chutes Errados",
+                "Passes-chave",
+                "Passes Errados",
+                "Desarmes",
+                "Faltas Sofridas",
+                "Participações Indiretas"
+            ]
+
+            colunas_exibir = [c for c in colunas_exibir if c in df_view.columns]
+
+            df_view = df_view[colunas_exibir].reset_index(drop=True)
+            df_view.index += 1
+            df_view.insert(0, "Nº", df_view.index)
+
+            st.dataframe(df_view, use_container_width=True, hide_index=True)
 
         if st.button("Exportar CSV (últimos 200)"):
-            tmp = df.tail(200).copy()
+            tmp = df_view.tail(200).copy()
             tmp.reset_index(drop=True, inplace=True)
             tmp.index += 1
             tmp.insert(0, 'Nº', tmp.index)
@@ -1549,8 +1775,6 @@ elif st.session_state["pagina"] == "jogos":
                 mime="text/csv"
             )
 
-# Aba Treinos
-# --------------------------
 elif st.session_state["pagina"] == "treinos":
 
     if st.button("⬅️ Voltar para Início"):
@@ -1558,7 +1782,7 @@ elif st.session_state["pagina"] == "treinos":
         st.rerun()
 
     st.header("🎯Treinos")
-    df_treinos = load_treinos_df()
+    df_treinos = load_treinos_df_firestore("bernardo_miranda")
 
     # --- NOVO BLOCO DE NORMALIZAÇÃO DE DADOS (CRUCIAL PARA UNIFICAR NOMES) ---
     NOME_COLUNA_TREINO = 'Treino'
@@ -1652,7 +1876,16 @@ elif st.session_state["pagina"] == "treinos":
                 date_str = date_t.strftime("%d/%m/%Y")
 
                 # ADICIONAR TREINO COM OS VALORES PADRONIZADOS
-                df_treinos = adicionar_treino(df_treinos, treino_final, date_str, tipo_final)
+                treino_firestore = {
+                    "Treino": treino_final,
+                    "Date": date_str,
+                    "Tipo": tipo_final
+                }
+
+                salvar_treino_firestore(
+                    atleta_id=ATLETA_ID,
+                    treino=treino_firestore
+                )
 
                 st.success("Registro de Treino adicionado! Recarregando lista...")
                 # FORÇA O RECARREGAMENTO DO SCRIPT PARA INCLUIR OS NOVOS TREINOS/TIPOS NA LISTA!
@@ -1886,10 +2119,8 @@ elif st.session_state["pagina"] == "treinos":
                 st.markdown("\n".join(resumo_texto))
                 st.markdown("---")
 
-# Aba Sono
-# --------------------------
-
 elif st.session_state["pagina"] == "sono":
+
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -1901,7 +2132,7 @@ elif st.session_state["pagina"] == "sono":
     COLUNAS_COCHILO_NAMES = [COL_DURACAO_COCHILO, COL_HOUVE_COCHILO]
 
     # Garante que a função load_sono_df() está carregando o DF aqui
-    df_sono = load_sono_df()
+    df_sono = load_sono_df_firestore(ATLETA_ID)
 
 
 
@@ -1928,7 +2159,33 @@ elif st.session_state["pagina"] == "sono":
                 hora_d_str = hora_d.strftime("%H:%M")
                 hora_a_str = hora_a.strftime("%H:%M")
 
-                df_sono = adicionar_sono(df_sono, data_str, hora_d_str, hora_a_str)
+                # 🔹 CALCULAR DURAÇÃO DO SONO (EM MINUTOS)
+                t1 = datetime.strptime(hora_d_str, "%H:%M")
+                t2 = datetime.strptime(hora_a_str, "%H:%M")
+
+                # Se passou da meia-noite
+                if t2 < t1:
+                    t2 = t2 + timedelta(days=1)
+
+                dur_noite_td = t2 - t1
+                dur_min_noite = int(dur_noite_td.total_seconds() / 60)
+
+                # 🔹 SALVAR NO FIRESTORE
+                sono_firestore = {
+                    "Data": data_str,
+                    "Hora Dormir": hora_d_str,
+                    "Hora Acordar": hora_a_str,
+                    "Duração do Sono (h:min)": format_minutes_to_h_mm(dur_min_noite),
+                    "Duração do Cochilo": "0:00",
+                    "Houve Cochilo": "Não"
+                }
+
+                salvar_sono_firestore(
+                    atleta_id=ATLETA_ID,
+                    sono=sono_firestore
+                )
+
+                st.success("Registro de sono salvo com sucesso!")
                 st.rerun()
 
         st.markdown("---")
@@ -1958,7 +2215,8 @@ elif st.session_state["pagina"] == "sono":
         st.markdown("### 🌙️ Registros de Sono")
 
         # RECARREGA O DATAFRAME SALVO
-        df_sono_atualizado = load_sono_df()
+        df_sono_atualizado = load_sono_df_firestore(ATLETA_ID)
+
 
         # Garantir coluna Data como datetime
         df_sono_atualizado["Data_DT"] = pd.to_datetime(
@@ -2006,7 +2264,8 @@ elif st.session_state["pagina"] == "sono":
 
 
     if st.button("Gerar Gráfico (Sono)"):
-        df_sono = load_sono_df()
+        df_sono = load_sono_df_firestore(ATLETA_ID)
+
 
         # ===============================
         # 🧠 CARD – QUALIDADE DO SONO (ÚLTIMO REGISTRO)
@@ -2260,7 +2519,6 @@ elif st.session_state["pagina"] == "sono":
                 st.pyplot(fig)
                 plt.close(fig)
 
-
 elif st.session_state["pagina"] == "saude":
 
     if st.button("⬅️ Voltar para Início"):
@@ -2303,13 +2561,9 @@ elif st.session_state["pagina"] == "saude":
     salvar_saude = st.button("💾 Salvar Registro de Saúde")
 
     if salvar_saude:
-        df_saude = load_saude_df()
         data_str = data_saude.strftime("%d/%m/%Y")
 
-        # Remove registro antigo do mesmo dia (se existir)
-        df_saude = df_saude[df_saude["Data"] != data_str]
-
-        novo = {
+        saude_firestore = {
             "Data": data_str,
             "Alimentação": alimentacao,
             "Hidratação": hidratacao,
@@ -2317,10 +2571,13 @@ elif st.session_state["pagina"] == "saude":
             "Observação": observacao
         }
 
-        df_saude = pd.concat([df_saude, pd.DataFrame([novo])], ignore_index=True)
-        save_saude_df(df_saude)
+        salvar_saude_firestore(
+            atleta_id=ATLETA_ID,
+            saude=saude_firestore
+        )
 
         st.success("Registro de saúde salvo com sucesso ✅")
+        st.rerun()
 
     st.markdown(
         """
@@ -2341,7 +2598,8 @@ elif st.session_state["pagina"] == "saude":
     st.markdown("---")
     st.subheader("📊 Registros Recentes de Saúde")
 
-    df_saude = load_saude_df()
+    df_saude = load_saude_df_firestore(ATLETA_ID)
+
 
     if df_saude.empty:
         st.info("Nenhum registro de saúde cadastrado ainda.")
@@ -2427,576 +2685,6 @@ elif st.session_state["pagina"] == "saude":
                     unsafe_allow_html=True
                 )
 
-    # st.header("🔗 Análises Integradas / Desempenho vs Recuperação")
-    # st.markdown(
-    #     "Use esta seção para correlacionar o desempenho em jogos com a frequência de treinos e qualidade do sono.")
-    #
-    #
-    # # --- FUNÇÕES HELPER (ASSUMINDO QUE ESTÃO NO ESCOPO GERAL) ---
-    # def get_date_obj(date_val):
-    #     """Converte a data para objeto datetime, priorizando o formato DD/MM/YYYY."""
-    #     return pd.to_datetime(date_val, errors='coerce', dayfirst=True)
-    #
-    #
-    # def get_sleep_date_obj(row):
-    #     """
-    #     REGRA SIMPLES: Atribui o sono EXATAMENTE à data de despertar ('Data' na planilha).
-    #     """
-    #     try:
-    #         data_acordar = pd.to_datetime(row['Data'], format='%d/%m/%Y', errors='coerce')
-    #         if pd.isna(data_acordar):
-    #             return pd.NaT
-    #         return data_acordar
-    #     except:
-    #         return pd.NaT
-    #
-    #
-    # # --- FILTRO POR PERÍODO ---
-    # periodo_opcoes = {
-    #     "Últimos 7 dias": 7,
-    #     "Últimas 2 semanas": 14,
-    #     "Últimas 4 semanas": 28,
-    #     "Últimos 90 dias": 90,
-    #     "Todos os Dados": 9999
-    # }
-    #
-    # # --- NOVO: OPÇÕES DE MODALIDADE ---
-    # # *AVISO: A linha abaixo pode dar erro se 'load_registros' não estiver no escopo global
-    # df_temp_modality = load_registros()
-    # modalidades_disponiveis = sorted(
-    #     [m for m in df_temp_modality['Condição do Campo'].astype(str).unique()
-    #      if m and m.strip() != "" and m.lower() != "nan"])
-    # modalidades_opcoes = ["Todas as Modalidades"] + modalidades_disponiveis
-    #
-    # # --- LAYOUT DOS FILTROS ---
-    # col_analise1, col_analise2 = st.columns(2)
-    # with col_analise1:
-    #     periodo_sel = st.selectbox("Selecione o Período de Análise:", list(periodo_opcoes.keys()))
-    # with col_analise2:
-    #     modalidade_filter = st.selectbox("Filtrar por Modalidade:", modalidades_opcoes)  # NOVO FILTRO
-    #
-    # dias_atras = periodo_opcoes[periodo_sel]
-    # data_inicial = (datetime.now() - timedelta(days=dias_atras)).replace(hour=0, minute=0, second=0, microsecond=0)
-    #
-    # st.markdown(f"**Analisando dados desde:** _{data_inicial.strftime('%d/%m/%Y')}_")
-    #
-    # if st.button("Gerar Análise Integrada"):
-    #
-    #     # ----------------------------------------------------
-    #     # 1. PROCESSAR DADOS DE JOGOS (Gols e Assistências)
-    #     # ----------------------------------------------------
-    #     df_jogos = load_registros()
-    #     # Remove treinos (mantendo apenas jogos)
-    #     df_jogos = df_jogos[df_jogos["Treino"].isna() | (df_jogos["Treino"] == "")]
-    #
-    #     # FILTRA JOGOS USANDO 'Condição do Campo' (CORRETO)
-    #     if modalidade_filter != "Todas as Modalidades":
-    #         df_jogos = df_jogos[df_jogos["Condição do Campo"].astype(str) == modalidade_filter]
-    #
-    #     df_jogos["Date_Obj"] = df_jogos["Data"].apply(get_date_obj)
-    #     df_jogos_filtrado = df_jogos[df_jogos["Date_Obj"] >= data_inicial].copy()
-    #
-    #     if df_jogos_filtrado.empty:
-    #         df_jogos_group = pd.DataFrame(columns=['Date_Obj', 'Gols Marcados', 'Assistências'])
-    #
-    #     else:
-    #         # Garante que Gols e Assistências são numéricos
-    #         def to_int_safe(x):
-    #             try:
-    #                 return int(x)
-    #             except:
-    #                 return 0
-    #
-    #
-    #         df_jogos_filtrado["Gols Marcados"] = df_jogos_filtrado["Gols Marcados"].apply(to_int_safe)
-    #         df_jogos_filtrado["Assistências"] = df_jogos_filtrado["Assistências"].apply(to_int_safe)
-    #
-    #         df_jogos_group = df_jogos_filtrado.groupby("Date_Obj")[
-    #             ["Gols Marcados", "Assistências"]].sum().reset_index()
-    #
-    #     # ----------------------------------------------------
-    #     # 2. PROCESSAR DADOS DE TREINOS (Contagem Filtrada para Resumo e Geral para Gráfico)
-    #     # ----------------------------------------------------
-    #     df_treinos = load_treinos_df()
-    #     df_treinos["Date_Obj"] = df_treinos["Date"].apply(get_date_obj)
-    #     df_treinos_filtrado_geral = df_treinos[df_treinos["Date_Obj"] >= data_inicial].copy()
-    #
-    #     # Para o Gráfico 2 (Contagem GERAL de treinos no período).
-    #     df_treinos_group = df_treinos_filtrado_geral.groupby("Date_Obj").size().reset_index(name='Contagem Treinos')
-    #
-    #     # --- Lógica de Filtro para o RESUMO Analítico ---
-    #     TREINO_MODALIDADE_COL = 'Tipo'  # <<< CORREÇÃO AQUI: USA A COLUNA 'Tipo'
-    #     df_treinos_para_resumo = df_treinos_filtrado_geral.copy()
-    #
-    #     # O filtro de treino só é aplicado se a coluna 'Tipo' existir e o filtro de modalidade estiver ativo
-    #     if modalidade_filter != "Todas as Modalidades":
-    #         if TREINO_MODALIDADE_COL in df_treinos_para_resumo.columns:
-    #             # FILTRA PELA MODALIDADE ESPECÍFICA usando a coluna 'Tipo'
-    #             df_treinos_para_resumo = df_treinos_para_resumo[
-    #                 df_treinos_para_resumo[TREINO_MODALIDADE_COL].astype(str) == modalidade_filter
-    #                 ]
-    #             total_treinos_resumo = df_treinos_para_resumo.shape[0]
-    #             modalidade_label = modalidade_filter
-    #
-    #             if total_treinos_resumo == 0:
-    #                 # Alerta apenas se o filtro estiver ativo e não houver dados.
-    #                 st.warning(
-    #                     f"⚠️ **{modalidade_filter}:** Nenhum treino do tipo **{modalidade_filter}** registrado no período. A contagem de treino no resumo será zero.")
-    #
-    #         else:
-    #             # Caso a coluna 'Tipo' não exista na planilha de treinos, o que geraria um KeyError.
-    #             total_treinos_resumo = df_treinos_filtrado_geral.shape[0]
-    #             modalidade_label = "Total (Coluna Tipo não encontrada no Treino)"
-    #             st.error(
-    #                 f"❌ **ERRO CRÍTICO:** O DataFrame de Treinos não tem a coluna '{TREINO_MODALIDADE_COL}'. A contagem será GERAL. Revise sua planilha de treinos.")
-    #     else:
-    #         # Se o filtro é 'Todas as Modalidades', usa a contagem geral.
-    #         total_treinos_resumo = df_treinos_filtrado_geral.shape[0]
-    #         modalidade_label = "Total Geral"
-    #
-    #     # Fim da Seção 2
-    #     # ----------------------------------------------------
-    #
-    #     # ----------------------------------------------------
-    #     # 3. PROCESSAR DADOS DE SONO (Média de Horas)
-    #     # ----------------------------------------------------
-    #     df_sono = load_sono_df()
-    #     df_sono["Date_Obj"] = df_sono.apply(get_sleep_date_obj, axis=1)
-    #     df_sono["Horas Sono"] = df_sono["Duração do Sono (h:min)"].apply(parse_duration_to_hours)
-    #     df_sono_filtrado = df_sono[df_sono["Date_Obj"] >= data_inicial].copy()
-    #     df_sono_group = df_sono_filtrado.groupby("Date_Obj")['Horas Sono'].mean().reset_index(name='Horas Sono')
-    #
-    #     # ----------------------------------------------------
-    #     # 4. CONSOLIDAR E GERAR GRÁFICO
-    #     # ----------------------------------------------------
-    #     if (('df_jogos_group' not in locals() or df_jogos_group.empty) and
-    #             ('df_treinos_group' not in locals() or df_treinos_group.empty) and
-    #             ('df_sono_group' not in locals() or df_sono_group.empty)):
-    #         st.warning("Não há dados de Jogo, Treino ou Sono no período selecionado.")
-    #     else:
-    #
-    #         # --- CORREÇÃO CRÍTICA DE NORMALIZAÇÃO DE DATAS ---
-    #         # Garante que todas as datas têm hora 00:00:00 para o merge funcionar corretamente
-    #         if 'df_jogos_group' in locals() and not df_jogos_group.empty:
-    #             df_jogos_group['Date_Obj'] = pd.to_datetime(df_jogos_group['Date_Obj']).dt.normalize()
-    #         if 'df_treinos_group' in locals() and not df_treinos_group.empty:
-    #             df_treinos_group['Date_Obj'] = pd.to_datetime(df_treinos_group['Date_Obj']).dt.normalize()
-    #         if 'df_sono_group' in locals() and not df_sono_group.empty:
-    #             df_sono_group['Date_Obj'] = pd.to_datetime(df_sono_group['Date_Obj']).dt.normalize()
-    #
-    #         # Garante que a coluna Date_Obj usada para merge está normalizada no df_jogos_filtrado
-    #         if not df_jogos_filtrado.empty:
-    #             df_jogos_filtrado['Date_Obj'] = pd.to_datetime(df_jogos_filtrado['Date_Obj']).dt.normalize()
-    #
-    #         # Reúne todas as datas disponíveis
-    #         all_dates = pd.to_datetime(pd.Series(
-    #             (df_jogos_group['Date_Obj'].tolist() if 'df_jogos_group' in locals() else []) +
-    #             (df_treinos_group['Date_Obj'].tolist() if 'df_treinos_group' in locals() else []) +
-    #             (df_sono_group['Date_Obj'].tolist() if 'df_sono_group' in locals() else [])
-    #         ).unique())
-    #
-    #         if len(all_dates) == 0:
-    #             st.warning("Não há dados para plotar.")
-    #         else:
-    #             # Cria o DataFrame final, AGORA ORDENADO POR DATA CRONOLÓGICA
-    #             df_final = pd.DataFrame({'Date_Obj': pd.Series(all_dates).sort_values()})
-    #
-    #             # FAZ A CONVERSÃO EXPLÍCITA E NOVA ORDENAÇÃO
-    #             df_final['Date_Obj'] = pd.to_datetime(df_final['Date_Obj']).dt.normalize()
-    #             df_final = df_final.sort_values(by='Date_Obj').reset_index(drop=True)
-    #
-    #             # Faz a junção (merge) dos 3 datasets
-    #             df_final = pd.merge(df_final, df_jogos_group if 'df_jogos_group' in locals() else pd.DataFrame(),
-    #                                 on='Date_Obj', how='left')
-    #             df_final = pd.merge(df_final, df_treinos_group if 'df_treinos_group' in locals() else pd.DataFrame(),
-    #                                 on='Date_Obj', how='left')
-    #             df_final = pd.merge(df_final, df_sono_group if 'df_sono_group' in locals() else pd.DataFrame(),
-    #                                 on='Date_Obj', how='left')
-    #             df_final = df_final.fillna(0)
-    #
-    #             # REORDENAÇÃO EXPLÍCITA FINAL PÓS-MERGE
-    #             df_final = df_final.sort_values(by='Date_Obj').reset_index(drop=True)
-    #
-    #             # Reagrupar o df_jogos_filtrado por data para obter a contagem de jogos (linhas)
-    #             df_contagem_jogos = df_jogos_filtrado.groupby(
-    #                 "Date_Obj"
-    #             ).size().reset_index(name='Contagem Jogos')
-    #
-    #             # Merge com df_final para trazer a contagem de jogos para CADA DIA
-    #             df_plot = pd.merge(df_final, df_contagem_jogos, on='Date_Obj', how='left').fillna({'Contagem Jogos': 0})
-    #             df_plot['Contagem Jogos'] = df_plot['Contagem Jogos'].astype(int)
-    #
-    #             # GARANTE A ORDEM DO DF_PLOT PELA DATA CORRETA
-    #             df_plot = df_plot.sort_values(by='Date_Obj').reset_index(drop=True)
-    #
-    #             # ----------------------------------------------------------------------
-    #             # GRÁFICO 1: DESEMPENHO (Gols e Assistências) - ALTAIR (FINAL FIX)
-    #             # ----------------------------------------------------------------------
-    #             st.subheader("Gráfico 1: Desempenho (Gols e Assistências)")
-    #
-    #             # Preparar os dados para o Altair
-    #             df_plot['Gols Marcados'] = pd.to_numeric(df_plot['Gols Marcados'], errors='coerce').fillna(0)
-    #             df_plot['Assistências'] = pd.to_numeric(df_plot['Assistências'], errors='coerce').fillna(0)
-    #
-    #             # Filtrar APENAS os dias que tiveram jogos (Contagem Jogos > 0)
-    #             df_desempenho_altair = df_plot[df_plot['Contagem Jogos'] > 0].copy()
-    #
-    #             if df_desempenho_altair.empty:
-    #                 st.info("Não há dados de Jogos registrados no período selecionado.")
-    #             else:
-    #                 # --- PREPARAÇÃO ALTAIR PARA EMPILHAMENTO ---
-    #                 df_desempenho_altair['Date_Obj'] = pd.to_datetime(df_desempenho_altair['Date_Obj']).dt.normalize()
-    #                 df_desempenho_altair['Data Jogo Formatada'] = df_desempenho_altair['Date_Obj'].dt.strftime('%d/%m')
-    #                 df_desempenho_altair = df_desempenho_altair.sort_values(by='Date_Obj').reset_index(drop=True)
-    #                 ordered_dates_domain = df_desempenho_altair['Data Jogo Formatada'].unique().tolist()
-    #
-    #                 # NOVO: Calcula o total de contribuições para a altura da barra e o limite Y
-    #                 df_desempenho_altair['Total Contribuicoes'] = df_desempenho_altair['Gols Marcados'] + \
-    #                                                               df_desempenho_altair['Assistências']
-    #
-    #                 # 1. Definição robusta do limite Y
-    #                 y_max_data = df_desempenho_altair['Total Contribuicoes'].max() if not df_desempenho_altair[
-    #                     'Total Contribuicoes'].empty else 0
-    #                 y_max_limit = max(y_max_data + 1.5,
-    #                                   3)  # Garante espaço para o rótulo (Nx) e um limite Y mínimo de 3
-    #
-    #                 # 2. Derreter o DataFrame (Formato longo necessário para barras empilhadas)
-    #                 df_melted = df_desempenho_altair.melt(
-    #                     id_vars=['Date_Obj', 'Contagem Jogos', 'Data Jogo Formatada', 'Total Contribuicoes'],
-    #                     value_vars=['Gols Marcados', 'Assistências'],
-    #                     var_name='Métrica',
-    #                     value_name='Valor'
-    #                 )
-    #                 df_melted['Contagem Jogos'] = df_melted['Contagem Jogos'].astype(int)
-    #                 chart_title = f"Desempenho em Jogos: Gols e Assistências ({modalidade_filter})"
-    #
-    #                 # --- CAMADAS DE VISUALIZAÇÃO ---
-    #
-    #                 # 3. GRÁFICO PRINCIPAL DE BARRAS EMPILHADAS
-    #                 chart_bars = alt.Chart(df_melted).mark_bar().encode(
-    #                     x=alt.X('Data Jogo Formatada:O',
-    #                             axis=alt.Axis(title='Data do Jogo', labelAngle=-45),
-    #                             scale=alt.Scale(domain=ordered_dates_domain)),
-    #
-    #                     # CHAVE PARA EMPILHAMENTO: Usa stack='zero' no Y e configura o eixo
-    #                     y=alt.Y('Valor:Q',
-    #                             title='Gols / Assistências',
-    #                             axis=alt.Axis(format='d', grid=False),  # Sem grade Y para um visual mais limpo
-    #                             scale=alt.Scale(domain=[0, y_max_limit]),
-    #                             stack="zero"),  # <-- EMPILHADO
-    #
-    #                     color=alt.Color('Métrica:N',
-    #                                     legend=alt.Legend(title="Métrica"),
-    #                                     scale=alt.Scale(domain=['Gols Marcados', 'Assistências'],
-    #                                                     range=['#E45757', '#FF8C00'])),
-    #                     order=alt.Order('Métrica', sort='descending'),
-    #                     # Gols (vermelho) no topo, Assistências (laranja) na base
-    #                     tooltip=[
-    #                         alt.Tooltip('Date_Obj:T', title='Data Completa', format='%d/%m/%Y'),
-    #                         alt.Tooltip('Métrica:N', title='Métrica'),
-    #                         alt.Tooltip('Valor:Q', title='Quantidade', format='.0f'),
-    #                         alt.Tooltip('Contagem Jogos:Q', title='Nº de Jogos no Dia')
-    #                     ]
-    #                 ).properties(
-    #                     title=chart_title
-    #                 )
-    #
-    #                 # 4. RÓTULOS DE TEXTO (Gols e Assistências) - Centralização Otimizada
-    #
-    #                 # Camada de Texto para GOLS (Vermelho - Topo)
-    #                 text_gols_layer = alt.Chart(df_melted).mark_text(
-    #                     align='center',
-    #                     baseline='middle',
-    #                     color='white',  # COR BRANCA (Contraste)
-    #                     fontWeight='bold',
-    #                     dy=15  # AUMENTADO: Move para baixo no segmento vermelho (centralização)
-    #                 ).encode(
-    #                     x='Data Jogo Formatada:O',
-    #                     y=alt.Y('Valor:Q', stack='zero'),
-    #                     text=alt.Text('Valor:Q', format='.0f'),
-    #                     # Só mostra se for Gol e o Valor for >= 1
-    #                     opacity=alt.condition((alt.datum.Métrica == 'Gols Marcados') & (alt.datum.Valor >= 1),
-    #                                           alt.value(1), alt.value(0))
-    #                 )
-    #
-    #                 # Camada de Texto para ASSISTÊNCIAS (Laranja - Base)
-    #                 text_assistencias_layer = alt.Chart(df_melted).mark_text(
-    #                     align='center',
-    #                     baseline='middle',
-    #                     color='white',  # COR BRANCA (Contraste)
-    #                     fontWeight='bold',
-    #                     dy=14  # AUMENTADO: Move para cima no segmento laranja (centralização)
-    #                 ).encode(
-    #                     x='Data Jogo Formatada:O',
-    #                     y=alt.Y('Valor:Q', stack='zero'),
-    #                     text=alt.Text('Valor:Q', format='.0f'),
-    #                     # Só mostra se for Assistência e o Valor for >= 1
-    #                     opacity=alt.condition((alt.datum.Métrica == 'Assistências') & (alt.datum.Valor >= 1),
-    #                                           alt.value(1), alt.value(0))
-    #                 )
-    #
-    #                 # 5. RÓTULOS (Nx) - Contagem de Jogos (Acima da Barra)
-    #                 df_multi_jogos_labels = df_desempenho_altair.copy()
-    #                 df_multi_jogos_labels['Label'] = '(' + df_multi_jogos_labels['Contagem Jogos'].astype(str) + 'x)'
-    #                 # Agora ValorMax usa o Total Contribuicoes (topo da barra empilhada)
-    #                 df_multi_jogos_labels['ValorMax'] = df_multi_jogos_labels['Total Contribuicoes']
-    #
-    #                 text_layer_nx = alt.Chart(df_multi_jogos_labels).mark_text(
-    #                     align='center',
-    #                     baseline='bottom',
-    #                     dy=-5,  # Pouco acima do topo da barra
-    #                     color='blue',
-    #                     fontWeight='bold'
-    #                 ).encode(
-    #                     x='Data Jogo Formatada:O',
-    #                     y=alt.Y('ValorMax:Q', stack=None, axis=None),
-    #                     text=alt.Text('Label:N'),
-    #                     order=alt.Order('Date_Obj', sort='ascending'),
-    #                     opacity=alt.condition(alt.datum['Contagem Jogos'] > 0, alt.value(1), alt.value(0))
-    #                 )
-    #
-    #                 # 6. COMBINAÇÃO FINAL
-    #                 final_chart = chart_bars + text_gols_layer + text_assistencias_layer + text_layer_nx
-    #
-    #                 st.markdown("<p style='font-size:12px; color:blue; margin-bottom: 0;'>\
-    #                                                                     🟦 indica o número de jogos disputados no dia.<br>\
-    #                                                                     **Rótulos brancos:** Não consta Gols/Assistencias.</p>",
-    #                             unsafe_allow_html=True)
-    #
-    #                 st.altair_chart(final_chart, use_container_width=True)
-    #             # ----------------------------------------------------
-    #             # GRÁFICO 2: RECUPERAÇÃO E FREQUÊNCIA (SONO E TREINOS) - MATPLOTLIB
-    #             # ----------------------------------------------------
-    #
-    #             st.subheader("Gráfico 2: Recuperação e Frequência (Sono e Treinos)")
-    #
-    #             # O df_final já está ordenado nesta etapa (na Seção 4)
-    #             x_labels_full = df_final['Date_Obj'].dt.strftime('%d/%m')
-    #             x_indices_full = np.arange(len(x_labels_full))
-    #
-    #             # O restante do Gráfico 2 segue inalterado.
-    #             # ...
-    #
-    #             # --- GRÁFICO 2: SONO (Eixo 1) E TREINOS (Eixo 2) ---
-    #             fig2, ax2 = plt.subplots(figsize=(14, 5))
-    #
-    #             # Eixo 1: SONO
-    #             ax2.plot(x_indices_full, df_final['Horas Sono'], label='Média Horas Sono', color='tab:green',
-    #                      marker='o',
-    #                      linestyle='-', linewidth=2)
-    #             ax2.set_ylabel('Horas de Sono', color='tab:green')
-    #             ax2.tick_params(axis='y', labelcolor='tab:green')
-    #             ax2.set_ylim(0, 12)  # CORREÇÃO: Aumenta o limite para evitar corte no valor máximo (10.0)
-    #
-    #             # Eixo 2: TREINOS
-    #             ax3 = ax2.twinx()
-    #             ax3.plot(x_indices_full, df_final['Contagem Treinos'], label='Contagem Treinos', color='tab:blue',
-    #                      marker='o', linestyle='-', linewidth=2)
-    #             ax3.set_ylabel('Contagem Treinos', color='tab:blue')
-    #             ax3.tick_params(axis='y', labelcolor='tab:blue')
-    #             ax3.set_ylim(bottom=0, top=df_final['Contagem Treinos'].max() * 1.5 + 1)
-    #
-    #             # Rótulos de Sono e Treinos
-    #             for i, txt in enumerate(df_final['Horas Sono']):
-    #                 if txt > 0:
-    #                     ax2.annotate(f'{txt:.1f}', (x_indices_full[i], df_final['Horas Sono'][i]),
-    #                                  textcoords="offset points", xytext=(0, 10), ha='center', fontsize=10,
-    #                                  color='tab:green', fontweight='bold')
-    #             for i, txt in enumerate(df_final['Contagem Treinos']):
-    #                 if txt > 0:
-    #                     ax3.annotate(f'{int(txt)}', (x_indices_full[i], df_final['Contagem Treinos'][i]),
-    #                                  textcoords="offset points", xytext=(0, -15), ha='center', fontsize=10,
-    #                                  color='tab:blue', fontweight='bold')
-    #
-    #             # Configuração do Eixo X
-    #             ax2.set_xticks(x_indices_full)
-    #             ax2.set_xticklabels(x_labels_full, rotation=45, ha='right')
-    #             ax2.set_xlabel("Data")
-    #             plt.grid(axis='y', linestyle='--', alpha=0.6)
-    #
-    #             lines, labels = ax2.get_legend_handles_labels()
-    #             lines3, labels3 = ax3.get_legend_handles_labels()
-    #             ax2.legend(lines + lines3, labels + labels3, loc='upper left')
-    #
-    #             st.pyplot(fig2)
-    #
-    #             #----------------------------------------------------------------
-    #
-    #
-    #
-    #             # ----------------------------------------------------
-    #             # 5. RESUMO E DIAGNÓSTICO DE FOCO
-    #             # ----------------------------------------------------
-    #             st.subheader("📊 Resumo Analítico e Foco da Semana")
-    #
-    #             # CÁLCULOS CHAVE
-    #             total_gols = df_final['Gols Marcados'].sum()
-    #             total_assistencias = df_final['Assistências'].sum()
-    #             # A contagem de dias_com_jogo (registros) foi corrigida no código anterior, mantida aqui.
-    #             dias_com_jogo = df_jogos_filtrado.shape[0]
-    #             dias_unicos_com_jogo = df_final[
-    #                 (df_final['Gols Marcados'] > 0) | (df_final['Assistências'] > 0)
-    #                 ].shape[0]
-    #
-    #             if dias_unicos_com_jogo == 0 and 'df_jogos_group' in locals() and not df_jogos_group.empty:
-    #                 dias_unicos_com_jogo = df_jogos_group.shape[0]
-    #
-    #             divisor_media = dias_unicos_com_jogo if dias_unicos_com_jogo > 0 else 1
-    #
-    #             media_gols_por_jogo = total_gols / divisor_media
-    #             media_assistencias_por_jogo = total_assistencias / divisor_media
-    #
-    #             # Média Geral de Recuperação
-    #             media_sono = df_final[df_final['Horas Sono'] > 0]['Horas Sono'].mean()
-    #
-    #             # total_treinos_resumo e modalidade_label já foram calculados corretamente na Seção 2.
-    #
-    #             # PARÂMETROS DE REFERÊNCIA
-    #             REF_SONO_MINIMO = 8.0
-    #             REF_TREINO_MINIMO = 2
-    #
-    #             # --------------------------------------------------------
-    #             # LÓGICA DE TEXTO PARA O RESUMO
-    #             # --------------------------------------------------------
-    #
-    #             # Gera o texto de análise da frequência
-    #             if total_treinos_resumo > 0:
-    #                 frequencia_analise_texto = (
-    #                     f"A frequência de treino (**{modalidade_label}**) foi **{'alta' if total_treinos_resumo >= REF_TREINO_MINIMO else 'baixa'}**, "
-    #                     f"com **{total_treinos_resumo} sessões** no período. Foco em manter a consistência."
-    #                 )
-    #             else:
-    #                 frequencia_analise_texto = f"Nenhum treino de **{modalidade_label}** registrado no período."
-    #
-    #             # --- ANÁLISE GERAL ---
-    #             analise_texto = []
-    #
-    #             # 1. ANÁLISE DE DESEMPENHO (GOLS E ASSISTÊNCIAS)
-    #             if total_gols > 0 or total_assistencias > 0:
-    #                 analise_texto.append(
-    #                     f"1. ANÁLISE DE DESEMPENHO: O desempenho em jogos ({modalidade_filter}) foi de **{total_gols} Gols** e **{total_assistencias} Assistências** no total, "
-    #                     f"com média de **{media_gols_por_jogo:.1f} Gols/Jogo** e **{media_assistencias_por_jogo:.1f} Assis./Jogo** nos {dias_com_jogo} jogos registrados.")
-    #             else:
-    #                 analise_texto.append(
-    #                     f"1. ANÁLISE DE DESEMPENHO: Não houve Gols ou Assistências registradas nos jogos ({modalidade_filter}) do período.")
-    #
-    #             # 2. ANÁLISE DE SONO/RECUPERAÇÃO (Mantida)
-    #             if pd.notna(media_sono):
-    #                 if media_sono >= REF_SONO_MINIMO:
-    #                     analise_texto.append(
-    #                         f"2. ANÁLISE DE SONO: A recuperação foi **excelente**: média de **{media_sono:.1f} horas de sono**, acima da meta de {REF_SONO_MINIMO}h. Isso sugere boa base de energia.")
-    #                 elif media_sono >= (REF_SONO_MINIMO - 0.5):
-    #                     analise_texto.append(
-    #                         f"2. ANÁLISE DE SONO: A recuperação foi **boa**: média de **{media_sono:.1f} horas de sono**. Manteve-se próximo do ideal ({REF_SONO_MINIMO}h).")
-    #                 else:
-    #                     analise_texto.append(
-    #                         f"2. ANÁLISE DE SONO: 🚨 **ALERTA DE FADIGA:** A média de sono foi de apenas **{media_sono:.1f} horas**. Esse déficit pode impactar negativamente a performance e o risco de lesões.")
-    #             else:
-    #                 analise_texto.append("2. ANÁLISE DE SONO: Dados de sono insuficientes para análise de recuperação.")
-    #
-    #             # 3. ANÁLISE DE FREQUÊNCIA DE TREINO (USA O TEXTO CORRIGIDO)
-    #             analise_texto.append(f"3. ANÁLISE DE FREQUÊNCIA DE TREINO: {frequencia_analise_texto}")
-    #
-    #             # --- CONCLUSÃO E FOCO ---
-    #             st.markdown("---")
-    #             st.markdown("#### Conclusão da Semana:")
-    #
-    #             # ATUALIZAÇÃO DO RESUMO: Usa total_treinos_resumo e modalidade_label
-    #             resumo_texto = f"""
-    #                                                                        **Resumo do Período Pesquisado:**
-    #
-    #                                                                        - **Jogos Registrados ({modalidade_filter}):** {dias_com_jogo}
-    #                                                                        - **Gols Marcados:** {int(total_gols)}
-    #                                                                        - **Assistências:** {int(total_assistencias)}
-    #                                                                        - **Sessões de Treino ({modalidade_label}):** {int(total_treinos_resumo)}
-    #                                                                        - **Média de Sono:** {media_sono:.1f} horas
-    #                                                                        """
-    #             st.info(resumo_texto)
-    #
-    #             # Lógica para conclusão (usando GOLS/ASSISTENCIAS > 0)
-    #             desempenho_positivo = total_gols > 0 or total_assistencias > 0
-    #
-    #             # A lógica de conclusão também deve usar o total_treinos_resumo
-    #             if desempenho_positivo and media_sono >= REF_SONO_MINIMO and total_treinos_resumo > 0:
-    #                 st.success(
-    #                     "✅ **Ótimo Equilíbrio!** O alto desempenho (Gols e Assistências) está correlacionado com a excelente recuperação (Sono) e boa frequência de treino. FOCO: Manter este padrão.")
-    #
-    #             elif media_sono < REF_SONO_MINIMO and desempenho_positivo:
-    #                 st.warning(
-    #                     "⚠️ **Rendimento em Risco!** Apesar do desempenho ofensivo (Gols/Assistências), a baixa média de sono pode indicar que o corpo está sendo exigido além da conta. FOCO: Priorizar o descanso imediatamente.")
-    #
-    #             elif media_sono < REF_SONO_MINIMO and not desempenho_positivo:
-    #                 media_sono_formatada = f"{media_sono:.1f}"
-    #                 st.error(
-    #                     f"❌ **Alerta Geral!** Baixo rendimento (sem Gols/Assistências) combinado com sono insuficiente (média de **{media_sono_formatada} horas**). O foco principal deve ser a **Recuperação e o Sono** para restaurar a energia.")
-    #
-    #             # ----------------------------------------------------
-    #             # 5.1. TABELA DE DETALHES DE GOLS POR ADVERSÁRIO (AJUSTADA E REORDENADA)
-    #             # ----------------------------------------------------
-    #             if total_gols > 0 or total_assistencias > 0:
-    #                 st.subheader("🎯 Detalhe do Desempenho Ofensivo")
-    #
-    #                 df_gols_filtrado = df_jogos_filtrado[
-    #                     (df_jogos_filtrado['Gols Marcados'] > 0) |
-    #                     (df_jogos_filtrado['Assistências'] > 0)
-    #                     ].copy()
-    #
-    #                 if not df_gols_filtrado.empty:
-    #
-    #                     # 2. Agrupa e calcula as colunas (Sintaxe de agg MAIS COMPATÍVEL)
-    #                     df_resumo_adversario = df_gols_filtrado.groupby('Visitante').agg(
-    #                         Gols=('Gols Marcados', 'sum'),
-    #                         Assistencias=('Assistências', 'sum'),
-    #                         Jogos=('Visitante', 'size'),
-    #                         # Pega a Data mais recente como um objeto DATETIME para ordenação correta
-    #                         Ultimo_Jogo_Raw=('Date_Obj', 'max')
-    #                     ).reset_index()
-    #
-    #                     # 3. Formata e Renomeia para exibição
-    #                     df_resumo_adversario = df_resumo_adversario.rename(columns={
-    #                         'Visitante': 'Adversário',
-    #                         'Gols': 'Total Gols',
-    #                         'Assistencias': 'Total Assistências',
-    #                         'Jogos': 'Nº de Jogos',
-    #                     })
-    #
-    #                     # 4. ORDENAÇÃO: ORDENA APENAS PELA DATA (MAIS RECENTE PARA MAIS ANTIGA)
-    #                     df_resumo_adversario = df_resumo_adversario.sort_values(
-    #                         by=['Ultimo_Jogo_Raw'],  # Lista contém APENAS a coluna de Data (objeto datetime)
-    #                         # False = Decrescente (do mais recente para o mais antigo)
-    #                         ascending=[False]
-    #                     )
-    #
-    #                     # 5. FORMATAÇÃO FINAL: Mapeia o objeto de data para a coluna final e formata para string (somente para exibição)
-    #                     df_resumo_adversario['Último Jogo'] = pd.to_datetime(
-    #                         df_resumo_adversario['Ultimo_Jogo_Raw']
-    #                     ).dt.strftime('%d/%m/%Y')
-    #
-    #                     # Remove a coluna temporária usada na ordenação
-    #                     df_resumo_adversario = df_resumo_adversario.drop(columns=['Ultimo_Jogo_Raw'])
-    #
-    #                     st.markdown(f"#### Gols e Assistências Contra Adversários ({modalidade_filter})")
-    #
-    #                     # NOVO: Define a ORDEM DAS COLUNAS SOLICITADA
-    #                     colunas_ordenadas = [
-    #                         'Último Jogo',
-    #                         'Adversário',
-    #                         'Total Gols',
-    #                         'Total Assistências',
-    #                         'Nº de Jogos'
-    #                     ]
-    #
-    #                     # Exibe apenas as colunas solicitadas
-    #                     st.dataframe(
-    #                         df_resumo_adversario[colunas_ordenadas],
-    #                         hide_index=True,
-    #                         use_container_width=True
-    #                     )
-    #                 else:
-    #                     st.info(
-    #                         f"Nenhum Adversário resultou em Gols ou Assistências em {modalidade_filter} neste período.")
-
-
 elif st.session_state["pagina"] == "dashboard":
 
     if st.button("⬅️ Voltar para Início"):
@@ -3006,10 +2694,23 @@ elif st.session_state["pagina"] == "dashboard":
     st.markdown("## 📊 Dashboard de Performance do Atleta")
     st.markdown("---")
 
-    # --- 2. CARREGAR DADOS COMPLETOS ---
-    df_jogos_full = garantir_score_jogo(load_registros())
-    df_treinos_full = load_treinos_df()
-    df_sono_full = load_sono_df()
+
+
+    df_treinos_full = load_treinos_df_firestore(ATLETA_ID)
+    if "Date" in df_treinos_full.columns:
+        df_treinos_full["Date_DT"] = pd.to_datetime(
+            df_treinos_full["Date"], dayfirst=True, errors="coerce"
+        )
+
+    df_treinos_full = normalizar_data_timezone(df_treinos_full, "Date_DT")
+
+    df_sono_full = load_sono_df_firestore(ATLETA_ID)
+    if "Data" in df_sono_full.columns:
+        df_sono_full["Data_DT"] = pd.to_datetime(
+            df_sono_full["Data"], dayfirst=True, errors="coerce"
+        )
+
+    df_sono_full = normalizar_data_timezone(df_sono_full, "Data_DT")
 
     # ATENÇÃO: Tratamento para evitar ArrowTypeError devido a formatos de data mistos.
     if 'Data' in df_jogos_full.columns:
@@ -3035,9 +2736,15 @@ elif st.session_state["pagina"] == "dashboard":
         # NORMALIZAÇÃO PARA TIPOS: Remove espaços, padroniza capitalização
         df_treinos_full[NOME_COLUNA_TIPO] = df_treinos_full[NOME_COLUNA_TIPO].astype(str).str.strip().str.title()
 
+    df_jogos_full = df_jogos_full.loc[:, ~df_jogos_full.columns.duplicated()]
+
     if 'Casa' in df_jogos_full.columns:
-        # NORMALIZAÇÃO PARA TIMES/JOGOS (Para garantir consistência nos filtros)
-        df_jogos_full['Casa'] = df_jogos_full['Casa'].astype(str).str.strip().str.title()
+        df_jogos_full['Casa'] = (
+            df_jogos_full['Casa']
+            .astype(str)
+            .str.strip()
+            .str.title()
+        )
 
     # --- 1. FILTRO DE PERÍODO E NOVOS FILTROS ---
 
@@ -3198,43 +2905,6 @@ elif st.session_state["pagina"] == "dashboard":
         except ValueError:
             return 0
         return 0
-
-
-    # Chamada para a função que também retorna os totais de V, E, D
-    def analisar_resultado(df):
-        if 'Resultado' not in df.columns or df.empty:
-            return 0, 0, 0, 0
-
-        df_temp = df.copy()
-        df_temp['Vitoria'] = df_temp['Resultado'].apply(lambda x: 1 if calcular_vitoria(x) == 1 else 0)
-        df_temp['Empate'] = df_temp['Resultado'].apply(
-            lambda x: 1 if str(x).strip().lower().replace(' ', '') in ['0x0', '1x1', '2x2', '3x3', '4x4', '5x5', '6x6',
-                                                                       '7x7', '8x8', '9x9'] else 0)
-
-        # Derrota = Não é vitória e não é empate
-        def calcular_derrota(row):
-            if row['Vitoria'] == 1 or row['Empate'] == 1:
-                return 0
-
-            # Recalcula a derrota com base no resultado (se a vitória for 0 e o empate 0)
-            try:
-                partes = str(row['Resultado']).strip().split('x')
-                if len(partes) == 2:
-                    gols_atleta = int(partes[0].strip())
-                    gols_adversario = int(partes[1].strip())
-                    return 1 if gols_atleta < gols_adversario else 0
-            except ValueError:
-                return 0
-            return 0
-
-        df_temp['Derrota'] = df_temp.apply(calcular_derrota, axis=1)
-
-        total_jogos_vd = df_temp.shape[0]
-        vitorias_vd = df_temp['Vitoria'].sum()
-        empates_vd = df_temp['Empate'].sum()
-        derrotas_vd = df_temp['Derrota'].sum()
-
-        return total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd
 
 
     # Chamada para obter os totais de V, E, D
@@ -3633,26 +3303,64 @@ elif st.session_state["pagina"] == "dashboard":
     # ======================================================
     if modo_scout == "🎯 Scout por jogo":
 
-
-
-        df_jogos["Data_DT"] = pd.to_datetime(
-            df_jogos["Data"], dayfirst=True, errors="coerce"
-        )
-        df_jogos = df_jogos.sort_values("Data_DT", ascending=False)
-
-        df_jogos["Jogo"] = (
-                df_jogos["Data"].astype(str) + " | " +
-                df_jogos["Casa"] + " x " +
-                df_jogos["Visitante"]
+        # 🔒 Garantia de Data_DT
+        df_jogos_full["Data_DT"] = pd.to_datetime(
+            df_jogos_full["Data"], dayfirst=True, errors="coerce"
         )
 
+        # 🔒 Remove jogos sem data válida
+        df_jogos_full = df_jogos_full.dropna(subset=["Data_DT"])
+
+        # 🔒 Preenche Casa / Visitante ausentes
+        df_jogos_full["Casa"] = (
+            df_jogos_full.get("Casa", "")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+        df_jogos_full["Visitante"] = (
+            df_jogos_full.get("Visitante", "")
+            .fillna("")
+            .astype(str)
+            .str.strip()
+        )
+
+        # 🔒 Remove jogos incompletos (evita NaN x NaN)
+        df_jogos_validos = df_jogos_full[
+            (df_jogos_full["Casa"] != "") &
+            (df_jogos_full["Visitante"] != "")
+            ].copy()
+
+        if df_jogos_validos.empty:
+            st.warning("⚠️ Nenhum jogo completo disponível para análise.")
+            st.stop()
+
+        # 🔢 Ordena por data
+        df_jogos_validos = df_jogos_validos.sort_values(
+            "Data_DT", ascending=False
+        )
+
+        # 🏷️ Cria rótulo do jogo
+        df_jogos_validos["Jogo"] = (
+                df_jogos_validos["Data_DT"].dt.strftime("%d/%m/%Y") + " | " +
+                df_jogos_validos["Casa"] + " x " +
+                df_jogos_validos["Visitante"]
+        )
+
+        # 🎛️ Selectbox
         jogo_sel = st.selectbox(
             "Selecione o jogo:",
-            df_jogos["Jogo"].unique(),
-            key="select_jogo_scout"
+            df_jogos_validos["Jogo"].unique()
         )
 
-        jogo = df_jogos[df_jogos["Jogo"] == jogo_sel].iloc[0]
+        jogo_df = df_jogos_validos[df_jogos_validos["Jogo"] == jogo_sel]
+
+        if jogo_df.empty:
+            st.error("❌ O jogo selecionado não foi encontrado.")
+            st.stop()
+
+        jogo = jogo_df.iloc[0]
 
         # ---------------- MÉTRICAS ----------------
         col1, col2, col3, col4 = st.columns(4)
@@ -3858,18 +3566,18 @@ elif st.session_state["pagina"] == "dashboard":
         # ======================================================
         st.markdown("### 📝 Análise Técnica do Jogo")
 
-        chutes_certos = jogo["Chutes"]
-        chutes_errados = jogo.get("Chutes Errados", 0)
+        chutes_certos = safe_int(jogo.get("Chutes"))
+        chutes_errados = safe_int(jogo.get("Chutes Errados"))
         finalizacoes = chutes_certos + chutes_errados
 
-        gols = int(jogo.get("Gols Marcados", 0))
-        assistencias = int(jogo.get("Assistências", 0)) if "Assistências" in jogo else 0
+        gols = safe_int(jogo.get("Gols Marcados"))
+        assistencias = safe_int(jogo.get("Assistências"))
 
-        passes_chave = jogo["Passes-chave"]
-        passes_errados = jogo.get("Passes Errados", 0)
+        passes_chave = safe_int(jogo.get("Passes-chave"))
+        passes_errados = safe_int(jogo.get("Passes Errados"))
 
-        desarmes = jogo["Desarmes"]
-        faltas = jogo["Faltas Sofridas"]
+        desarmes = safe_int(jogo.get("Desarmes"))
+        faltas = safe_int(jogo.get("Faltas Sofridas"))
 
         analise = []
 
@@ -3974,10 +3682,10 @@ elif st.session_state["pagina"] == "dashboard":
 
 
         # Minutos jogados no jogo
-        minutos_jogo = int(jogo.get("Minutos Jogados", 0))
+        minutos_jogo = safe_int(jogo.get("Minutos Jogados"))
 
         # Modalidade do jogo
-        modalidade_jogo = jogo["Condição do Campo"]
+        modalidade_jogo = str(jogo.get("Condição do Campo", "")).strip()
 
         # ======================================================
         # ⚖️ PESOS DE CARGA FÍSICA (BASE FISIOLÓGICA)
@@ -4107,8 +3815,8 @@ elif st.session_state["pagina"] == "dashboard":
         carga_jogos = 0
 
         for _, j in jogos_periodo.iterrows():
-            minutos = int(j.get("Minutos Jogados", 0))
-            modalidade_j = j.get("Condição do Campo", "")
+            minutos = safe_int(j.get("Minutos Jogados"))
+            modalidade_j = str(j.get("Condição do Campo", "")).strip()
             peso = PESO_JOGO_MODALIDADE.get(modalidade_j, 1.0)
 
             carga_jogos += minutos * peso
@@ -4123,7 +3831,7 @@ elif st.session_state["pagina"] == "dashboard":
         for _, j in jogos_periodo.iterrows():
             data_fmt = j["Data_DT"].strftime("%d/%m")
             modalidade_j = j.get("Condição do Campo", "N/D")
-            minutos = int(j.get("Minutos Jogados", 0))
+            minutos = safe_int(j.get("Minutos Jogados"))
 
             total_minutos_jogos += minutos
 
@@ -4182,7 +3890,7 @@ elif st.session_state["pagina"] == "dashboard":
 
         for _, j in jogos_periodo.iterrows():
             data_j = j["Data_DT"].date()
-            minutos = int(j.get("Minutos Jogados", 0))
+            minutos = safe_int(j.get("Minutos Jogados"))
             modalidade_j = j.get("Condição do Campo", "")
             peso = PESO_JOGO_MODALIDADE.get(modalidade_j, 1.0)
 
@@ -4205,10 +3913,12 @@ elif st.session_state["pagina"] == "dashboard":
 
 
         # -------- SAÚDE --------
-        df_saude = load_saude_df()
+        df_saude = load_saude_df_firestore(ATLETA_ID)
+
         df_saude["Data_DT"] = pd.to_datetime(
             df_saude["Data"], dayfirst=True, errors="coerce"
         )
+
         saude_periodo = df_saude[
             (df_saude["Data_DT"].dt.date >= inicio_janela) &
             (df_saude["Data_DT"].dt.date <= fim_janela)
@@ -4536,15 +4246,12 @@ elif st.session_state["pagina"] == "dashboard":
         if df_tend.empty or "Score_Jogo" not in df_tend.columns:
             st.info("Dados insuficientes para análise de tendência.")
         else:
-            df_tend["Data_DT"] = pd.to_datetime(
-                df_tend["Data"], dayfirst=True, errors="coerce"
-            )
-            df_tend = df_tend.sort_values("Data_DT")
+            df_tend = ordenar_jogos(df_tend)
 
             if len(df_tend) < 5:
                 st.info("São necessários pelo menos 5 jogos para análise de tendência.")
             else:
-                scores = df_tend.tail(5)["Score_Jogo"].tolist()
+                scores = df_tend.head(5)["Score_Jogo"].tolist()
 
                 ultimo = scores[-1]
                 penultimo = scores[-2]
@@ -4666,7 +4373,8 @@ elif st.session_state["pagina"] == "dashboard":
 
         st.markdown("#### 📋 Jogos considerados na análise")
 
-        df_ultimos_5 = df_tend.tail(5).copy()
+        df_ultimos_5 = df_tend.head(5).copy()
+
 
         df_ultimos_5["Jogo"] = (
                 df_ultimos_5["Casa"].astype(str) +
@@ -4674,7 +4382,7 @@ elif st.session_state["pagina"] == "dashboard":
                 df_ultimos_5["Visitante"].astype(str)
         )
 
-        df_ultimos_5["Data_fmt"] = df_ultimos_5["Data_DT"].dt.strftime("%d/%m")
+        df_ultimos_5["Data_fmt"] = df_ultimos_5["Data"].astype(str).str[:5]
 
         df_visual = df_ultimos_5[[
             "Data_fmt",
@@ -4705,7 +4413,7 @@ elif st.session_state["pagina"] == "dashboard":
         df_chart = df_ultimos_5.copy()
 
         df_chart["Rotulo"] = (
-                df_chart["Data_DT"].dt.strftime("%d/%m") +
+                df_chart["Data_fmt"] +
                 " | " +
                 df_chart["Casa"] +
                 " x " +
@@ -4994,10 +4702,6 @@ elif st.session_state["pagina"] == "dashboard":
             plt.tight_layout()
             st.pyplot(fig_sono)
             plt.close(fig_sono)
-
-            if st.button("🔄 Recarregar Dados da Planilha"):
-                st.info("Forçando recarregamento dos dados...")
-                st.rerun()
 
 
 # Fim da seção dos logos
