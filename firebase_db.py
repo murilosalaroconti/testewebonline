@@ -1,15 +1,24 @@
+import os
+import json
+import streamlit as st
 import firebase_admin
 from firebase_admin import credentials, firestore
 
 # ======================================================
-# 🔐 Inicialização ÚNICA do Firebase (anti-erro)
+# 🔐 Inicialização ÚNICA do Firebase (LOCAL + CLOUD)
 # ======================================================
 if not firebase_admin._apps:
-    cred = credentials.Certificate("firebase_key.json")
+    try:
+        # ☁️ STREAMLIT CLOUD (Secrets)
+        firebase_key = json.loads(st.secrets["firebase_key"])
+        cred = credentials.Certificate(firebase_key)
+    except Exception:
+        # 🖥️ LOCAL (arquivo)
+        cred = credentials.Certificate("firebase_key.json")
+
     firebase_admin.initialize_app(cred)
 
 db = firestore.client()
-
 # ======================================================
 # 📌 JOGOS
 # ======================================================
