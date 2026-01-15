@@ -399,7 +399,7 @@ if "jogo_em_andamento" not in st.session_state:
     st.session_state["jogo_em_andamento"] = False
 
 
-# BASE_DIR = Path(__file__).parent
+BASE_DIR = Path(__file__).parent
 # IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 
@@ -4986,5 +4986,6 @@ st.markdown(
     "<p style='text-align:center; color:#6B7280; font-size:13px;'>ScoutMind • Desenvolvido para evolução contínua do atleta.</p>",
     unsafe_allow_html=True
 )
+
 
 
