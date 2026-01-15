@@ -1,8 +1,8 @@
 import pandas as pd
 from firebase_db import carregar_treinos_firestore
 
-def load_treinos_df_firestore(atleta_id: str):
-    registros = carregar_treinos_firestore(atleta_id)
+def load_treinos_df_firestore(user_uid: str, atleta_id: str):
+    registros = carregar_treinos_firestore(user_uid, atleta_id)
 
     if not registros:
         return pd.DataFrame(columns=["Treino", "Date", "Tipo"])

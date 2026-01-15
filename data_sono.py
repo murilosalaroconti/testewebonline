@@ -1,4 +1,5 @@
 import pandas as pd
+import streamlit as st
 from firebase_db import carregar_sono_firestore
 
 COLUNAS_SONO = [
@@ -11,7 +12,9 @@ COLUNAS_SONO = [
 ]
 
 def load_sono_df_firestore(atleta_id: str):
-    registros = carregar_sono_firestore(atleta_id)
+    user_uid = st.session_state["user_uid"]
+
+    registros = carregar_sono_firestore(user_uid, atleta_id)
 
     if not registros:
         return pd.DataFrame(columns=COLUNAS_SONO)
@@ -24,7 +27,10 @@ def load_sono_df_firestore(atleta_id: str):
             "Hora Dormir": r.get("Hora Dormir", ""),
             "Hora Acordar": r.get("Hora Acordar", ""),
             "Duração do Sono (h:min)": r.get("Duração do Sono (h:min)", ""),
-            "Duração do Cochilo": r.get("Duração do Cochilo", ""),
+            "Duração do Cochilo": r.get(
+                "Duração do Cochilo",
+                r.get("Duração do Cochilo (h:min)", "0:00")
+            ),
             "Houve Cochilo": r.get("Houve Cochilo", "")
         })
 

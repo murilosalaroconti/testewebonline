@@ -28,15 +28,28 @@ from reportlab.platypus import (
 import json
 from firebase_admin import firestore
 from data_treinos import load_treinos_df_firestore
-from firebase_db import carregar_jogos_firestore, salvar_jogo_firestore
 from firebase_db import salvar_treino_firestore
 from data_sono import load_sono_df_firestore
 from firebase_db import salvar_sono_firestore
 from data_saude import load_saude_df_firestore
 from firebase_db import salvar_saude_firestore
+from firebase_db import salvar_jogo_firestore
+from data_jogos import load_jogos_df_firestore
 import unicodedata
-from firebase_auth import login_firebase, criar_usuario_firebase
+from firebase_auth import (
+    login_firebase,
+    criar_usuario_firebase,
+    verificar_trial_ativo,enviar_email_reset_senha
+)
 from firebase_atletas import listar_atletas, criar_atleta
+from firebase_trial import get_info_trial
+
+
+
+
+
+st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
+
 
 
 
@@ -46,28 +59,60 @@ def tela_login():
         <style>
         .login-container {
             display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 85vh;
+            justify-content: center;      /* centro horizontal */
+            align-items: flex-start;      /* topo */
+            padding-top: 24px;            /* controla altura do card */
         }
+
         .login-card {
             background-color: #0E1117;
-            padding: 40px;
+            padding: 24px 26px;           /* compacto */
             border-radius: 18px;
-            width: 420px;
+            width: 400px;
             box-shadow: 0 12px 30px rgba(0,0,0,0.7);
             text-align: center;
         }
+
         .login-title {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: bold;
             color: #00E5FF;
-            margin-bottom: 10px;
+            margin-bottom: 4px;
         }
+
         .login-subtitle {
-            font-size: 14px;
+            font-size: 13px;
             color: #AAAAAA;
-            margin-bottom: 25px;
+            margin-bottom: 8px;
+        }
+
+        /* 🔥 compacta rádio (Acesso) */
+        section[data-testid="stRadio"] {
+            margin-top: 16px !important;
+            margin-bottom: 6px !important;
+        }
+
+        /* 🔥 DIMINUI ALTURA DOS INPUTS */
+        div[data-baseweb="input"] input {
+            height: 36px !important;          /* altura menor */
+            padding: 6px 10px !important;     /* menos espaço interno */
+            font-size: 14px !important;       /* texto menor */
+        }
+
+        /* 🔥 labels (Email / Senha) mais compactas */
+        label {
+            margin-bottom: 2px !important;
+            font-size: 13px !important;
+        }
+
+        /* 🔥 espaço entre inputs */
+        div[data-baseweb="input"] {
+            margin-bottom: 8px !important;
+        }
+
+        /* 🔥 botão mais próximo */
+        div.stButton {
+            margin-top: 6px !important;
         }
         </style>
         """,
@@ -86,6 +131,8 @@ def tela_login():
         unsafe_allow_html=True
     )
 
+    st.markdown("<div style='height:32px'></div>", unsafe_allow_html=True)
+
     modo = st.radio(
         "Acesso",
         ["Já tenho cadastro", "Criar conta"],
@@ -94,6 +141,20 @@ def tela_login():
 
     email = st.text_input("Email", placeholder="seu@email.com")
     senha = st.text_input("Senha", type="password", placeholder="••••••••")
+
+    if st.button("🔁 Esqueceu a senha?"):
+        if not email:
+            st.warning("Informe o email para redefinir a senha.")
+        else:
+            enviado = enviar_email_reset_senha(email)
+
+            if enviado:
+                st.success(
+                    "📧 Enviamos um email para redefinição de senha.\n"
+                    "Verifique sua caixa de entrada."
+                )
+            else:
+                st.error("Não foi possível enviar o email. Verifique o email informado.")
 
     senha_confirma = None
     if modo == "Criar conta":
@@ -123,11 +184,19 @@ def tela_login():
                 st.error("Erro ao criar conta (email pode já existir)")
                 return False
 
+            # ✅ CRIA TRIAL APENAS AQUI (UMA VEZ)
+            criar_trial_usuario(user["uid"], user["email"])
+
         else:  # Já tenho cadastro
             user = login_firebase(email, senha)
 
             if not user:
-                st.error("Usuário não encontrado")
+                st.error("Usuário ou senha inválidos")
+                return False
+
+            # 🔒 VERIFICA SE TRIAL AINDA É VÁLIDO
+            if not verificar_trial_ativo(user["uid"]):
+                st.error("⛔ Seu período de teste expirou.")
                 return False
 
         st.session_state["user_logado"] = True
@@ -137,7 +206,6 @@ def tela_login():
         st.rerun()
 
     return False
-
 
 def tela_selecao_atleta():
     st.markdown("## 👤 Selecione um Atleta")
@@ -190,6 +258,10 @@ def normalizar_jogos_firestore_base(df: pd.DataFrame) -> pd.DataFrame:
         df["data"] = df["dados"]
         df.drop(columns=["dados"], inplace=True)
 
+    # 🔒 FIX DEFINITIVO PASSSES-CHAVE
+    if "passeschave" in df.columns:
+        df["Passes-chave"] = df["passeschave"]
+
     # 3️⃣ REMOVE DUPLICADAS DE VEZ
     df = df.loc[:, ~df.columns.duplicated(keep="first")]
 
@@ -207,26 +279,54 @@ def normalizar_jogos_firestore_base(df: pd.DataFrame) -> pd.DataFrame:
         "local": "Local",
         "condicaodocampo": "Condição do Campo",
 
-        # Scouts (🔥 AGORA COM PREFIXO)
-        "scout_chutes": "Chutes",
-        "scout_chuteserrados": "Chutes Errados",
-        "scout_desarmes": "Desarmes",
-        "scout_passeschave": "Passes-chave",
-        "scout_passeserrados": "Passes Errados",
-        "scout_faltassofridas": "Faltas Sofridas",
-        "scout_participacoesindiretas": "Participações Indiretas",
+        # ⚽ ESTATÍSTICAS (🔴 FALTAVA ISSO)
+        "golsmarcados": "Gols Marcados",
+        "assistencias": "Assistências",
+
+        # Scouts
+        "chutes": "Chutes",
+        "chuteserrados": "Chutes Errados",
+        "desarmes": "Desarmes",
+        "passeschave": "Passes-chave",
+        "passeserrados": "Passes Errados",
+        "faltassofridas": "Faltas Sofridas",
+        "participacoesindiretas": "Participações Indiretas",
     }
+
+    # 🔒 FIX ABSOLUTO Passes-chave (mata coluna fantasma)
+    for col in df.columns:
+        if col.replace("-", "").replace("-", "").lower() == "passeschave":
+            df["passeschave"] = df[col]
 
     df = df.rename(columns=MAPA)
 
-    # 5️⃣ CONTRATO FINAL
+    # 🔒 GARANTIA FINAL – Passes-chave nunca some
+    if "Passes-chave" not in df.columns:
+        candidatos = [c for c in df.columns if "passeschave" in c.lower()]
+        if candidatos:
+            df["Passes-chave"] = df[candidatos[0]]
+        else:
+            df["Passes-chave"] = 0
+
     ORDEM_FINAL = [
-        "Casa","Visitante","Data","Horário","Campeonato",
-        "Quadro Jogado","Minutos Jogados","Gols Marcados",
-        "Assistências","Chutes","Chutes Errados","Desarmes",
-        "Passes-chave","Passes Errados","Faltas Sofridas",
-        "Participações Indiretas","Resultado","Local",
-        "Condição do Campo"
+        # 🔹 Identificação
+        "Casa", "Visitante",
+        "Data", "Horário",
+        "Campeonato", "Quadro Jogado",
+
+        # 🔹 Estatísticas base
+        "Minutos Jogados",
+        "Gols Marcados",
+        "Assistências",
+
+        # 🔹 Scouts
+        "Chutes", "Chutes Errados",
+        "Passes-chave", "Passes Errados",
+        "Desarmes", "Faltas Sofridas",
+        "Participações Indiretas",
+
+        # 🔹 Contexto do jogo
+        "Resultado", "Local", "Condição do Campo"
     ]
 
     for col in ORDEM_FINAL:
@@ -260,47 +360,47 @@ def ordenar_jogos(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ===============================
-# 🔒 ESTADOS GLOBAIS DO APP
+# 🔐 SESSION STATE GLOBAL (BASE)
 # ===============================
-if "pagina" not in st.session_state:
-    st.session_state["pagina"] = "home"
+if "user_logado" not in st.session_state:
+    st.session_state["user_logado"] = False
+
+if "user_uid" not in st.session_state:
+    st.session_state["user_uid"] = None
 
 if "atleta_ativo" not in st.session_state:
     st.session_state["atleta_ativo"] = None
 
+if "pagina" not in st.session_state:
+    st.session_state["pagina"] = "home"
 
-if "user_logado" not in st.session_state:
-    st.session_state["user_logado"] = False
 
+# 3️⃣ 🔥 AGORA SIM O ATLETA EXISTE
+ATLETA_ID = st.session_state["atleta_ativo"]
+
+# 🔒 GARANTIA GLOBAL — df_sono SEMPRE EXISTE
+df_sono = load_sono_df_firestore(ATLETA_ID)
 
 # ===============================
 # 🧠 SCOUT TEMPORÁRIO (GARANTIA)
 # ===============================
 if "scout_temp" not in st.session_state:
     st.session_state["scout_temp"] = {
-        "Chutes": 0,
-        "Chutes Errados": 0,
-        "Desarmes": 0,
-        "Passes-chave": 0,
-        "Passes Errados": 0,
-        "Faltas Sofridas": 0,
-        "Participações Indiretas": 0
+        "chutes": 0,
+        "chutes_errados": 0,
+        "passes_chave": 0,
+        "passes_errados": 0,
+        "desarmes": 0,
+        "faltas_sofridas": 0,
+        "participacoes_indiretas": 0
     }
-
 
 if "jogo_em_andamento" not in st.session_state:
     st.session_state["jogo_em_andamento"] = False
 
-# 🔐 Atleta ativo (MVP)
-ATLETA_ID = st.session_state["atleta_ativo"]
-
 
 BASE_DIR = Path(__file__).parent
 IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
-
-st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
-
-
 
 
 # ----------------------
@@ -1081,6 +1181,46 @@ def inject_custom_css():
         .card-engajamento {{ background-color: #2196F3; }} /* Azul Escuro (Igual ao minutos, se preferir outra cor, ajuste) */
         .card-modalidade {{ background-color: #00BCD4; }} /* Azul Claro (Igual ao jogos, se preferir outra cor, ajuste) */
         .card-media-gols {{ background-color: #4CAF50; }} /* Verde Claro (Igual ao gols, se preferir outra cor, ajuste) */
+        
+        /* ============================
+        🎯 ESTADOS INTELIGENTES
+        ============================ */
+
+        .card-neutral {{
+            background-color: #475569 !important; /* cinza */
+        }}
+        
+        .card-ok {{
+            background-color: #16A34A !important; /* verde */
+        }}
+        
+        .card-warn {{
+            background-color: #F59E0B !important; /* amarelo */
+        }}
+        
+        .card-bad {{
+            background-color: #DC2626 !important; /* vermelho */
+        }}
+        
+        /* 7. Estilo dos títulos dos gráficos e outros textos no Dark Mode */
+        h3 {{
+            color: #E0E0E0;
+        }}
+        
+        /* Otimização de margens internas */
+        .card-jogos > p, .card-gols > p, .card-assistencias > p, 
+        .card-minutos > p, .card-treinos > p, .card-sono > p,
+        .card-derrotas > p, .card-vitorias > p, .card-avaliacao > p,
+        .card-engajamento > p, .card-modalidade > p, .card-media-gols > p {{
+            margin: 0;
+        }}
+        
+        .card-jogos > label, .card-gols > label, .card-assistencias > label, 
+        .card-minutos > label, .card-treinos > label, .card-sono > label,
+        .card-derrotas > label, .card-vitorias > label, .card-avaliacao > label,
+        .card-engajamento > label, .card-modalidade > label, .card-media-gols > label {{
+            margin: 0;
+        }}
 
         /* 7. Estilo dos títulos dos gráficos e outros textos no Dark Mode */
         h3 {{ color: #E0E0E0; }}
@@ -1164,54 +1304,6 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 🔥 FONTE ÚNICA DE DADOS — FIRESTORE
-# (SEMPRE EXECUTA AO INICIAR O APP)
-# ==========================================
-
-jogos_firestore = carregar_jogos_firestore(ATLETA_ID)
-df_jogos_full = pd.DataFrame(jogos_firestore)
-
-
-# 🔥 EXPLODE SCOUT
-if "scout" in df_jogos_full.columns:
-    scouts_df = pd.json_normalize(df_jogos_full["scout"])
-    scouts_df.columns = [f"scout_{c}" for c in scouts_df.columns]
-    df_jogos_full = df_jogos_full.drop(columns=["scout"])
-    df_jogos_full = pd.concat([df_jogos_full, scouts_df], axis=1)
-
-# 🔥 NORMALIZA NOMES
-df_jogos_full = normalizar_jogos_firestore_base(df_jogos_full)
-
-# 🔥 CORREÇÃO DA MODALIDADE  ← 🔴 ESTE ERA O FALTANTE
-if "Condição do Campo" in df_jogos_full.columns:
-    df_jogos_full["Condição do Campo"] = (
-        df_jogos_full["Condição do Campo"]
-        .astype(str)
-        .str.strip()
-        .replace({"nan": "", "None": ""})
-    )
-
-# 🔥 DATA
-df_jogos_full = garantir_coluna_data_dt(df_jogos_full)
-
-# 🔥 NUMÉRICOS
-SCOUT_NUM_COLS = [
-    "Chutes", "Chutes Errados", "Desarmes",
-    "Passes-chave", "Passes Errados",
-    "Faltas Sofridas", "Participações Indiretas"
-]
-
-for col in SCOUT_NUM_COLS:
-    if col in df_jogos_full.columns:
-        df_jogos_full[col] = pd.to_numeric(
-            df_jogos_full[col], errors="coerce"
-        ).fillna(0)
-
-# 🔥 SCORE
-df_jogos_full = garantir_score_jogo(df_jogos_full)
-
-
 
 # Sidebar com imagem e informações
 with st.sidebar:
@@ -1260,11 +1352,142 @@ if not st.session_state["user_logado"]:
     tela_login()
     st.stop()
 
+if st.session_state["user_logado"] and not st.session_state["atleta_ativo"]:
+    tela_selecao_atleta()
+    st.stop()
+
+if ATLETA_ID is None:
+    st.warning("Selecione ou crie um atleta para continuar.")
+    st.stop()
+
+# ===============================
+# 🔥 FONTE ÚNICA DE DADOS — FIRESTORE
+# ===============================
+
+df_jogos_full = load_jogos_df_firestore(ATLETA_ID)
+
+
+
+# 🛑 PROTEÇÃO
+if df_jogos_full.empty:
+    st.warning("Nenhum jogo carregado ainda.")
+    df_jogos_full = pd.DataFrame()
+else:
+
+    # 🔥 NORMALIZA NOMES
+    df_jogos_full = normalizar_jogos_firestore_base(df_jogos_full)
+
+    # 🔒 BLINDAGEM APÓS NORMALIZAÇÃO (LOCAL CORRETO)
+    for col in ["Data", "Casa", "Visitante"]:
+        if col in df_jogos_full.columns:
+            df_jogos_full[col] = (
+                df_jogos_full[col]
+                .astype(str)
+                .str.strip()
+                .replace({"nan": "", "None": ""})
+            )
+
+    # 🔥 CORREÇÃO DA MODALIDADE  ✅ AGORA NO LUGAR CERTO
+    if "Condição do Campo" in df_jogos_full.columns:
+        df_jogos_full["Condição do Campo"] = (
+            df_jogos_full["Condição do Campo"]
+            .astype(str)
+            .str.strip()
+            .replace({"nan": "", "None": ""})
+        )
+
+    # 🔥 DATA
+    df_jogos_full = garantir_coluna_data_dt(df_jogos_full)
+
+    # 🔥 NUMÉRICOS
+    SCOUT_NUM_COLS = [
+        "Chutes", "Chutes Errados", "Desarmes",
+        "Passes-chave", "Passes Errados",
+        "Faltas Sofridas", "Participações Indiretas"
+    ]
+
+    for col in SCOUT_NUM_COLS:
+        if col in df_jogos_full.columns:
+            df_jogos_full[col] = pd.to_numeric(
+                df_jogos_full[col], errors="coerce"
+            ).fillna(0)
+
+    # 🔥 SCORE
+    df_jogos_full = garantir_score_jogo(df_jogos_full)
+
 
 #--------------------------------------------
 #Pagina Home
+# Página Home
 if st.session_state["pagina"] == "home":
 
+    trial_info = get_info_trial(st.session_state["user_uid"])
+
+    if trial_info:
+        if trial_info["ativo"]:
+            st.markdown(
+                f"""
+                <style>
+                    .trial-wrapper {{
+                        display: flex;
+                        justify-content: center;
+                        margin-bottom: 20px;
+                    }}
+                    .trial-banner {{
+                        background-color: #4A4F1D;
+                        color: #F1F5C1;
+                        padding: 14px 22px;
+                        border-radius: 10px;
+                        width: 80%;
+                        max-width: 900px;
+                        font-size: 15px;
+                        box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+                        text-align: center;       /* 👈 AQUI */
+                        line-height: 1.6;         /* 👈 melhora leitura */
+                    }}
+                </style>
+
+                <div class="trial-wrapper">
+                    <div class="trial-banner">
+                        🧪 <b>Plano de Teste Ativo</b><br>
+                        ⏳ Restam {trial_info['dias_restantes']} dias de acesso gratuito.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                """
+                <div style="
+                    display:flex;
+                    justify-content:center;
+                    margin-top:20px;
+                ">
+                    <div style="
+                        background-color:#3A1515;
+                        color:#FFD6D6;
+                        padding:16px 22px;
+                        border-radius:10px;
+                        width:80%;
+                        max-width:900px;
+                        box-shadow:0 4px 12px rgba(0,0,0,0.4);
+                    ">
+                        🔒 <b>Período de teste encerrado</b><br>
+                        Entre em contato para continuar usando.
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            st.stop()
+
+
+    # =========================
+    # 🔒 VALORES PADRÃO (ANTI-CRASH)
+    # =========================
+    classe_jogo = "card-neutral"
+    classe_sono = "card-neutral"
 
 
     # =========================
@@ -1281,6 +1504,21 @@ if st.session_state["pagina"] == "home":
     else:
         nota_ultimo_jogo = "—"
 
+    # 🎯 Estado do card Último Jogo
+    if nota_ultimo_jogo == "—":
+        classe_jogo = "card-neutral"
+    else:
+        try:
+            nota = float(nota_ultimo_jogo)
+            if nota >= 7:
+                classe_jogo = "card-ok"
+            elif nota >= 5:
+                classe_jogo = "card-warn"
+            else:
+                classe_jogo = "card-bad"
+        except:
+            classe_jogo = "card-neutral"
+
     st.markdown("## 🧠 ScoutMind")
     st.markdown("### Entenda seu jogo. Evolua com inteligência.")
     st.markdown(
@@ -1292,8 +1530,11 @@ if st.session_state["pagina"] == "home":
     # =========================
     # 📌 CARREGAR OUTROS DADOS
     # =========================
-    df_treinos = load_treinos_df_firestore(ATLETA_ID)
-    df_sono = load_sono_df_firestore(ATLETA_ID)
+    df_treinos = load_treinos_df_firestore(
+        st.session_state["user_uid"],
+        ATLETA_ID
+    )
+    load_sono_df_firestore(ATLETA_ID)
 
     if "Date" in df_treinos.columns:
         df_treinos["Date_DT"] = pd.to_datetime(df_treinos["Date"], dayfirst=True, errors="coerce")
@@ -1318,6 +1559,20 @@ if st.session_state["pagina"] == "home":
             m = int((horas - h) * 60)
             sono_ontem_txt = f"{h}h{m:02d}"
 
+    # 🎯 Estado do card Sono
+    if sono_ontem_txt == "Sem registro":
+        classe_sono = "card-neutral"
+    else:
+        horas = parse_duration_to_hours(
+            sono_ontem_txt.replace("h", ":").replace("m", "")
+        )
+        if horas >= 8:
+            classe_sono = "card-ok"
+        elif horas >= 6:
+            classe_sono = "card-warn"
+        else:
+            classe_sono = "card-bad"
+
     # =========================
     # 💪 TREINOS (7 DIAS)
     # =========================
@@ -1327,6 +1582,39 @@ if st.session_state["pagina"] == "home":
         treinos_7d = df_treinos[
             df_treinos["Date_Date"] >= (hoje - pd.Timedelta(days=7))
         ].shape[0]
+
+        # =========================
+        # 🎯 ESTADO DOS CARDS (HOME)
+        # =========================
+
+        # Último jogo
+        if nota_ultimo_jogo == "—":
+            classe_jogo = "card-neutral"
+        else:
+            try:
+                nota = float(nota_ultimo_jogo)
+                if nota >= 7:
+                    classe_jogo = "card-ok"
+                elif nota >= 5:
+                    classe_jogo = "card-warn"
+                else:
+                    classe_jogo = "card-bad"
+            except:
+                classe_jogo = "card-neutral"
+
+        # Sono
+        if sono_ontem_txt == "Sem registro":
+            classe_sono = "card-neutral"
+        else:
+            horas = parse_duration_to_hours(
+                sono_ontem_txt.replace("h", ":").replace("m", "")
+            )
+            if horas >= 8:
+                classe_sono = "card-ok"
+            elif horas >= 6:
+                classe_sono = "card-warn"
+            else:
+                classe_sono = "card-bad"
 
     # =========================
     # =========================
@@ -1353,7 +1641,7 @@ if st.session_state["pagina"] == "home":
 
     with col1:
         st.markdown(f"""
-        <div class="card-jogos">
+        <div class="card-jogos {classe_jogo}">
             ⚽ Último jogo
             <p>{nota_ultimo_jogo}</p>
             <label>Nota</label>
@@ -1362,7 +1650,7 @@ if st.session_state["pagina"] == "home":
 
     with col2:
         st.markdown(f"""
-        <div class="card-sono">
+        <div class="card-sono {classe_sono}">
             🌙 Sono ontem
             <p>{sono_ontem_txt}</p>
             <label>Duração</label>
@@ -1438,9 +1726,13 @@ elif st.session_state["pagina"] == "jogos":
     # ----------------------------------------------------------------------
     df_temp = df_jogos_full.copy()
 
+    # 🔥 GARANTE COLUNAS OBRIGATÓRIAS MESMO SEM JOGOS
+    for col in ["Casa", "Visitante", "Campeonato", "Local"]:
+        if col not in df_temp.columns:
+            df_temp[col] = ""
+
     times_casa = df_temp["Casa"].astype(str).unique()
     times_visitante = df_temp["Visitante"].astype(str).unique()
-
 
     opcoes_times = set(
         t.strip() for t in list(times_casa) + list(times_visitante)
@@ -1554,21 +1846,32 @@ elif st.session_state["pagina"] == "jogos":
             "Faltas Sofridas", "Participações Indiretas"
         ]
 
-        for k in SCOUT_KEYS:
-            if k not in st.session_state:
-                st.session_state[k] = 0
+        SCOUT_LABEL_TO_KEY = {
+            "Chutes": "chutes",
+            "Chutes Errados": "chutes_errados",
+            "Passes-chave": "passes_chave",
+            "Passes Errados": "passes_errados",
+            "Desarmes": "desarmes",
+            "Faltas Sofridas": "faltas_sofridas",
+            "Participações Indiretas": "participacoes_indiretas"
+        }
+
+
+
 
 
 
         # ------------------ FORMULÁRIO ------------------
 
-        def incrementar_scout(nome):
-            st.session_state["scout_temp"][nome] += 1
+        def incrementar_scout(label):
+            key = SCOUT_LABEL_TO_KEY[label]
+            st.session_state["scout_temp"][key] += 1
 
 
-        def decrementar_scout(nome):
-            if st.session_state["scout_temp"][nome] > 0:
-                st.session_state["scout_temp"][nome] -= 1
+        def decrementar_scout(label):
+            key = SCOUT_LABEL_TO_KEY[label]
+            if st.session_state["scout_temp"][key] > 0:
+                st.session_state["scout_temp"][key] -= 1
 
 
         st.markdown("### 📊 Scout Ao Vivo")
@@ -1592,7 +1895,8 @@ elif st.session_state["pagina"] == "jogos":
                     <div class="scout-card {classe}">
                         <div class="scout-title">{scout}</div>
                         <div class="scout-value">
-                            {st.session_state["scout_temp"][scout]}
+                            {st.session_state["scout_temp"][SCOUT_LABEL_TO_KEY[scout]]
+}
                         </div>
                     </div>
                     """,
@@ -1693,24 +1997,38 @@ elif st.session_state["pagina"] == "jogos":
 
                 }
                 jogo_firestore = {
+                    # 📅 Dados principais do jogo
                     "Data": data.strftime("%d/%m/%Y"),
+                    "Horário": horario.strftime("%H:%M"),
+                    "Quadro Jogado": quadro,
+
                     "Campeonato": novo["Campeonato"],
                     "Casa": novo["Casa"],
                     "Visitante": novo["Visitante"],
-                    "Condição do Campo": modalidade,
                     "Local": novo["Local"],
+                    "Condição do Campo": modalidade,
+
+                    # 📊 Estatísticas individuais
                     "Minutos Jogados": minutos,
+                    "Gols Marcados": gols,
+                    "Assistências": assistencias,
+
+                    # 🏁 Resultado
                     "Resultado": f"{gols_atleta}x{gols_adversario}",
 
-                    # 🔥 ORGANIZAÇÃO DEFINITIVA
-                    "criado_em": firestore.SERVER_TIMESTAMP,
+                    # 🎯 Scout (map)
+                    "scout": st.session_state["scout_temp"].copy(),
 
-                    # 🎯 SCOUT (ÚNICA FONTE DE VERDADE)
-                    "scout": st.session_state["scout_temp"].copy()
+                    # 🕒 Controle interno
+                    "criado_em": firestore.SERVER_TIMESTAMP,
                 }
 
                 with st.spinner("💾 Salvando jogo..."):
-                    salvar_jogo_firestore(ATLETA_ID, jogo_firestore)
+                    salvar_jogo_firestore(
+                        st.session_state["user_uid"],
+                        ATLETA_ID,
+                        jogo_firestore
+                    )
 
                 # 🔥 LIMPA APENAS O SCOUT BACKEND
                 for k in st.session_state["scout_temp"]:
@@ -1735,18 +2053,34 @@ elif st.session_state["pagina"] == "jogos":
 
             # Limita colunas para visualização
             colunas_exibir = [
-                "Data", "Casa", "Visitante",
-                "Campeonato", "Condição do Campo",
-                "Minutos Jogados", "Resultado",
+                # 🔹 Identificação
+                "Data",
+                "Horário",
+                "Casa",
+                "Visitante",
 
-                # 🔥 SCOUTS
+                # 🔹 Contexto
+                "Campeonato",
+                "Quadro Jogado",
+                "Condição do Campo",
+                "Local",
+
+                # 🔹 Estatísticas principais
+                "Minutos Jogados",
+                "Gols Marcados",
+                "Assistências",
+
+                # 🔹 Resultado
+                "Resultado",
+
+                # 🔹 Scouts
                 "Chutes",
                 "Chutes Errados",
                 "Passes-chave",
                 "Passes Errados",
                 "Desarmes",
                 "Faltas Sofridas",
-                "Participações Indiretas"
+                "Participações Indiretas",
             ]
 
             colunas_exibir = [c for c in colunas_exibir if c in df_view.columns]
@@ -1782,7 +2116,10 @@ elif st.session_state["pagina"] == "treinos":
         st.rerun()
 
     st.header("🎯Treinos")
-    df_treinos = load_treinos_df_firestore("bernardo_miranda")
+    df_treinos = load_treinos_df_firestore(
+        st.session_state["user_uid"],
+        ATLETA_ID
+    )
 
     # --- NOVO BLOCO DE NORMALIZAÇÃO DE DADOS (CRUCIAL PARA UNIFICAR NOMES) ---
     NOME_COLUNA_TREINO = 'Treino'
@@ -1883,8 +2220,9 @@ elif st.session_state["pagina"] == "treinos":
                 }
 
                 salvar_treino_firestore(
-                    atleta_id=ATLETA_ID,
-                    treino=treino_firestore
+                    st.session_state["user_uid"],
+                    ATLETA_ID,
+                    treino_firestore
                 )
 
                 st.success("Registro de Treino adicionado! Recarregando lista...")
@@ -2128,11 +2466,13 @@ elif st.session_state["pagina"] == "sono":
 
     st.header("💤Controle de Sono")
 
+    COL_DURACAO_COCHILO = "Duração do Cochilo"
+    COL_HOUVE_COCHILO = "Houve Cochilo"
     # AS CONSTANTES JÁ FORAM DEFINIDAS NO TOPO. USAMOS ELAS AQUI.
     COLUNAS_COCHILO_NAMES = [COL_DURACAO_COCHILO, COL_HOUVE_COCHILO]
 
     # Garante que a função load_sono_df() está carregando o DF aqui
-    df_sono = load_sono_df_firestore(ATLETA_ID)
+    load_sono_df_firestore(ATLETA_ID)
 
 
 
@@ -2181,8 +2521,9 @@ elif st.session_state["pagina"] == "sono":
                 }
 
                 salvar_sono_firestore(
-                    atleta_id=ATLETA_ID,
-                    sono=sono_firestore
+                    st.session_state["user_uid"],
+                    ATLETA_ID,
+                    sono_firestore
                 )
 
                 st.success("Registro de sono salvo com sucesso!")
@@ -2261,10 +2602,8 @@ elif st.session_state["pagina"] == "sono":
 
     ano_filter = st.selectbox("Filtrar por ano", anos_disponiveis)
 
-
-
     if st.button("Gerar Gráfico (Sono)"):
-        df_sono = load_sono_df_firestore(ATLETA_ID)
+        load_sono_df_firestore(ATLETA_ID)
 
 
         # ===============================
@@ -2380,6 +2719,35 @@ elif st.session_state["pagina"] == "sono":
             if col not in df_sono.columns:
                 df_sono[col] = '0:00' if col == COL_DURACAO_COCHILO else 'Não'
 
+        # ===============================
+        # 🔧 PREPARA DF PARA O GRÁFICO (ORDEM CORRETA)
+        # ===============================
+        df_sono_plot = df_sono.copy()
+
+        # Converte Data para datetime REAL
+        df_sono_plot["Data_DT"] = pd.to_datetime(
+            df_sono_plot["Data"],
+            dayfirst=True,
+            errors="coerce"
+        )
+
+        # Remove datas inválidas
+        df_sono_plot = df_sono_plot.dropna(subset=["Data_DT"])
+
+        # Aplica filtros (MESMOS do gráfico)
+        if mes_filter_s:
+            df_sono_plot = df_sono_plot[
+                df_sono_plot["Data_DT"].dt.month == int(mes_filter_s)
+                ]
+
+        if ano_filter:
+            df_sono_plot = df_sono_plot[
+                df_sono_plot["Data_DT"].dt.year == int(ano_filter)
+                ]
+
+        # 🔥 PASSO CRÍTICO — ORDENA POR DATA
+        df_sono_plot = df_sono_plot.sort_values("Data_DT")
+
         if df_sono.empty:
             st.info("Nenhum registro de sono.")
         else:
@@ -2388,7 +2756,7 @@ elif st.session_state["pagina"] == "sono":
             indicador_cochilo = []
             horarios_dormir = []
 
-            for _, row in df_sono.iterrows():
+            for _, row in df_sono_plot.iterrows():
 
 
 
@@ -2572,8 +2940,9 @@ elif st.session_state["pagina"] == "saude":
         }
 
         salvar_saude_firestore(
-            atleta_id=ATLETA_ID,
-            saude=saude_firestore
+            st.session_state["user_uid"],
+            ATLETA_ID,
+            saude_firestore
         )
 
         st.success("Registro de saúde salvo com sucesso ✅")
@@ -2623,69 +2992,9 @@ elif st.session_state["pagina"] == "saude":
             hide_index=True
         )
 
-    st.markdown("---")
-    st.subheader("📄 Documentos de Saúde")
-    st.markdown(
-        "Aqui você pode anexar relatórios da nutricionista, exames ou avaliações físicas."
-    )
-
-    descricao_pdf = st.text_input(
-        "📝 Descrição do documento",
-        placeholder="Ex: Avaliação nutricional - Janeiro 2025"
-    )
-
-    link_documento = st.text_input(
-        "🔗 Link do documento (Google Drive)",
-        placeholder="Cole aqui o link do PDF no Drive"
-    )
-
-    salvar_pdf = st.button("💾 Salvar Documento")
-
-    if salvar_pdf:
-        if descricao_pdf.strip() == "" or link_documento.strip() == "":
-            st.warning("Informe a descrição e o link do documento.")
-        else:
-            client = get_client()
-            sheet = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
-
-            hoje = datetime.now().strftime("%d/%m/%Y")
-            nome_arquivo = f"{hoje}_{descricao_pdf.replace(' ', '_')}"
-
-            sheet.append_row([
-                hoje,
-                descricao_pdf,
-                nome_arquivo,
-                link_documento
-            ])
-
-            st.success("Documento registrado com sucesso 📄✅")
-
-    st.markdown("---")
-    st.subheader("📂 Documentos Registrados")
-
-    client = get_client()
-    sheet_docs = client.open("Registro_Atleta_Bernardo").worksheet("saude_docs")
-    dados_docs = sheet_docs.get_all_records()
-
-    if not dados_docs:
-        st.info("Nenhum documento registrado ainda.")
-    else:
-        df_docs = pd.DataFrame(dados_docs)
-
-        st.markdown("### 📄 Abrir documentos")
-
-        df_docs["Data_dt"] = pd.to_datetime(df_docs["Data"], dayfirst=True, errors="coerce")
-        df_docs = df_docs.sort_values("Data_dt", ascending=False)
-
-        for _, row in df_docs.iterrows():
-            if row.get("Link"):
-                st.markdown(
-                    f"🔗 **{row['Descricao']}**  \n"
-                    f"[Abrir PDF]({row['Link']})",
-                    unsafe_allow_html=True
-                )
 
 elif st.session_state["pagina"] == "dashboard":
+
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -2696,7 +3005,12 @@ elif st.session_state["pagina"] == "dashboard":
 
 
 
-    df_treinos_full = load_treinos_df_firestore(ATLETA_ID)
+    df_treinos_full = load_treinos_df_firestore(
+        st.session_state["user_uid"],
+        ATLETA_ID
+    )
+
+
     if "Date" in df_treinos_full.columns:
         df_treinos_full["Date_DT"] = pd.to_datetime(
             df_treinos_full["Date"], dayfirst=True, errors="coerce"
@@ -2704,7 +3018,11 @@ elif st.session_state["pagina"] == "dashboard":
 
     df_treinos_full = normalizar_data_timezone(df_treinos_full, "Date_DT")
 
-    df_sono_full = load_sono_df_firestore(ATLETA_ID)
+    df_sono_full = load_sono_df_firestore(
+        ATLETA_ID
+    )
+
+
     if "Data" in df_sono_full.columns:
         df_sono_full["Data_DT"] = pd.to_datetime(
             df_sono_full["Data"], dayfirst=True, errors="coerce"
@@ -4245,34 +4563,35 @@ elif st.session_state["pagina"] == "dashboard":
 
         if df_tend.empty or "Score_Jogo" not in df_tend.columns:
             st.info("Dados insuficientes para análise de tendência.")
+
+        elif len(df_tend) < 5:
+            st.info("São necessários pelo menos 5 jogos para análise de tendência.")
+
         else:
             df_tend = ordenar_jogos(df_tend)
+            scores = df_tend.head(5)["Score_Jogo"].tolist()
 
-            if len(df_tend) < 5:
-                st.info("São necessários pelo menos 5 jogos para análise de tendência.")
-            else:
-                scores = df_tend.head(5)["Score_Jogo"].tolist()
+            ultimo = scores[-1]
+            penultimo = scores[-2]
+            antepenultimo = scores[-3]
 
-                ultimo = scores[-1]
-                penultimo = scores[-2]
-                antepenultimo = scores[-3]
-                media_5 = sum(scores) / len(scores)
+            media_5 = sum(scores) / len(scores)
 
-                jogos_ruins = sum(1 for s in scores if s < 4.5)
-                jogos_bons = sum(1 for s in scores if s >= 6)
+            jogos_ruins = sum(1 for s in scores if s < 4.5)
+            jogos_bons = sum(1 for s in scores if s >= 6)
 
-                queda_continua = ultimo < penultimo < antepenultimo
-                subida_continua = ultimo > penultimo > antepenultimo
+            queda_continua = ultimo < penultimo < antepenultimo
+            subida_continua = ultimo > penultimo > antepenultimo
 
             oscilacao = (
                     max(scores) - min(scores) >= 3
                     and not subida_continua
                     and not queda_continua
             )
-            # ===============================
-            # 🎯 CLASSIFICAÇÃO DE NÍVEL TÉCNICO
-            # ===============================
 
+            # ===============================
+            # 🎯 CLASSIFICAÇÃO DE NÍVEL
+            # ===============================
             if media_5 >= 8:
                 nivel_label = "🔵 Rendimento altíssimo"
             elif media_5 >= 6:
@@ -4283,87 +4602,42 @@ elif st.session_state["pagina"] == "dashboard":
                 nivel_label = "🔴 Rendimento baixo"
 
             # ===============================
-            # 🧭 CLASSIFICAÇÃO DE FORMA
+            # 🧭 FORMA
             # ===============================
-
-            # 🟢 ALTA PERFORMANCE
             if media_5 >= 8 and jogos_bons >= 3 and ultimo >= 7:
                 forma_label = "🟢 Alta performance"
                 forma_cor = "#2E7D32"
-                forma_texto = (
-                    "O atleta vive um momento de alto rendimento técnico, "
-                    "com atuações consistentes e impacto elevado nas partidas recentes."
-                )
-
-            # 🔴 QUEDA TÉCNICA
+                forma_texto = "O atleta vive um momento de alto rendimento técnico."
             elif media_5 < 4.5 and jogos_ruins >= 3 and queda_continua:
                 forma_label = "🔴 Queda técnica"
                 forma_cor = "#C62828"
-                forma_texto = (
-                    "O desempenho técnico apresenta queda progressiva nos jogos mais recentes, "
-                    "indicando uma fase de baixo rendimento."
-                )
-
-            # 📈 EVOLUÇÃO
-            elif subida_continua and ultimo >= media_5 and media_5 >= 4.5:
+                forma_texto = "Há queda progressiva no rendimento técnico."
+            elif subida_continua:
                 forma_label = "⬆️ Em evolução técnica"
                 forma_cor = "#00E676"
-                forma_texto = (
-                    "Apesar de oscilações anteriores, o atleta demonstra melhora contínua "
-                    "no desempenho técnico recente."
-                )
-
-            # 🎢 OSCILAÇÃO
+                forma_texto = "O atleta apresenta evolução técnica recente."
             elif oscilacao:
                 forma_label = "➡️ Oscilação técnica"
                 forma_cor = "#FFC107"
-                forma_texto = (
-                    "O desempenho recente apresenta variações significativas, "
-                    "alternando jogos de bom nível com quedas técnicas."
-                )
-
-            # ➡️ ESTÁVEL (SOMENTE SE NÃO FOR RUIM)
-            elif media_5 >= 4.5:
+                forma_texto = "O rendimento apresenta variações."
+            else:
                 forma_label = "➡️ Estável"
                 forma_cor = "#9E9E9E"
-                forma_texto = (
-                    "O atleta mantém um padrão técnico relativamente constante, "
-                    "sem grandes variações no desempenho recente."
-                )
+                forma_texto = "O atleta mantém padrão técnico estável."
 
-            # 🔴 RUIM SEM QUEDA CONTÍNUA
-            else:
-                forma_label = "🔴 Baixo rendimento"
-                forma_cor = "#B71C1C"
-                forma_texto = (
-                    "O atleta apresenta desempenho técnico abaixo do esperado nos jogos recentes, "
-                    "mesmo sem uma tendência clara de recuperação."
-                )
-
-            # 🧱 CARD VISUAL FINAL
-            st.markdown(
-                f"""
-                        <div style="
-                            padding:16px;
-                            border-radius:14px;
-                            background:#0B1220;
-                            border-left:6px solid {forma_cor};
-                            box-shadow: 0 6px 18px rgba(0,0,0,0.4);
-                        ">
-                            <div style="font-size:18px; font-weight:bold;">
-                                {forma_label}
-                            </div>
-                            <div style="font-size:15px; margin-top:6px;">
-                                <strong>{nivel_label}</strong>
-                            </div>
-                            <div style="font-size:14px; opacity:0.9; margin-top:6px;">
-                                {forma_texto}
-                            </div>
-                        </div>
-                        """,
-                unsafe_allow_html=True
-            )
-
+            # ✅ CARD FINAL
+            st.markdown(f"""
+            <div style="
+                padding:16px;
+                border-radius:14px;
+                background:#0B1220;
+                border-left:6px solid {forma_cor};
+            ">
+                <b>{forma_label}</b><br>
+                {nivel_label}<br>
+                <span style="opacity:0.8">{forma_texto}</span>
+            </div>
+            """, unsafe_allow_html=True)
 
         st.write("")
 

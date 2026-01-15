@@ -22,9 +22,11 @@ db = firestore.client()
 # ======================================================
 # 📌 JOGOS
 # ======================================================
-def carregar_jogos_firestore(atleta_id: str):
+def carregar_jogos_firestore(user_uid: str, atleta_id: str):
     docs = (
-        db.collection("atletas")
+        db.collection("users")
+        .document(user_uid)
+        .collection("atletas")
         .document(atleta_id)
         .collection("jogos")
         .stream()
@@ -38,19 +40,23 @@ def carregar_jogos_firestore(atleta_id: str):
 
     return jogos
 
+def salvar_jogo_firestore(user_uid: str, atleta_id: str, jogo: dict):
+    db.collection("users") \
+      .document(user_uid) \
+      .collection("atletas") \
+      .document(atleta_id) \
+      .collection("jogos") \
+      .add(jogo)
 
-def salvar_jogo_firestore(atleta_id: str, jogo: dict):
-    db.collection("atletas") \
-        .document(atleta_id) \
-        .collection("jogos") \
-        .add(jogo)
 
 # ======================================================
 # 📌 TREINOS
 # ======================================================
-def carregar_treinos_firestore(atleta_id: str):
+def carregar_treinos_firestore(user_uid: str, atleta_id: str):
     docs = (
-        db.collection("atletas")
+        db.collection("users")
+        .document(user_uid)
+        .collection("atletas")
         .document(atleta_id)
         .collection("treinos")
         .stream()
@@ -65,8 +71,10 @@ def carregar_treinos_firestore(atleta_id: str):
     return treinos
 
 
-def salvar_treino_firestore(atleta_id: str, treino: dict):
-    db.collection("atletas") \
+def salvar_treino_firestore(user_uid: str, atleta_id: str, treino: dict):
+    db.collection("users") \
+        .document(user_uid) \
+        .collection("atletas") \
         .document(atleta_id) \
         .collection("treinos") \
         .add(treino)
@@ -74,9 +82,11 @@ def salvar_treino_firestore(atleta_id: str, treino: dict):
 # ======================================================
 # 📌 SONO
 # ======================================================
-def carregar_sono_firestore(atleta_id: str):
+def carregar_sono_firestore(user_uid: str, atleta_id: str):
     docs = (
-        db.collection("atletas")
+        db.collection("users")
+        .document(user_uid)
+        .collection("atletas")
         .document(atleta_id)
         .collection("sono")
         .stream()
@@ -90,19 +100,23 @@ def carregar_sono_firestore(atleta_id: str):
 
     return registros
 
-
-def salvar_sono_firestore(atleta_id: str, sono: dict):
-    db.collection("atletas") \
+def salvar_sono_firestore(user_uid: str, atleta_id: str, sono: dict):
+    db.collection("users") \
+        .document(user_uid) \
+        .collection("atletas") \
         .document(atleta_id) \
         .collection("sono") \
         .add(sono)
 
+
 # ======================================================
 # 📌 SAÚDE
 # ======================================================
-def carregar_saude_firestore(atleta_id: str):
+def carregar_saude_firestore(user_uid: str, atleta_id: str):
     docs = (
-        db.collection("atletas")
+        db.collection("users")
+        .document(user_uid)
+        .collection("atletas")
         .document(atleta_id)
         .collection("saude")
         .stream()
@@ -117,8 +131,11 @@ def carregar_saude_firestore(atleta_id: str):
     return registros
 
 
-def salvar_saude_firestore(atleta_id: str, saude: dict):
-    db.collection("atletas") \
+def salvar_saude_firestore(user_uid: str, atleta_id: str, saude: dict):
+    db.collection("users") \
+        .document(user_uid) \
+        .collection("atletas") \
         .document(atleta_id) \
         .collection("saude") \
         .add(saude)
+
