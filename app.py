@@ -399,8 +399,8 @@ if "jogo_em_andamento" not in st.session_state:
     st.session_state["jogo_em_andamento"] = False
 
 
-BASE_DIR = Path(__file__).parent
-IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
+# BASE_DIR = Path(__file__).parent
+# IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
 
 
 # ----------------------
@@ -1305,48 +1305,48 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 
-# Sidebar com imagem e informações
-with st.sidebar:
-    st.title("Bernardo Miranda Conti")
-    st.write("✨_Tudo posso naquele que me fortalece._✨")
-    if os.path.exists(IMAGE_PATH):
-        try:
-            img = Image.open(IMAGE_PATH)
-            st.image(img, use_container_width=True)
-        except Exception:
-            st.info("Imagem presente, mas não pode ser exibida.")
-    else:
-        st.info("Coloque a imagem em 'imagens/bernardo1.jpeg' para ver a foto aqui.")
-
-    st.markdown("---")
-
-    # Título da Seção do Atleta
-    st.subheader("👤 Perfil do Atleta")
-
-    # --- LAYOUT EM 3 COLUNAS ---
-    col_dados, col_campo, col_futsal = st.columns(3)
-
-    with col_dados:
-        st.markdown("##### 🏋️ Dados Físicos")
-        # Agrupamos em markdown simples para garantir que caiba no espaço
-        st.markdown(f"**Peso:** 33 kg")
-        st.markdown(f"**Altura:** 1.32 m")
-        st.markdown(f"**Idade:** 9 anos")
-
-    with col_campo:
-        st.markdown("##### ⚽ Posições  Campo")
-        st.markdown("- M.A")
-        st.markdown("- C.A")
-        st.markdown("- P.E")
-
-    with col_futsal:
-        st.markdown("##### 🥅 Posições  Futsal")
-        st.markdown("- Ala")
-        st.markdown("- Pivô")
-
-
-    st.markdown("---")
-    st.write("📊 Desenvolvido para fins estatísticos 📊")
+# # Sidebar com imagem e informações
+# with st.sidebar:
+#     st.title("Bernardo Miranda Conti")
+#     st.write("✨_Tudo posso naquele que me fortalece._✨")
+#     if os.path.exists(IMAGE_PATH):
+#         try:
+#             img = Image.open(IMAGE_PATH)
+#             st.image(img, use_container_width=True)
+#         except Exception:
+#             st.info("Imagem presente, mas não pode ser exibida.")
+#     else:
+#         st.info("Coloque a imagem em 'imagens/bernardo1.jpeg' para ver a foto aqui.")
+#
+#     st.markdown("---")
+#
+#     # Título da Seção do Atleta
+#     st.subheader("👤 Perfil do Atleta")
+#
+#     # --- LAYOUT EM 3 COLUNAS ---
+#     col_dados, col_campo, col_futsal = st.columns(3)
+#
+#     with col_dados:
+#         st.markdown("##### 🏋️ Dados Físicos")
+#         # Agrupamos em markdown simples para garantir que caiba no espaço
+#         st.markdown(f"**Peso:** 33 kg")
+#         st.markdown(f"**Altura:** 1.32 m")
+#         st.markdown(f"**Idade:** 9 anos")
+#
+#     with col_campo:
+#         st.markdown("##### ⚽ Posições  Campo")
+#         st.markdown("- M.A")
+#         st.markdown("- C.A")
+#         st.markdown("- P.E")
+#
+#     with col_futsal:
+#         st.markdown("##### 🥅 Posições  Futsal")
+#         st.markdown("- Ala")
+#         st.markdown("- Pivô")
+#
+#
+#     st.markdown("---")
+#     st.write("📊 Desenvolvido para fins estatísticos 📊")
 
 if not st.session_state["user_logado"]:
     tela_login()
