@@ -1,7 +1,8 @@
 from firebase_admin import firestore
 from datetime import datetime
+from firebase_db import db
 
-db = firestore.client()
+
 
 def listar_atletas(user_uid):
     atletas_ref = db.collection("users").document(user_uid).collection("atletas")

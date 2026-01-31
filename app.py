@@ -34,6 +34,7 @@ from firebase_db import salvar_sono_firestore
 from data_saude import load_saude_df_firestore
 from firebase_db import salvar_saude_firestore
 from firebase_db import salvar_jogo_firestore
+
 from data_jogos import load_jogos_df_firestore
 import unicodedata
 from firebase_auth import (
@@ -43,15 +44,26 @@ from firebase_auth import (
 )
 from firebase_atletas import listar_atletas, criar_atleta
 from firebase_trial import get_info_trial
+from data_jogos import carregar_jogos_firestore
+
+
+import uuid
+from firebase_admin import get_app
+from firebase_db import db
+from firebase_trial import get_info_trial, get_plano_usuario
+from score_v12 import calcular_score_v12
+
+# -*- coding: utf-8 -*-
 
 
 
+# ================================================
+# 🌐 URL BASE DO SCOUT AO VIVO (PWA - FIREBASE HOSTING)
+# ==================================================
+PWA_BASE_URL = "https://perfomance-atleta.web.app"
 
 
 st.set_page_config(page_title="Registro Atleta - Web", layout="wide", initial_sidebar_state="expanded")
-
-
-
 
 def tela_login():
     st.markdown(
@@ -309,23 +321,22 @@ def normalizar_jogos_firestore_base(df: pd.DataFrame) -> pd.DataFrame:
             df["Passes-chave"] = 0
 
     ORDEM_FINAL = [
-        # 🔹 Identificação
         "Casa", "Visitante",
         "Data", "Horário",
         "Campeonato", "Quadro Jogado",
 
-        # 🔹 Estatísticas base
         "Minutos Jogados",
         "Gols Marcados",
         "Assistências",
 
-        # 🔹 Scouts
+        # 🔥 SCOUTS REAIS
         "Chutes", "Chutes Errados",
-        "Passes-chave", "Passes Errados",
-        "Desarmes", "Faltas Sofridas",
-        "Participações Indiretas",
+        "Passes Certos", "Passes-chave", "Passes Errados",
+        "Dribles Certos", "Desarmes",
+        "Faltas Sofridas", "Faltas Cometidas",
+        "Perda de Posse",
 
-        # 🔹 Contexto do jogo
+        "Participações Indiretas",
         "Resultado", "Local", "Condição do Campo"
     ]
 
@@ -374,6 +385,9 @@ if "atleta_ativo" not in st.session_state:
 if "pagina" not in st.session_state:
     st.session_state["pagina"] = "home"
 
+if "jogo_ativo_id" not in st.session_state:
+    st.session_state["jogo_ativo_id"] = None
+
 
 # 3️⃣ 🔥 AGORA SIM O ATLETA EXISTE
 ATLETA_ID = st.session_state["atleta_ativo"]
@@ -381,19 +395,6 @@ ATLETA_ID = st.session_state["atleta_ativo"]
 # 🔒 GARANTIA GLOBAL — df_sono SEMPRE EXISTE
 df_sono = load_sono_df_firestore(ATLETA_ID)
 
-# ===============================
-# 🧠 SCOUT TEMPORÁRIO (GARANTIA)
-# ===============================
-if "scout_temp" not in st.session_state:
-    st.session_state["scout_temp"] = {
-        "chutes": 0,
-        "chutes_errados": 0,
-        "passes_chave": 0,
-        "passes_errados": 0,
-        "desarmes": 0,
-        "faltas_sofridas": 0,
-        "participacoes_indiretas": 0
-    }
 
 if "jogo_em_andamento" not in st.session_state:
     st.session_state["jogo_em_andamento"] = False
@@ -401,6 +402,8 @@ if "jogo_em_andamento" not in st.session_state:
 
 BASE_DIR = Path(__file__).parent
 # IMAGE_PATH = BASE_DIR / "imagens" / "bernardo1.jpeg"
+
+
 
 
 # ----------------------
@@ -426,6 +429,11 @@ EXPECTED_SAUDE_COLUMNS = [
 OPCOES_QUADRO = ["Principal", "Reserva", "Misto", "Não Aplicável"]
 # Removida OPCOES_RESULTADO pois será texto livre (ex: 4x1)
 OPCOES_MODALIDADE = ["Futsal", "Campo", "Society", "Areia"] # Nova lista
+
+POSICOES_POR_MODALIDADE = {
+    "Futsal":["Ala","Pivo","Fixo"],
+    "Campo":["Zagueiro","Lateral","Volante","Meia","Atacante"]
+}
 # ------------------------------------------------------------------
 
 # Garantir pasta Data
@@ -514,24 +522,39 @@ def garantir_score_jogo(df):
     if df.empty:
         return df
 
-    if "Score_Jogo" in df.columns:
-        return df
+    # ⚠️ ATENÇÃO:
+    # Esta função usa SCOUT LEGADO (colunas visuais).
+    # O Score oficial atual é calculado via Score_V12 (scout_raw)
+    # 🔒 se não tem scout, NÃO calcula score
+    scout_cols = [
+        "Finalização Alvo",
+        "Finalização Fora",
+        "Passe Certo",
+        "Passe Errado",
+        "Drible Certos",
+        "Desarme",
+        "Perda de Posse",
+        "Faltas Sofridas",
+        "Falta Cometida",
+    ]
+
+    # se nenhuma coluna de scout existir → usuário básico
+    if not any(col in df.columns for col in scout_cols):
+        return df  # 👈 sem Score_Jogo
 
     df = df.copy()
 
-    # garante colunas mínimas
-    colunas_minimas = [
-        "Gols Marcados", "Assistências", "Passes-chave",
-        "Desarmes", "Faltas Sofridas", "Participações Indiretas",
-        "Chutes", "Chutes Errados", "Passes Errados", "Condição do Campo"
-    ]
-
-    for col in colunas_minimas:
+    # garante colunas de scout (premium)
+    for col in scout_cols:
         if col not in df.columns:
             df[col] = 0
 
-    df["Score_Jogo"] = df.apply(calcular_score_real, axis=1)
+    # evita recalcular score
+    if "Score_Jogo" not in df.columns:
+        df["Score_Jogo"] = df.apply(calcular_score_real, axis=1)
+
     return df
+
 
 def garantir_coluna_data_dt(df):
     if df.empty:
@@ -875,28 +898,29 @@ def parse_duration_to_hours(dur_str):
         return 0.0
 
 def filter_df_by_date(df, date_col, start_date, end_date):
-    """Filtra o DataFrame por um período de data, tratando a data como string DD/MM/YYYY."""
-    try:
-        df_temp = df.copy()
-        date_format = '%d/%m/%Y'
-        # Garante que a coluna de data é string antes da conversão para evitar ArrowTypeError
-        df_temp[date_col] = df_temp[date_col].astype(str)
+    if df.empty or date_col not in df.columns:
+        return df
+
+    df_temp = df.copy()
+
+    df_temp[date_col] = pd.to_datetime(df_temp[date_col], errors="coerce")
+    df_temp = df_temp.dropna(subset=[date_col])
+
+    start_dt = pd.to_datetime(start_date)
+
+    # 🔥 FECHA O DIA FINAL (BUG FIX)
+    end_dt = (
+        pd.to_datetime(end_date)
+        + pd.Timedelta(days=1)
+        - pd.Timedelta(seconds=1)
+    )
+
+    return df_temp[
+        (df_temp[date_col] >= start_dt) &
+        (df_temp[date_col] <= end_dt)
+    ]
 
 
-
-        df_temp = df_temp.dropna(subset=['Data_DT'])
-
-        start_dt = pd.to_datetime(start_date)
-        end_dt = pd.to_datetime(end_date)
-
-        df_filtrado = df_temp[
-            (df_temp['Data_DT'] >= start_dt) &
-            (df_temp['Data_DT'] <= end_dt)
-            ]
-        return df_filtrado
-    except Exception as e:
-        # st.error(f"Erro ao filtrar dados por data: {e}")
-        return pd.DataFrame(columns=df.columns)
 
 def safe_sum(series):
     return pd.to_numeric(series, errors='coerce').fillna(0).sum()
@@ -949,6 +973,7 @@ def analisar_resultado(df):
 
     return total_jogos, vitorias, empates, derrotas
 
+#FUNÇÃO DO PAINEL BASICO (DASHBOARD)
 def calculate_avaliacao_tecnica(df_jogos_f, modalidade_filter, time_filter):
     """
     Calcula a Avaliação Técnica (índice ponderado) e gera uma conclusão explicativa.
@@ -1055,6 +1080,7 @@ def calculate_avaliacao_tecnica(df_jogos_f, modalidade_filter, time_filter):
 
     return f"{nota_final:.1f}", conclusao_texto
 
+#FUNÇÃO DO PAINEL BASICO (DASHBOARD
 def calculate_engajamento(df_treinos_f, df_sono_f, total_dias_periodo, media_sono_decimal):
     """Calcula o Engajamento baseado em Treinos (Presença) e Sono (Qualidade)."""
 
@@ -1106,6 +1132,18 @@ def normalizar_data_timezone(df, coluna):
             df[coluna] = df[coluna].dt.tz_localize(None)
 
     return df
+
+def calcular_vitoria(resultado_str):
+    if pd.isna(resultado_str): return 0
+    try:
+        partes = str(resultado_str).strip().split('x')
+        if len(partes) == 2:
+            gols_atleta = int(partes[0].strip())
+            gols_adversario = int(partes[1].strip())
+            return 1 if gols_atleta > gols_adversario else 0
+    except ValueError:
+        return 0
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -1301,6 +1339,14 @@ st.markdown("""
 .bg-indiretas {
     background: linear-gradient(135deg, #FF5252, #B71C1C);
 }
+
+.bg-dribles {
+    background: linear-gradient(135deg, #7E57C2, #512DA8);
+}
+
+.bg-faltas-cometidas {
+    background: linear-gradient(135deg, #E53935, #8E0000);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -1364,7 +1410,82 @@ if ATLETA_ID is None:
 # 🔥 FONTE ÚNICA DE DADOS — FIRESTORE
 # ===============================
 
-df_jogos_full = load_jogos_df_firestore(ATLETA_ID)
+jogos = carregar_jogos_firestore(
+    st.session_state["user_uid"],
+    ATLETA_ID
+)
+
+df_jogos_full = pd.DataFrame(jogos)
+
+
+
+def normalizar_scout_pwa(s):
+    if not isinstance(s, dict):
+        return {k: 0 for k in [
+            "Chutes","Chutes Errados","Passes Certos","Passes-chave",
+            "Passes Errados","Dribles Certos","Desarmes",
+            "Faltas Sofridas","Faltas Cometidas","Perda de Posse"
+        ]}
+
+    return {
+        "Chutes": s.get("finalizacao_alvo", 0),
+        "Chutes Errados": s.get("finalizacao_fora", 0),
+
+        # 🔒 SEMPRE BRUTO
+        "Passes Certos": s.get("passe_certo", 0),
+
+        # 🔒 NUNCA DERIVAR AQUI
+        "Passes-chave": 0,
+
+        "Passes Errados": s.get("passe_errado", 0),
+        "Dribles Certos": s.get("drible_certo", 0),
+        "Desarmes": s.get("desarme", 0),
+        "Faltas Sofridas": s.get("falta_sofrida", 0),
+        "Faltas Cometidas": s.get("falta_cometida", 0),
+        "Perda de Posse": s.get("perda_posse", s.get("participacoes_indiretas", 0))
+    }
+
+
+
+def safe_float(value, default=0.0):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+# ===============================
+# 🔥 SCOUT — PIPELINE OFICIAL
+# ===============================
+
+# 🔒 GARANTE SCOUT RAW (VEM DO FIRESTORE)
+if "scout" in df_jogos_full.columns:
+    df_jogos_full["scout_raw"] = df_jogos_full["scout"]
+else:
+    df_jogos_full["scout_raw"] = [{} for _ in range(len(df_jogos_full))]
+
+# 🎨 NORMALIZA SCOUT PARA UI
+df_jogos_full["scout_ui"] = df_jogos_full["scout_raw"].apply(normalizar_scout_pwa)
+
+# 🧱 EXPANDE SCOUT UI EM COLUNAS VISUAIS
+df_scout_ui = pd.DataFrame(df_jogos_full["scout_ui"].tolist())
+
+df_jogos_full = pd.concat(
+    [
+        df_jogos_full.drop(columns=["scout", "scout_ui"], errors="ignore"),
+        df_scout_ui
+    ],
+    axis=1
+)
+
+st.write("MEU UID:", st.session_state["user_uid"])
+st.write("MEU EMAIL:", st.session_state["user_email"])
+
+
+# ============================================
+# 🔥 BLOQUEIO ABSOLUTO – REMOVE COLUNAS DUPLICADAS
+# ============================================
+df_jogos_full.columns = df_jogos_full.columns.astype(str)
+df_jogos_full = df_jogos_full.loc[:, ~df_jogos_full.columns.duplicated()]
 
 
 
@@ -1374,8 +1495,38 @@ if df_jogos_full.empty:
     df_jogos_full = pd.DataFrame()
 else:
 
-    # 🔥 NORMALIZA NOMES
+    # 🔥 MOSTRAR APENAS JOGOS FINALIZADOS
+    if "status" in df_jogos_full.columns:
+        df_jogos_full = df_jogos_full[
+            (df_jogos_full["status"] == "finalizado") |
+            (df_jogos_full["status"].isna())
+            ]
+
+    # 🔒 BACKUP ABSOLUTO DO SCOUT RAW (ANTES DA NORMALIZAÇÃO)
+    _scoutraw_backup = df_jogos_full["scout_raw"].copy()
+
+    # 🔥 NORMALIZA NOMES (⚠️ ESSA FUNÇÃO APAGA COLUNAS FORA DA ORDEM_FINAL)
     df_jogos_full = normalizar_jogos_firestore_base(df_jogos_full)
+
+    # 🔥 NORMALIZAÇÃO ÚNICA E DEFINITIVA DA MODALIDADE
+    df_jogos_full["Condição do Campo"] = (
+        df_jogos_full["Condição do Campo"]
+        .astype(str)
+        .str.lower()
+        .str.strip()
+        .replace({
+            "fut sal": "futsal",
+            "futsal ": "futsal",
+            "futebol de salão": "futsal",
+            "campo ": "campo",
+            "society ": "society"
+        })
+        .str.title()
+    )
+
+    # 🔒 RESTAURA SCOUT RAW (APÓS A NORMALIZAÇÃO)
+    df_jogos_full["scout_raw"] = _scoutraw_backup.values
+
 
     # 🔒 BLINDAGEM APÓS NORMALIZAÇÃO (LOCAL CORRETO)
     for col in ["Data", "Casa", "Visitante"]:
@@ -1396,14 +1547,20 @@ else:
             .replace({"nan": "", "None": ""})
         )
 
+    # 🔒 GARANTE COLUNA POSIÇÃO
+    if "posição" not in df_jogos_full.columns:
+        df_jogos_full["posição"] = ""
+
     # 🔥 DATA
     df_jogos_full = garantir_coluna_data_dt(df_jogos_full)
 
     # 🔥 NUMÉRICOS
     SCOUT_NUM_COLS = [
-        "Chutes", "Chutes Errados", "Desarmes",
+        "Chutes", "Chutes Errados",
         "Passes-chave", "Passes Errados",
-        "Faltas Sofridas", "Participações Indiretas"
+        "Dribles Certos", "Desarmes",
+        "Faltas Sofridas", "Faltas Cometidas",
+        "Perda de Posse"
     ]
 
     for col in SCOUT_NUM_COLS:
@@ -1413,7 +1570,33 @@ else:
             ).fillna(0)
 
     # 🔥 SCORE
+    df_jogos_full["scout"] = df_jogos_full.get("scout", {})
     df_jogos_full = garantir_score_jogo(df_jogos_full)
+
+
+    def aplicar_score_v12(df):
+        if df.empty:
+            return df
+
+        df = df.copy()
+
+        def calc(row):
+            jogo = {
+                "Condição do Campo": row.get("Condição do Campo"),
+                "posição": row.get("posição"),
+                "Gols Marcados": safe_int(row.get("Gols Marcados", 0)),
+                "Assistências": safe_int(row.get("Assistências", 0)),
+                # 🔥🔥🔥 PASSA O RAW PURO 🔥🔥🔥
+                "scout": row.get("scout_raw", {})
+            }
+
+            return calcular_score_v12(jogo)
+
+        df["Score_V12"] = df.apply(calc, axis=1)
+        return df
+
+
+    df_jogos_full = aplicar_score_v12(df_jogos_full)
 
 
 #--------------------------------------------
@@ -1500,7 +1683,7 @@ if st.session_state["pagina"] == "home":
 
         if not df_jogos_ord.empty:
             ultimo_jogo = df_jogos_ord.iloc[0]
-            nota_ultimo_jogo = ultimo_jogo.get("Score_Jogo", "—")
+            nota_ultimo_jogo = ultimo_jogo.get("Score_V12", "—")
     else:
         nota_ultimo_jogo = "—"
 
@@ -1624,15 +1807,20 @@ if st.session_state["pagina"] == "home":
 
     df_jogos_ord = ordenar_jogos(df_jogos_full)
 
-    if len(df_jogos_ord) >= 5:
-        ultimos = df_jogos_ord.head(5)["Score_Jogo"].tolist()
+    df_jogos_ord = garantir_score_jogo(df_jogos_ord)
 
-        if ultimos[0] > ultimos[-1]:
-            tendencia = "Em evolução 📈"
-        elif ultimos[0] < ultimos[-1]:
-            tendencia = "Queda 📉"
-        else:
-            tendencia = "Estável ➖"
+    tendencia = "—"
+
+    if "Score_Jogo" in df_jogos_ord.columns and len(df_jogos_ord) >= 5:
+        ultimos = df_jogos_ord.head(5)["Score_Jogo"].dropna().tolist()
+
+        if len(ultimos) >= 2:
+            if ultimos[0] > ultimos[-1]:
+                tendencia = "Em evolução 📈"
+            elif ultimos[0] < ultimos[-1]:
+                tendencia = "Queda 📉"
+            else:
+                tendencia = "Estável ➖"
 
     # =========================
     # 🎯 CARDS PRINCIPAIS
@@ -1838,76 +2026,80 @@ elif st.session_state["pagina"] == "jogos":
         st.markdown("---")
 
         # ===============================
-        # 🧠 SCOUT – MVP CLEAN
+        # 🧠 BASE DO JOGO (SEMPRE EXISTE)
         # ===============================
-        SCOUT_KEYS = [
-            "Chutes", "Chutes Errados", "Desarmes",
-            "Passes-chave", "Passes Errados",
-            "Faltas Sofridas", "Participações Indiretas"
-        ]
-
-        SCOUT_LABEL_TO_KEY = {
-            "Chutes": "chutes",
-            "Chutes Errados": "chutes_errados",
-            "Passes-chave": "passes_chave",
-            "Passes Errados": "passes_errados",
-            "Desarmes": "desarmes",
-            "Faltas Sofridas": "faltas_sofridas",
-            "Participações Indiretas": "participacoes_indiretas"
+        novo_base = {
+            "Casa": "",
+            "Visitante": "",
+            "Campeonato": "",
+            "Local": "",
         }
 
+        if casa_sel != "Selecione ou Crie Novo":
+            novo_base["Casa"] = casa_sel
+        elif criar_novo_casa and novo_casa_input.strip():
+            novo_base["Casa"] = novo_casa_input.strip()
 
+        if visitante_sel != "Selecione ou Crie Novo":
+            novo_base["Visitante"] = visitante_sel
+        elif criar_novo_visitante and novo_visitante_input.strip():
+            novo_base["Visitante"] = novo_visitante_input.strip()
 
+        if campeonato_sel != "Selecione ou Crie Novo":
+            novo_base["Campeonato"] = campeonato_sel
+        elif criar_novo_campeonato and novo_campeonato_input.strip():
+            novo_base["Campeonato"] = novo_campeonato_input.strip()
 
+        if local_sel != "Selecione ou Crie Novo":
+            novo_base["Local"] = local_sel
+        elif criar_novo_local and novo_local_input.strip():
+            novo_base["Local"] = novo_local_input.strip()
+
+        # ===============================
+        # 🔒 DEFAULTS PARA SCOUT AO VIVO
+        # ===============================
+        if "data_jogo_tmp" not in st.session_state:
+            st.session_state["data_jogo_tmp"] = datetime.today()
+
+        if "horario_jogo_tmp" not in st.session_state:
+            st.session_state["horario_jogo_tmp"] = time(20, 0)
+
+        if "quadro_jogo_tmp" not in st.session_state:
+            st.session_state["quadro_jogo_tmp"] = "Principal"
+
+        if "modalidade_jogo_tmp" not in st.session_state:
+            st.session_state["modalidade_jogo_tmp"] = "Futsal"
+        
 
 
         # ------------------ FORMULÁRIO ------------------
+        #SCOUT PWA
+        st.markdown("### ▶️ Scout Ao Vivo")
 
-        def incrementar_scout(label):
-            key = SCOUT_LABEL_TO_KEY[label]
-            st.session_state["scout_temp"][key] += 1
+        # SE NÃO EXISTE JOGO ATIVO → MOSTRA BOTÃO
+        if st.session_state["jogo_ativo_id"] is None:
+
+            iniciar_scout = st.button("▶️ Iniciar Scout (Premium)", use_container_width=True)
+
+            if iniciar_scout:
+                temp_id = str(uuid.uuid4())
+                st.session_state["jogo_ativo_id"] = temp_id
+                st.success("Scout iniciado (temporário)")
+                st.rerun()
+
+        # SE EXISTE JOGO ATIVO → MOSTRA LINK
+        else:
+            scout_path = f"temp_scouts/{st.session_state['jogo_ativo_id']}"
+            scout_url = f"{PWA_BASE_URL}?path={scout_path}#{scout_path}"
 
 
-        def decrementar_scout(label):
-            key = SCOUT_LABEL_TO_KEY[label]
-            if st.session_state["scout_temp"][key] > 0:
-                st.session_state["scout_temp"][key] -= 1
 
+            st.link_button(
+                "📱 Abrir Scout no Celular",
+                scout_url,
+                use_container_width=True
+            )
 
-        st.markdown("### 📊 Scout Ao Vivo")
-
-        SCOUT_LAYOUT = [
-            ("Chutes", "bg-chutes"),
-            ("Chutes Errados", "bg-chutes-errados"),
-            ("Passes-chave", "bg-passes"),
-            ("Passes Errados", "bg-passes-errados"),
-            ("Desarmes", "bg-desarmes"),
-            ("Faltas Sofridas", "bg-faltas"),
-            ("Participações Indiretas", "bg-indiretas")
-        ]
-
-        cols = st.columns(2)
-
-        for i, (scout, classe) in enumerate(SCOUT_LAYOUT):
-            with cols[i % 2]:
-                st.markdown(
-                    f"""
-                    <div class="scout-card {classe}">
-                        <div class="scout-title">{scout}</div>
-                        <div class="scout-value">
-                            {st.session_state["scout_temp"][SCOUT_LABEL_TO_KEY[scout]]
-}
-                        </div>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.button("➕", key=f"mais_{scout}", on_click=incrementar_scout, args=(scout,))
-                with c2:
-                    st.button("➖", key=f"menos_{scout}", on_click=decrementar_scout, args=(scout,))
 
 
         st.markdown("---")
@@ -1916,16 +2108,23 @@ elif st.session_state["pagina"] == "jogos":
         if "jogo_salvo_sucesso" not in st.session_state:
             st.session_state["jogo_salvo_sucesso"] = False
 
-        # placeholder da mensagem
-        msg_sucesso = st.empty()
-
-        # mostra a mensagem uma única vez
-        if st.session_state["jogo_salvo_sucesso"]:
-            msg_sucesso.success("⚽ Jogo registrado com sucesso!")
-            st.session_state["jogo_salvo_sucesso"] = False
 
         OPCAO_INVALIDA = "Selecione ou Crie Novo"
 
+
+        modalidade = st.selectbox(
+            "Modalidade",
+            OPCOES_MODALIDADE,
+            key="modalidade_jogo"
+        )
+
+        posicoes_disponiveis = POSICOES_POR_MODALIDADE.get(modalidade, [])
+
+        posicao = st.selectbox(
+            "Posição do Atleta",
+            posicoes_disponiveis,
+            key="posicao_jogo"
+        )
 
         with st.form("form_salvar_jogo"):
 
@@ -1942,11 +2141,15 @@ elif st.session_state["pagina"] == "jogos":
             with c2:
                 gols_adversario = st.number_input("Gols do Adversário", min_value=0)
 
-            modalidade = st.selectbox("Modalidade", OPCOES_MODALIDADE)
+
 
             salvar = st.form_submit_button("💾 Salvar Jogo")
 
+            msg_sucesso = st.empty()  # 👈 AQUI
+
             if salvar:
+                st.session_state["data_jogo_tmp"] = data
+                st.session_state["horario_jogo_tmp"] = horario
 
                 erros = []
 
@@ -1966,79 +2169,80 @@ elif st.session_state["pagina"] == "jogos":
                 if local_sel == OPCAO_INVALIDA and not (criar_novo_local and novo_local_input.strip()):
                     erros.append("Local")
 
+                #----POSIÇÃO----
+                if not posicao:
+                    erros.append("Posição do Atleta")
+
                 if erros:
                     st.error(
                         "❌ Preencha corretamente:\n- " + "\n- ".join(erros)
                     )
                     st.stop()
 
-                novo = {
-                    "Casa": (
-                        novo_casa_input.strip()
-                        if criar_novo_casa and novo_casa_input.strip()
-                        else casa_sel
-                    ),
 
-                    "Visitante": (
-                        novo_visitante_input.strip()
-                        if criar_novo_visitante and novo_visitante_input.strip()
-                        else visitante_sel
-                    ),
-                    "Campeonato": (
-                        novo_campeonato_input.strip()
-                        if criar_novo_campeonato and novo_campeonato_input.strip()
-                        else campeonato_sel
-                    ),
-                    "Local": (
-                        novo_local_input.strip()
-                        if criar_novo_local and novo_local_input.strip()
-                        else local_sel
-                    ),
+                if not st.session_state.get("jogo_ativo_id"):
+                    st.error("Nenhum scout ativo para encerrar.")
+                    st.stop()
 
-                }
-                jogo_firestore = {
-                    # 📅 Dados principais do jogo
-                    "Data": data.strftime("%d/%m/%Y"),
-                    "Horário": horario.strftime("%H:%M"),
-                    "Quadro Jogado": quadro,
+                with st.spinner("💾 Encerrando partida..."):
+                    scout_temp = {}
 
-                    "Campeonato": novo["Campeonato"],
-                    "Casa": novo["Casa"],
-                    "Visitante": novo["Visitante"],
-                    "Local": novo["Local"],
-                    "Condição do Campo": modalidade,
-
-                    # 📊 Estatísticas individuais
-                    "Minutos Jogados": minutos,
-                    "Gols Marcados": gols,
-                    "Assistências": assistencias,
-
-                    # 🏁 Resultado
-                    "Resultado": f"{gols_atleta}x{gols_adversario}",
-
-                    # 🎯 Scout (map)
-                    "scout": st.session_state["scout_temp"].copy(),
-
-                    # 🕒 Controle interno
-                    "criado_em": firestore.SERVER_TIMESTAMP,
-                }
-
-                with st.spinner("💾 Salvando jogo..."):
-                    salvar_jogo_firestore(
-                        st.session_state["user_uid"],
-                        ATLETA_ID,
-                        jogo_firestore
+                    scout_temp_doc = (
+                        db.collection("temp_scouts")
+                        .document(st.session_state["jogo_ativo_id"])
+                        .get()
                     )
 
-                # 🔥 LIMPA APENAS O SCOUT BACKEND
-                for k in st.session_state["scout_temp"]:
-                    st.session_state["scout_temp"][k] = 0
+                    if scout_temp_doc.exists:
+                        raw = scout_temp_doc.to_dict()
+                        if raw and isinstance(raw.get("scout"), dict):
+                            scout_temp = raw["scout"]
 
-                # ✅ FLAG DE SUCESSO
+
+
+
+                    # 🔥 CRIAR JOGO DEFINITIVO
+                    jogo_base = {
+                        "Data": data.strftime("%d/%m/%Y"),
+                        "Horário": horario.strftime("%H:%M"),
+                        "Quadro Jogado": quadro,
+                        "Campeonato": novo_base["Campeonato"],
+                        "Casa": novo_base["Casa"],
+                        "Visitante": novo_base["Visitante"],
+                        "Local": novo_base["Local"],
+                        "Condição do Campo": modalidade,
+                        "Posição": posicao,
+                        "Minutos Jogados": minutos,
+                        "Gols Marcados": gols,
+                        "Assistências": assistencias,
+                        "Resultado": f"{gols_atleta}x{gols_adversario}",
+                        "status": "finalizado",
+                        "scout": scout_temp,
+                        "criado_em": firestore.SERVER_TIMESTAMP
+                    }
+
+                    jogo_id = salvar_jogo_firestore(
+                        st.session_state["user_uid"],
+                        ATLETA_ID,
+                        jogo_base
+                    )
+
+
+
+                    # 🧹 APAGAR SCOUT TEMPORÁRIO
+                    db.collection("temp_scouts") \
+                        .document(st.session_state["jogo_ativo_id"]) \
+                        .delete()
+
+                st.session_state["jogo_ativo_id"] = None
                 st.session_state["jogo_salvo_sucesso"] = True
-
-                # 🔄 RERUN LIMPA A TELA E OS INPUTS
                 st.rerun()
+
+            if st.session_state.get("jogo_salvo_sucesso"):
+                msg_sucesso.success("⚽ Jogo registrado com sucesso!")
+                st.session_state["jogo_salvo_sucesso"] = False
+
+
 
     # ----------------------------------------------------------------------
     # COLUNA 2 - TABELA
@@ -2081,6 +2285,7 @@ elif st.session_state["pagina"] == "jogos":
                 "Desarmes",
                 "Faltas Sofridas",
                 "Participações Indiretas",
+                "Score_v12_TESTE",
             ]
 
             colunas_exibir = [c for c in colunas_exibir if c in df_view.columns]
@@ -2992,9 +3197,17 @@ elif st.session_state["pagina"] == "saude":
             hide_index=True
         )
 
-
 elif st.session_state["pagina"] == "dashboard":
 
+    conclusao_avaliacao = None
+
+    # 🔐 CONTROLE DE PLANO
+    plano = get_plano_usuario(st.session_state["user_uid"])
+
+    is_premium = (
+            plano["plano"] == "premium"
+            and plano["plano_ativo"] is True
+    )
 
     if st.button("⬅️ Voltar para Início"):
         st.session_state["pagina"] = "home"
@@ -3017,6 +3230,8 @@ elif st.session_state["pagina"] == "dashboard":
         )
 
     df_treinos_full = normalizar_data_timezone(df_treinos_full, "Date_DT")
+
+
 
     df_sono_full = load_sono_df_firestore(
         ATLETA_ID
@@ -3064,6 +3279,21 @@ elif st.session_state["pagina"] == "dashboard":
             .str.title()
         )
 
+    # ======================================================
+    # 🔒 ETAPA 4 — GARANTE COLUNA POSIÇÃO (SEGURO)
+    # ======================================================
+
+    if "posição" not in df_jogos_full.columns:
+        df_jogos_full["posição"] = "Ala"  # fallback seguro
+    else:
+        df_jogos_full["posição"] = (
+            df_jogos_full["posição"]
+            .fillna("Ala")
+            .astype(str)
+            .str.strip()
+            .replace({"": "Ala", "nan": "Ala", "None": "Ala"})
+        )
+
     # --- 1. FILTRO DE PERÍODO E NOVOS FILTROS ---
 
     # Definindo datas padrão para o filtro (últimos 30 dias)
@@ -3082,6 +3312,23 @@ elif st.session_state["pagina"] == "dashboard":
         st.markdown(
             f'<div style="text-align: right; padding-top: 15px;">**Visão Geral** (De {data_inicio.strftime("%d/%m/%Y")} a {data_fim.strftime("%d/%m/%Y")})</div>',
             unsafe_allow_html=True)
+
+    # ======================================================
+    # 🔧 NORMALIZAÇÃO DA MODALIDADE (CAMPO / FUTSAL / SOCIETY)
+    # ======================================================
+    if "Condição do Campo" in df_jogos_full.columns:
+        df_jogos_full["Condição do Campo"] = (
+            df_jogos_full["Condição do Campo"]
+            .astype(str)
+            .str.strip()
+            .str.title()
+            .replace({
+                "Campo ": "Campo",
+                "Fut Sal": "Futsal",
+                "Society ": "Society",
+                "Nan": ""
+            })
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("##### 🔍 Filtros Adicionais de Jogos")
@@ -3107,11 +3354,38 @@ elif st.session_state["pagina"] == "dashboard":
 
     # --- 2. APLICAR FILTRO DE DATA EM TODOS OS DATAFRAMES ---
 
-    df_jogos_f = filter_df_by_date(df_jogos_full, 'Data', data_inicio, data_fim)
-    df_treinos_f = filter_df_by_date(df_treinos_full, 'Date', data_inicio, data_fim)
+    df_jogos_f = filter_df_by_date(df_jogos_full, 'Data_DT', data_inicio, data_fim)
+    df_treinos_f = filter_df_by_date(df_treinos_full, 'Date_DT', data_inicio, data_fim)
     df_sono_f = filter_df_by_date(df_sono_full, 'Data', data_inicio, data_fim)
 
     df_jogos_f = garantir_score_jogo(df_jogos_f)
+    df_jogos_f = aplicar_score_v12(df_jogos_f)
+
+    # ======================================================
+    # ⚖️ AJUSTE DE SCORE POR MODALIDADE (CAMPO)
+    # ======================================================
+    if "Condição do Campo" in df_jogos_f.columns and "Score_V12" in df_jogos_f.columns:
+        ajuste_modalidade = {
+            "Futsal": 1.0,  # referência
+            "Society": 1.05,  # leve ajuste
+            "Campo": 1.15  # compensação por menos ações
+        }
+
+        df_jogos_f["Score_V12"] = df_jogos_f.apply(
+            lambda row: round(
+                row["Score_V12"] * ajuste_modalidade.get(
+                    str(row["Condição do Campo"]).strip().title(), 1.0
+                ),
+                2
+            ),
+            axis=1
+        )
+
+    if not df_jogos_f.empty:
+        df_jogos_f = df_jogos_f.sort_values("Data_DT")
+        score_dashboard = round(df_jogos_f.iloc[-1]["Score_V12"], 1)
+    else:
+        score_dashboard = 0
 
     # --- PREPARAR DADOS DE SONO PARA USO IMEDIATO ---
     if not df_sono_f.empty and 'Duração do Sono (h:min)' in df_sono_f.columns:
@@ -3144,86 +3418,42 @@ elif st.session_state["pagina"] == "dashboard":
     total_dias_periodo = (pd.to_datetime(data_fim) - pd.to_datetime(data_inicio)).days + 1
 
     # --- CÁLCULO PARA TREINOS BASEADO NO FILTRO DE TIME (Requisito) ---
-    total_treinos_display = total_treinos
-    treino_label = "Sessões Concluídas"
+    # ======================================================
+    # ✅ TREINOS — LÓGICA CORRETA (SEM TIME)
+    # ======================================================
 
-    # Nome da coluna que contem o time, exatamente como está na planilha
-    NOME_COLUNA_TIME = 'Treino'
-
-    # DataFrame para aplicar filtros adicionais (Time e Modalidade)
     df_treinos_calculo = df_treinos_f.copy()
 
-    # Define se os filtros de Time ou Modalidade estão ativos (assumindo que modalidade_filter existe no escopo)
-    is_time_filter_active = (time_filtrado_selecionado and time_filtrado_selecionado != "Todos")
-    is_modalidade_filter_active = ('modalidade_filter' in locals() and modalidade_filter != "Todos")
+    # 🔹 FILTRO APENAS POR MODALIDADE (TREINO NÃO TEM TIME)
+    if modalidade_filter != "Todos" and 'Tipo' in df_treinos_calculo.columns:
+        df_treinos_calculo['Tipo'] = (
+            df_treinos_calculo['Tipo']
+            .astype(str)
+            .str.strip()
+            .str.title()
+        )
 
-    # 1. FILTRO POR TIME
-    if is_time_filter_active and NOME_COLUNA_TIME in df_treinos_calculo.columns:
-        termo_pesquisa = time_filtrado_selecionado.strip().lower()
         df_treinos_calculo = df_treinos_calculo[
-            df_treinos_calculo[NOME_COLUNA_TIME].astype(str).str.lower().str.contains(termo_pesquisa, na=False)
-        ]
+            df_treinos_calculo['Tipo'] == modalidade_filter
+            ]
 
-    # 2. FILTRO POR MODALIDADE
-    # Usamos a coluna 'Tipo' para filtrar por modalidade.
-    if is_modalidade_filter_active and 'Tipo' in df_treinos_calculo.columns:
-        modalidade_lower = modalidade_filter.strip().lower()
-        df_treinos_calculo = df_treinos_calculo[
-            df_treinos_calculo['Tipo'].astype(str).str.lower().str.contains(modalidade_lower, na=False)
-        ]
+    # 🔢 TOTAL FINAL DE TREINOS
+    total_treinos_display = len(df_treinos_calculo)
 
-    # 3. ATUALIZAÇÃO DO CARD (Se Time OU Modalidade estiver ativo)
-    if is_time_filter_active or is_modalidade_filter_active:
+    # 🏷️ LABEL DO CARD
+    if modalidade_filter != "Todos":
+        treino_label = f"Treinos ({modalidade_filter})"
+    else:
+        treino_label = "Sessões Concluídas"
 
-        total_filtrado = df_treinos_calculo.shape[0]
-        total_treinos_display = total_filtrado  # FORÇA a exibição do valor filtrado
+    # ================================
+    # ⭐ AVALIAÇÃO TÉCNICA (DASHBOARD)
+    # ================================
+    # Baseada no PERÍODO / FILTROS (não scout, não último jogo)
 
-        if total_filtrado > 0:
-            # Define um rótulo mais informativo baseado nos filtros ativos
-            if is_modalidade_filter_active and not is_time_filter_active:
-                treino_label = f"Treinos de '{modalidade_filter}'"
-            elif is_time_filter_active and not is_modalidade_filter_active:
-                treino_label = f"Treinos de '{time_filtrado_selecionado}'"
-            else:  # Ambos ativos ou outros cenários (Apenas o filtro de Time já garante isso)
-                treino_label = "Sessões Filtradas"
-        else:
-            treino_label = "Nenhum treino encontrado"
-
-    # Se 'Treino' estava ausente e o filtro de time estava ativo (caso de erro original)
-    elif time_filtrado_selecionado and NOME_COLUNA_TIME not in df_treinos_f.columns:
-        total_treinos_display = total_treinos
-        treino_label = f"Treino: Coluna '{NOME_COLUNA_TIME}' Ausente"
-
-    # --------------------------------------------------------------------------
-    # 3. CARDS DE INDICADORES (TOPO)
-    # --------------------------------------------------------------------------
-
-    # --- 3.1. CÁLCULOS ADICIONAIS: AVALIAÇÃO TÉCNICA E ENGAJAMENTO ---
-
-    # ** CÁLCULO DA AVALIAÇÃO TÉCNICA **
-    # ATENÇÃO: A função AGORA retorna a nota E a conclusão
     avaliacao_tecnica, conclusao_avaliacao = calculate_avaliacao_tecnica(
-        df_jogos_f, modalidade_filter, time_filter  # Passando os filtros
+        df_jogos_f, modalidade_filter, time_filter
     )
-
-    # ** CÁLCULO DO ENGAJAMENTO **
-    engajamento = calculate_engajamento(
-        df_treinos_f, df_sono_f, total_dias_periodo, media_sono_decimal
-    )
-
-
-    def calcular_vitoria(resultado_str):
-        if pd.isna(resultado_str): return 0
-        try:
-            partes = str(resultado_str).strip().split('x')
-            if len(partes) == 2:
-                gols_atleta = int(partes[0].strip())
-                gols_adversario = int(partes[1].strip())
-                return 1 if gols_atleta > gols_adversario else 0
-        except ValueError:
-            return 0
-        return 0
-
 
     # Chamada para obter os totais de V, E, D
     total_jogos_vd, vitorias_vd, empates_vd, derrotas_vd = analisar_resultado(df_jogos_f)
@@ -3338,6 +3568,14 @@ elif st.session_state["pagina"] == "dashboard":
                         <label>Média Diária</label>
                     </div>''', unsafe_allow_html=True)
 
+    # 🔒 GARANTE ENGAGEMENT SEMPRE DEFINIDO
+    engajamento = calculate_engajamento(
+        df_treinos_f,
+        df_sono_f,
+        total_dias_periodo,
+        media_sono_decimal
+    )
+
     # --- 3.3. SEGUNDA LINHA DE CARDS ---
     col7, col8, col9, col10, col11, col12 = st.columns(6)
 
@@ -3375,17 +3613,20 @@ elif st.session_state["pagina"] == "dashboard":
     # Coluna 11: Avaliação Técnica (CALCULADO)
     with col11:
         st.markdown(f'''
-                    <div class="card-treinos">
-                        ⭐ AVALIAÇÃO TÉCNICA<p>{avaliacao_tecnica}</p>
-                        <label>Ficha Ajustada</label>
-                    </div>''', unsafe_allow_html=True)
-    # Coluna 12: Engajamento (CALCULADO)
+            <div class="card-treinos">
+                ⭐ AVALIAÇÃO TÉCNICA<p>{avaliacao_tecnica}</p>
+                <label>Período Selecionado</label>
+            </div>
+        ''', unsafe_allow_html=True)
+
+    # Coluna 12: Engajamento
     with col12:
         st.markdown(f'''
-                    <div class="card-minutos">
-                        🧠 ENGAJAMENTO<p>{engajamento}</p>
-                        <label>Sono e Disciplina</label>
-                    </div>''', unsafe_allow_html=True)
+            <div class="card-minutos">
+                🧠 ENGAJAMENTO<p>{engajamento}</p>
+                <label>Sono e Disciplina</label>
+            </div>
+        ''', unsafe_allow_html=True)
 
     if insight_texto:
         st.success(insight_texto)
@@ -3483,19 +3724,25 @@ elif st.session_state["pagina"] == "dashboard":
 
         # 1. FILTRO POR TIME
         # Esta filtragem só ocorrerá se um Time ESPECÍFICO for selecionado.
-        if time_filtrado_selecionado and 'Treino' in df_treinos_f.columns:
-            termo_pesquisa = time_filtrado_selecionado.strip().lower()
+        if time_filter != "Todos" and 'Treino' in df_treinos_grafico.columns:
+            termo = time_filter.strip().lower()
             df_treinos_grafico = df_treinos_grafico[
-                df_treinos_grafico['Treino'].astype(str).str.lower().str.contains(termo_pesquisa, na=False)
+                df_treinos_grafico['Treino'].astype(str).str.lower().str.contains(termo, na=False)
             ]
 
-        # 2. FILTRO POR MODALIDADE
-        if 'modalidade_filter' in locals() and modalidade_filter != "Todos" and 'Tipo' in df_treinos_f.columns:
-            modalidade_lower = modalidade_filter.strip().lower()
+        # 2. FILTRO POR MODALIDADE (CORRETO E EXATO)
+        if modalidade_filter != "Todos" and 'Tipo' in df_treinos_grafico.columns:
+            df_treinos_grafico['Tipo'] = (
+                df_treinos_grafico['Tipo']
+                .astype(str)
+                .str.strip()
+                .str.title()
+            )
+
             df_treinos_grafico = df_treinos_grafico[
-                df_treinos_grafico['Tipo'].astype(str).str.lower().str.contains(modalidade_lower, na=False)
-            ]
-        # -------------------------------------------------------------------------
+                df_treinos_grafico['Tipo'] == modalidade_filter
+                ]
+        #--------------------------------------------------------------
 
         if df_treinos_grafico.empty:
             st.info("Não há registros de treinos no período ou para os filtros selecionados.")
@@ -3558,20 +3805,48 @@ elif st.session_state["pagina"] == "dashboard":
             st.pyplot(fig_treinos)
             plt.close(fig_treinos)
 
+    #INICIO PLANO PREMIUMM #########################################################################################
+
+    # ======================================================
+    # 🔒 BLOQUEIO DE CONTEÚDO PREMIUM
+    # ======================================================
+
+    if not is_premium:
+        st.markdown("---")
+        st.warning(
+            "🔒 Recursos avançados disponíveis apenas no **Plano Premium**.\n\n"
+            "Desbloqueie análise de scouts, score, relatórios, contexto físico e muito mais."
+        )
+        st.stop()
+
     st.markdown("---")
 
     # ===============================================
     # 🎨 Paleta FIFA
     SCOUT_COLORS = {
-        "Chutes": "#00E5FF",  # Ciano
-        "Chutes Errados": "#FF1744",  # vermelho forte
-        "Desarmes": "#7C4DFF",  # Roxo
-        "Passes-chave": "#00E676",  # Verde
-        "Passes Errados": "#9E9E9E",  # CINZA
-        "Faltas Sofridas": "#FF9100",  # Laranja
-        "Participações Indiretas": "#FF5252"  # Vermelho
-
+        "Chutes": "#00E5FF",
+        "Chutes Errados": "#FF1744",
+        "Desarmes": "#7C4DFF",
+        "Passes Certos": "#00E676",
+        "Passes Errados": "#9E9E9E",
+        "Faltas Sofridas": "#FF9100",
+        "Faltas Cometidas": "#E53935",
+        "Dribles Certos": "#7E57C2",
+        "Perda de Posse": "#FF5252"
     }
+
+    # 📐 ORDEM OFICIAL DE SCOUTS (UI GLOBAL)
+    SCOUT_ORDER_UI = [
+        "Chutes",
+        "Chutes Errados",
+        "Passes Certos",
+        "Passes Errados",
+        "Desarmes",
+        "Dribles Certos",
+        "Faltas Sofridas",
+        "Faltas Cometidas",
+        "Perda de Posse"
+    ]
 
 
     def hex_to_rgba(hex_color, alpha=0.35):
@@ -3580,21 +3855,31 @@ elif st.session_state["pagina"] == "dashboard":
         return f"rgba({r},{g},{b},{alpha})"
 
 
+    # ======================================================
+    # 🔥 BASE GLOBAL DE SCOUT (RAW → COLUNAS)
+    # ======================================================
+
+    df_scout_media = df_jogos_full.copy()
+
+
+    def _scout_from_raw(row):
+        raw = normalizar_scout_pwa(row.get("scout_raw", {}))
+        return pd.Series({k: int(raw.get(k, 0)) for k in SCOUT_ORDER_UI})
+
+
+    df_scout_media[SCOUT_ORDER_UI] = (
+        df_scout_media
+        .apply(_scout_from_raw, axis=1)
+        .fillna(0)
+    )
+
     # 📊 ANÁLISE DE SCOUTS
     # ======================================================
 
     st.markdown("## 📊 Análise de Scouts")
 
     # Garante colunas
-    scout_cols = [
-        "Chutes",
-        "Chutes Errados",
-        "Desarmes",
-        "Passes-chave",
-        "Passes Errados",
-        "Faltas Sofridas",
-        "Participações Indiretas"
-    ]
+    scout_cols = SCOUT_ORDER_UI.copy()
 
     for c in scout_cols:
         if c not in df_jogos_full.columns:
@@ -3615,6 +3900,19 @@ elif st.session_state["pagina"] == "dashboard":
         ],
         horizontal=True
     )
+
+
+    # =============================
+    # 🔒 GARANTIA DE COLUNAS DE SCOUT NO DATAFRAME
+    # =============================
+
+    for c in SCOUT_ORDER_UI:
+        if c not in df_jogos_full.columns:
+            df_jogos_full[c] = 0
+
+    df_jogos_full[SCOUT_ORDER_UI] = df_jogos_full[SCOUT_ORDER_UI].apply(
+        pd.to_numeric, errors="coerce"
+    ).fillna(0)
 
     # ======================================================
     # 🎯 1️⃣ SCOUT POR JOGO
@@ -3680,82 +3978,139 @@ elif st.session_state["pagina"] == "dashboard":
 
         jogo = jogo_df.iloc[0]
 
+        # ======================================================
+        # 🟦 RESULTADO DA PARTIDA (OFICIAL — BASEADO NO RESULTADO)
+        # ======================================================
+
+        time_casa = str(jogo.get("Casa", "Casa"))
+        time_visitante = str(jogo.get("Visitante", "Visitante"))
+
+        resultado_raw = str(jogo.get("Resultado", "")).strip().lower()
+
+        import re
+
+        gols_casa = gols_visitante = None
+
+        # 🔎 Extrai placar tipo "2x1"
+        match = re.search(r"(\d+)\s*x\s*(\d+)", resultado_raw)
+        if match:
+            gols_casa = int(match.group(1))
+            gols_visitante = int(match.group(2))
+
+        # 🎨 COR PELO RESULTADO (TIME CASA = ATLETA)
+        if gols_casa is not None and gols_visitante is not None:
+            if gols_casa > gols_visitante:
+                cor_fundo = "#1B5E20"  # VERDE → CASA VENCEU
+                texto_resultado = f"{time_casa} venceu"
+            elif gols_casa < gols_visitante:
+                cor_fundo = "#B71C1C"  # VERMELHO → CASA PERDEU
+                texto_resultado = f"{time_casa} perdeu"
+            else:
+                cor_fundo = "#37474F"  # EMPATE
+                texto_resultado = "Empate"
+
+            placar = f"{time_casa} {gols_casa} x {gols_visitante} {time_visitante}"
+        else:
+            cor_fundo = "#263238"
+            texto_resultado = "Resultado não informado"
+            placar = f"{time_casa} x {time_visitante}"
+
+        # 🧩 CARD
+        st.markdown(
+            f"""
+            <div style="
+                background: linear-gradient(135deg, {cor_fundo}, #000000);
+                border-radius: 16px;
+                padding: 24px;
+                margin-top: 15px;
+                margin-bottom: 25px;
+                text-align: center;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.45);
+            ">
+            <div style="font-size:18px; opacity:0.85; margin-bottom:6px;">
+                Resultado da Partida
+                </div>
+
+            <div style="font-size:30px; font-weight:800; margin-bottom:6px;">
+                {placar}
+                </div>
+
+            <div style="font-size:20px; font-weight:700;">
+                {texto_resultado}
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        # 🔒 FONTE ÚNICA DO SCOUT DO JOGO (OFICIAL)
+        raw = normalizar_scout_pwa(jogo.get("scout_raw", {}))
+
+
+        passes_certos_raw = int(jogo.get("scout_raw", {}).get("passe_certo", 0))
+        assistencias = safe_int(jogo.get("Assistências"))
+
+        passes_chave = assistencias
+        passes_certos = passes_certos_raw  # 🔒 NÃO SUBTRAI NADA
+
+        scout_vals = pd.Series({
+            "Chutes": int(raw.get("Chutes", 0)),
+            "Chutes Errados": int(raw.get("Chutes Errados", 0)),
+            "Passes Certos": passes_certos,  # 🔒 BRUTO
+            "Passes-chave": passes_chave,  # 🔥 DERIVADO
+            "Passes Errados": int(raw.get("Passes Errados", 0)),
+            "Desarmes": int(raw.get("Desarmes", 0)),
+            "Dribles Certos": int(raw.get("Dribles Certos", 0)),
+            "Faltas Sofridas": int(raw.get("Faltas Sofridas", 0)),
+            "Faltas Cometidas": int(raw.get("Faltas Cometidas", 0)),
+            "Perda de Posse": int(raw.get("Perda de Posse", 0)),
+        }).reindex(scout_cols, fill_value=0)
+
         # ---------------- MÉTRICAS ----------------
-        col1, col2, col3, col4 = st.columns(4)
-        col5, col6, col7 = st.columns(3)
 
-        with col1:
-            st.markdown(f"""
-                    <div class="scout-card bg-chutes">
-                        <div class="icon">🥅</div>
-                        <div class="scout-title">Chutes Certos</div>
-                        <div class="scout-value">{int(jogo["Chutes"])}</div>
-                    </div>
+        SCOUT_CARD_META = {
+            "Chutes": ("🥅", "Chutes Certos", "bg-chutes"),
+            "Chutes Errados": ("❌", "Chutes Errados", "bg-chutes-errados"),
+            "Passes Certos": ("🎯", "Passes Certos", "bg-passes"),
+            "Passes Errados": ("📉", "Passes Errados", "bg-passes-errados"),
+            "Desarmes": ("🛡️", "Desarmes", "bg-desarmes"),
+            "Dribles Certos": ("🌀", "Dribles Certos", "bg-dribles"),
+            "Faltas Sofridas": ("⚡", "Faltas Sofridas", "bg-faltas"),
+            "Faltas Cometidas": ("🚫", "Faltas Cometidas", "bg-faltas-cometidas"),
+            "Perda de Posse": ("🔁", "Perda de Posse", "bg-indiretas"),
+        }
+
+        cards_por_linha = 5
+
+        linhas = [
+            SCOUT_ORDER_UI[i:i + cards_por_linha]
+            for i in range(0, len(SCOUT_ORDER_UI), cards_por_linha)
+        ]
+
+        for linha in linhas:
+            cols = st.columns(len(linha))
+
+            for col, scout in zip(cols, linha):
+                icon, label, css = SCOUT_CARD_META[scout]
+                valor = int(scout_vals.get(scout, 0))
+
+                with col:
+                    st.markdown(f"""
+                        <div class="scout-card {css}">
+                            <div class="icon">{icon}</div>
+                            <div class="scout-title">{label}</div>
+                            <div class="scout-value">{valor}</div>
+                        </div>
                     """, unsafe_allow_html=True)
 
-        with col2:
-            st.markdown(f"""
-                    <div class="scout-card bg-chutes-errados">
-                        <div class="icon">❌</div>
-                        <div class="scout-title">Chutes Errados</div>
-                        <div class="scout-value">{int(jogo.get("Chutes Errados", 0))}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        with col3:
-            st.markdown(f"""
-                    <div class="scout-card bg-passes">
-                        <div class="icon">🎯</div>
-                        <div class="scout-title">Passes-chave</div>
-                        <div class="scout-value">{int(jogo["Passes-chave"])}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        with col4:
-            st.markdown(f"""
-                    <div class="scout-card bg-passes-errados">
-                        <div class="icon">📉</div>
-                        <div class="scout-title">Passes Errados</div>
-                        <div class="scout-value">{int(jogo.get("Passes Errados", 0))}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        with col5:
-            st.markdown(f"""
-                    <div class="scout-card bg-desarmes">
-                        <div class="icon">🛡️</div>
-                        <div class="scout-title">Desarmes</div>
-                        <div class="scout-value">{int(jogo["Desarmes"])}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        with col6:
-            st.markdown(f"""
-                    <div class="scout-card bg-faltas">
-                        <div class="icon">⚡</div>
-                        <div class="scout-title">Faltas Sofridas</div>
-                        <div class="scout-value">{int(jogo["Faltas Sofridas"])}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        with col7:
-            st.markdown(f"""
-                    <div class="scout-card bg-indiretas">
-                        <div class="icon">🔁</div>
-                        <div class="scout-title">Ações Ofensivas</div>
-                        <div class="scout-value">{int(jogo["Participações Indiretas"])}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-        # ---------------- GRÁFICO ----------------
-        scout_vals = jogo[scout_cols]
+        scout_vals_plot = scout_vals.reindex(SCOUT_ORDER_UI, fill_value=0)
 
         fig_barra = px.bar(
-            x=scout_vals.index,
-            y=scout_vals.values,
-            color=scout_vals.index,
+            x=scout_vals_plot.index,
+            y=scout_vals_plot.values,
+            color=scout_vals_plot.index,
             color_discrete_map=SCOUT_COLORS,
-            text=scout_vals.values,  # 👈 MOSTRA OS VALORES
+            text=scout_vals_plot.values,
             labels={"x": "Scout", "y": "Quantidade"},
             title="Distribuição de Scouts no Jogo"
         )
@@ -3793,52 +4148,116 @@ elif st.session_state["pagina"] == "dashboard":
             }
         )
 
-        # ---------------- RADAR ----------------
+        # ---------------- RADAR PREMIUM ----------------
         st.markdown("### 🎮 Radar de Scouts")
 
-        radar_vals = []
-        for scout in scout_cols:
-            max_val = df_jogos_full[scout].max()
-            valor = jogo[scout]
-            radar_vals.append((valor / max_val) * 100 if max_val > 0 else 0)
+        # 📊 Ordem narrativa (ofensivo → defensivo → erros)
+        radar_labels = [
+            "Chutes",
+            "Passes Certos",
+            "Dribles Certos",
+            "Faltas Sofridas",
+            "Desarmes",
+            "Passes Errados",
+            "Perda de Posse",
+            "Chutes Errados",
+            "Faltas Cometidas",
+        ]
 
-        radar_vals += radar_vals[:1]
-        radar_labels = scout_cols + [scout_cols[0]]
+        # Grupos conceituais
+        positivos = {
+            "Chutes",
+            "Passes Certos",
+            "Dribles Certos",
+            "Faltas Sofridas",
+            "Desarmes",
+        }
+
+        negativos = {
+            "Passes Errados",
+            "Perda de Posse",
+            "Chutes Errados",
+            "Faltas Cometidas",
+        }
+
+        # Valores reais do jogo
+        valores = {k: int(scout_vals.get(k, 0)) for k in radar_labels}
+
+        # 🔝 Normalização PELO PRÓPRIO JOGO (visual realista)
+        max_jogo = max(valores.values()) if max(valores.values()) > 0 else 1
+
+        vals_pos = [
+            (valores[k] / max_jogo) * 100 if k in positivos else 0
+            for k in radar_labels
+        ]
+
+        vals_neg = [
+            (valores[k] / max_jogo) * 100 if k in negativos else 0
+            for k in radar_labels
+        ]
 
         fig_radar = go.Figure()
+
+        # 🟢 POSITIVO
         fig_radar.add_trace(
             go.Scatterpolar(
-                r=radar_vals,
+                r=vals_pos,
                 theta=radar_labels,
-                mode="lines",
+                mode="lines+markers",
+                name="Ações Positivas",
+                line=dict(color="#00E676", width=3),
+                marker=dict(size=7, color="#00E676"),
                 fill="toself",
-                line=dict(color="#00E5FF", width=4),
-                fillcolor="rgba(0,229,255,0.35)"
+                fillcolor="rgba(0,230,118,0.25)",
+                hovertemplate="%{theta}: %{r:.0f}%<extra></extra>"
             )
         )
 
+        # 🔴 NEGATIVO
+        fig_radar.add_trace(
+            go.Scatterpolar(
+                r=vals_neg,
+                theta=radar_labels,
+                mode="lines+markers",
+                name="Ações Negativas",
+                line=dict(color="#FF1744", width=3),
+                marker=dict(size=7, color="#FF1744"),
+                fill="toself",
+                fillcolor="rgba(255,23,68,0.22)",
+                hovertemplate="%{theta}: %{r:.0f}%<extra></extra>"
+            )
+        )
+
+        # 🎨 Layout premium
         fig_radar.update_layout(
             polar=dict(
                 bgcolor="#0E1117",
-                radialaxis=dict(range=[0, 100], gridcolor="rgba(255,255,255,0.15)"),
-                angularaxis=dict(tickfont=dict(color="white"))
+                radialaxis=dict(
+                    range=[0, 100],
+                    showticklabels=False,
+                    ticks="",
+                    gridcolor="rgba(255,255,255,0.12)"
+                ),
+                angularaxis=dict(
+                    tickfont=dict(color="white", size=12),
+                    rotation=90,
+                    direction="clockwise"
+                )
             ),
             paper_bgcolor="#0E1117",
             font=dict(color="white"),
-            showlegend=False,
-            height=500
+            legend=dict(
+                orientation="h",
+                y=-0.15,
+                x=0.5,
+                xanchor="center"
+            ),
+            showlegend=True,
+            height=520,
+            margin=dict(t=20, b=20)
         )
 
-        st.plotly_chart(
-            fig_radar,
-            use_container_width=True,
-            config={
-                "scrollZoom": False,
-                "displayModeBar": False,
-                "doubleClick": False,
-                "staticPlot": True
-            }
-        )
+        st.plotly_chart(fig_radar, use_container_width=True)
 
         # ======================================================
         # ======================================================
@@ -3847,8 +4266,9 @@ elif st.session_state["pagina"] == "dashboard":
 
         st.markdown("### ⭐ Score Geral do Jogo")
 
-        # ⭐ SCORE OFICIAL (MESMO DO HOME)
-        score_final = float(jogo["Score_Jogo"])
+        score_final = safe_float(jogo.get("Score_V12", 0))
+
+
         score_formatado = f"{score_final:.1f}"
 
         # Normaliza 0–10
@@ -3900,43 +4320,136 @@ elif st.session_state["pagina"] == "dashboard":
         analise = []
 
         # ===============================
-        # ⚽ FINALIZAÇÕES
+        # 🔢 SCOUT ÚNICO — FONTE OFICIAL
+        # ===============================
+
+        chutes_certos = int(scout_vals.get("Chutes", 0))
+        chutes_errados = int(scout_vals.get("Chutes Errados", 0))
+        finalizacoes = chutes_certos + chutes_errados
+
+        passes_certos = int(scout_vals.get("Passes Certos", 0))
+        passes_chave = int(scout_vals.get("Passes-chave", 0))
+        passes_errados = int(scout_vals.get("Passes Errados", 0))
+
+        perdas_posse = int(scout_vals.get("Perda de Posse", 0))
+        dribles_certos = int(scout_vals.get("Dribles Certos", 0))
+        desarmes = int(scout_vals.get("Desarmes", 0))
+        faltas = int(scout_vals.get("Faltas Sofridas", 0))
+        faltas_cometidas = int(scout_vals.get("Faltas Cometidas", 0))
+
+        # ===============================
+        # ⚽ FINALIZAÇÕES (PRIORIDADE)
         # ===============================
         if finalizacoes > 0:
-            if gols > 0:
-                eficiencia = gols / finalizacoes
-                if eficiencia >= 0.25:
+            eficiencia = gols / finalizacoes if finalizacoes > 0 else 0
+
+            if gols >= 2:
+                if eficiencia >= 0.4:
                     analise.append(
-                        f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols** com boa eficiência."
+                        f"⚽ Finalizou **{finalizacoes} vezes** e marcou **{gols} gols**, com ótima eficiência."
                     )
                 else:
                     analise.append(
-                        f"⚽ Finalizou **{finalizacoes} vezes**, marcou **{gols} gols**, mas pode melhorar a precisão."
+                        f"⚽ Finalizou **{finalizacoes} vezes** e marcou **{gols} gols**, mas desperdiçou várias oportunidades."
                     )
+
+            elif gols == 1:
+                if eficiencia >= 0.3:
+                    analise.append(
+                        f"⚽ Finalizou **{finalizacoes} vezes** e marcou **1 gol**, com boa eficiência."
+                    )
+                else:
+                    analise.append(
+                        f"⚽ Finalizou **{finalizacoes} vezes**, marcou **1 gol**, mas precisa melhorar a precisão."
+                    )
+
+            else:  # gols == 0
+                if finalizacoes >= 5:
+                    analise.append(
+                        f"⚽ Finalizou **{finalizacoes} vezes**, mas errou a maioria das tentativas."
+                    )
+                else:
+                    analise.append(
+                        f"⚽ Tentou **{finalizacoes} finalizações**, mas não marcou gols."
+                    )
+
+        # ===============================
+        # ⚽ GARANTIA NARRATIVA DE GOLS (COM FINALIZAÇÕES)
+        # ===============================
+        if gols > 0 and not any("⚽" in linha for linha in analise):
+            eficiencia = gols / finalizacoes if finalizacoes > 0 else 0
+
+            if eficiencia >= 0.4:
+                analise.append(
+                    f"⚽ Finalizou **{finalizacoes} vezes** e marcou **{gols} gols**, mostrando boa eficiência."
+                )
             else:
                 analise.append(
-                    f"⚽ Tentou **{finalizacoes} finalizações**, mas não marcou gols."
+                    f"⚽ Finalizou **{finalizacoes} vezes** e marcou **{gols} gols**, mas desperdiçou várias oportunidades."
                 )
 
         # ===============================
-        # 🎯 PASSES-CHAVE x ASSISTÊNCIA
+        # 🎯 ASSISTÊNCIAS (FATO OBJETIVO)
         # ===============================
-        if passes_chave > 0:
-            if assistencias > 0:
-                analise.append(
-                    f"🎯 Criou **{passes_chave} chances**, resultando em **{assistencias} assistência(s)**."
-                )
-            else:
-                analise.append(
-                    f"🎯 Criou **{passes_chave} chances claras**, mas sem conversão em gol."
-                )
 
-        # ===============================
-        # ⚠️ ERROS DE PASSE
-        # ===============================
-        if passes_errados > passes_chave:
+
+        passes_totais = passes_certos
+
+        if assistencias > 0:
             analise.append(
-                "⚠️ Teve mais erros do que passes decisivos, atenção à tomada de decisão."
+                f"🎯 Contribuiu diretamente para o placar com **{assistencias} assistência(s)**, "
+                f"sendo **{assistencias} passe(s) decisivo(s)** em um total de "
+                f"**{passes_totais} passes certos**."
+            )
+
+        # ===============================
+        # 🌀 DRIBLES
+        # ===============================
+        if dribles_certos >= 4:
+            analise.append(
+                "🌀 Teve sucesso nas jogadas individuais, ganhando duelos importantes."
+            )
+        elif dribles_certos >= 2:
+            analise.append(
+                "🌀 Tentou jogadas individuais em alguns momentos da partida."
+            )
+
+        # ===============================
+        # 🔄 CONTROLE DE POSSE (SÓ CRÍTICA)
+        # ===============================
+        total_erros_posse = perdas_posse + passes_errados
+
+        if total_erros_posse >= 7:
+            analise.append(
+                "🔄 Demonstrou grande instabilidade com a bola, perdendo a posse com frequência."
+            )
+        elif total_erros_posse >= 5:
+            analise.append(
+                "🔄 Oscilou no controle da posse e na tomada de decisão."
+            )
+
+        # ===============================
+        # 🎯 PASSES (CONTEXTO REAL)
+        # ===============================
+        if passes_chave > 0 and total_erros_posse < passes_chave:
+            analise.append(
+                "🎯 Participou bem da construção das jogadas, dando fluidez ao jogo."
+            )
+        elif passes_chave > 0:
+            analise.append(
+                "🎯 Tentou participar da construção das jogadas, mas com eficiência irregular."
+            )
+
+        # ===============================
+        # 🚨 FALTAS COMETIDAS
+        # ===============================
+        if faltas_cometidas >= 5:
+            analise.append(
+                "🚨 Cometeu muitas faltas, oferecendo bolas paradas perigosas ao adversário."
+            )
+        elif faltas_cometidas >= 3:
+            analise.append(
+                "🚨 Teve dificuldade no tempo de bola, recorrendo a faltas para conter as jogadas."
             )
 
         # ===============================
@@ -3944,49 +4457,53 @@ elif st.session_state["pagina"] == "dashboard":
         # ===============================
         if desarmes >= 5:
             analise.append(
-                f"🛡️ Forte presença defensiva com **{desarmes} desarmes**."
+                f"🛡️ Forte presença defensiva, com **{desarmes} desarmes**."
             )
 
         if faltas >= 4:
             analise.append(
-                f"⚡ Sofreu **{faltas} faltas**, mostrando agressividade ofensiva."
+                f"⚡ Sofreu **{faltas} faltas**, mostrando intensidade e agressividade ofensiva."
             )
 
+        # ===============================
+        # 🧠 LEITURA GLOBAL DO JOGO (SEMPRE FECHA)
+        # ===============================
+        if score_final >= 9:
+            analise.append(
+                "📌 Atuação de alto nível, decisiva para o resultado da partida."
+            )
+        elif score_final >= 7:
+            analise.append(
+                "📌 Boa atuação, com contribuição relevante para a equipe."
+            )
+        elif score_final >= 5:
+            analise.append(
+                "📌 Teve impacto pontual, mas apresentou oscilações ao longo do jogo."
+            )
+        else:
+            analise.append(
+                "📌 Desempenho abaixo do ideal, com dificuldades técnicas e de tomada de decisão."
+            )
+
+        # ===============================
+        # 📝 EXIBIÇÃO FINAL
+        # ===============================
         analise_texto_pdf = "\n".join(analise)
         if analise_texto_pdf:
             st.markdown(
                 f"""
-                        <div style="
-                            background:#0B1220;
-                            padding:14px;
-                            border-radius:12px;
-                            border-left:4px solid #00E5FF;
-                            margin-bottom:14px;
-                        ">
-                            {analise_texto_pdf.replace("\n", "<br>")}
-                        </div>
-                        """,
+                <div style="
+                    background:#0B1220;
+                    padding:14px;
+                    border-radius:12px;
+                    border-left:4px solid #00E5FF;
+                    margin-bottom:14px;
+                ">
+                    {analise_texto_pdf.replace("\n", "<br>")}
+                </div>
+                """,
                 unsafe_allow_html=True
             )
-
-        # 🔹 SEPARADOR PREMIUM ENTRE ANÁLISE DO JOGO E TENDÊNCIA
-        st.markdown(
-            """
-            <div style="
-                height: 2px;
-                margin: 28px 0 32px 0;
-                background: linear-gradient(
-                    to right,
-                    rgba(0,229,255,0.05),
-                    rgba(0,229,255,0.9),
-                    rgba(0,229,255,0.05)
-                );
-                box-shadow: 0 0 12px rgba(0,229,255,0.6);
-                border-radius: 10px;
-            "></div>
-            """,
-            unsafe_allow_html=True
-        )
 
         # ======================================================
         # 🧠 ZONA 1 — CONTEXTO FÍSICO PRÉ-JOGO (7 DIAS ANTERIORES)
@@ -4344,10 +4861,11 @@ elif st.session_state["pagina"] == "dashboard":
             border-left:6px solid #00E5FF;
             margin-bottom:18px;
         ">
-            <strong>🧠 Contexto Físico Pré-Jogo</strong><br>
-            Exposição física: <b>{status_carga[0]}</b><br>
-            Sono: <b>{status_sono[0]}</b><br>
-            Carga recente: <b>{"⚠️ Atenção" if alerta_forte_carga else "Controlada"}</b>
+            <strong>🧠 Contexto Físico Pré-Jogo (Dados Objetivos)</strong><br>
+                Carga física estimada: <b>{status_carga[0]}</b><br>
+                Sono médio (registros): <b>{status_sono[0]}</b><br>
+                Sequência recente de jogos: <b>{"⚠️ Atenção" if alerta_forte_carga else "Controlada"}</b>
+
         </div>
         """, unsafe_allow_html=True)
 
@@ -4501,12 +5019,22 @@ elif st.session_state["pagina"] == "dashboard":
         with st.expander("📊 Ver detalhes técnicos do contexto físico"):
             st.markdown(html_card, unsafe_allow_html=True)
 
+
+
         # -------- VISUAL MODERNO DOS 4 PILARES --------
-        st.markdown("#### 📊 Leitura Rápida do Contexto Físico")
+        st.markdown("#### 📊 Leitura Rápida do Contexto Físico do Atleta (Resumo ultimos 7 dias)")
 
 
         def barra(label, status):
             nome, valor, emoji = status
+
+            if nome.lower() in ["irregular", "atenção"]:
+                gradiente = "linear-gradient(90deg, #FBBF24, #F59E0B)"  # AMARELO
+            elif nome.lower() in ["alto", "ruim"]:
+                gradiente = "linear-gradient(90deg, #EF4444, #B91C1C)"  # VERMELHO
+            else:
+                gradiente = "linear-gradient(90deg, #00E5FF, #1DE9B6)"  # BOM
+
             st.markdown(
                 f"""
                 <div style="margin-bottom:10px;">
@@ -4514,7 +5042,7 @@ elif st.session_state["pagina"] == "dashboard":
                     <div style="background:#1F2933; border-radius:10px; overflow:hidden; height:10px;">
                         <div style="
                             width:{valor}%;
-                            background:linear-gradient(90deg, #00E5FF, #1DE9B6);
+                            background:{gradiente};
                             height:10px;
                         "></div>
                     </div>
@@ -4528,6 +5056,13 @@ elif st.session_state["pagina"] == "dashboard":
         barra("💪 Treino", status_treino)
         barra("🍽️ Alimentação", status_alimentacao)
         barra("🥵 Cansaço", status_cansaco)
+
+        st.markdown(
+            "<span style='opacity:0.7;'>"
+            "ℹ️ O cansaço representa a percepção do atleta e pode divergir da carga física estimada pelo sistema."
+            "</span>",
+            unsafe_allow_html=True
+        )
 
         st.markdown(
             """
@@ -4645,6 +5180,12 @@ elif st.session_state["pagina"] == "dashboard":
         # 📋 VISUALIZAÇÃO DOS ÚLTIMOS 5 JOGOS (SUPORTE À TENDÊNCIA)
         # ======================================================
 
+        # 🔒 SCORE UNIFICADO (V12 > Legado)
+        if "Score_V12" in df_tend.columns:
+            df_tend["Score_Usado"] = df_tend["Score_V12"]
+        else:
+            df_tend["Score_Usado"] = df_tend.get("Score_Jogo", 0)
+
         st.markdown("#### 📋 Jogos considerados na análise")
 
         df_ultimos_5 = df_tend.head(5).copy()
@@ -4662,11 +5203,11 @@ elif st.session_state["pagina"] == "dashboard":
             "Data_fmt",
             "Jogo",
             "Condição do Campo",
-            "Score_Jogo"
+            "Score_Usado"
         ]].rename(columns={
             "Data_fmt": "Data",
             "Condição do Campo": "Modalidade",
-            "Score_Jogo": "Nota"
+            "Score_Usado": "Nota"
         })
 
         df_visual["Nota"] = df_visual["Nota"].round(1)
@@ -4699,7 +5240,7 @@ elif st.session_state["pagina"] == "dashboard":
         fig_notas.add_trace(
             go.Scatter(
                 x=df_chart["Rotulo"],
-                y=df_chart["Score_Jogo"],
+                y=df_chart["Score_Usado"],
                 mode="lines+markers",
                 line=dict(
                     color="#00E5FF",
@@ -4707,7 +5248,7 @@ elif st.session_state["pagina"] == "dashboard":
                 ),
                 marker=dict(
                     size=10,
-                    color=df_chart["Score_Jogo"],
+                    color=df_chart["Score_Usado"],
                     colorscale="RdYlGn",
                     cmin=0,
                     cmax=10
@@ -4766,21 +5307,32 @@ elif st.session_state["pagina"] == "dashboard":
                 )
 
 
+
     # ======================================================
     # 📊 2️⃣ MÉDIA POR JOGO
     # ======================================================
     elif modo_scout == "📊 Média por jogo":
 
         total_jogos = len(df_jogos_full)
-        medias = df_jogos_full[scout_cols].sum() / total_jogos if total_jogos > 0 else 0
+
+        medias = (
+            df_scout_media[SCOUT_ORDER_UI].sum() / total_jogos
+            if total_jogos > 0
+            else pd.Series(0, index=SCOUT_ORDER_UI)
+        )
+
+        media_assistencias = (
+            df_jogos_full["Assistências"].sum() / total_jogos
+            if total_jogos > 0 else 0
+        )
 
         c1, c2, c3, c4, c5 = st.columns(5)
 
         c1.metric("🥅 Chutes/jogo", round(medias["Chutes"], 2))
         c2.metric("🛡️ Desarmes/jogo", round(medias["Desarmes"], 2))
-        c3.metric("🎯 Passes-chave/jogo", round(medias["Passes-chave"], 2))
+        c3.metric("🎯 Assistências/jogo", round(media_assistencias, 2))
         c4.metric("⚡ Faltas Sofridas/jogo", round(medias["Faltas Sofridas"], 2))
-        c5.metric("🔁 Part. Indiretas/jogo", round(medias["Participações Indiretas"], 2))
+        c5.metric("🔁 Perda de Posse/jogo", round(medias["Perda de Posse"], 2))
 
         fig = px.bar(
             x=medias.index,
@@ -4801,54 +5353,135 @@ elif st.session_state["pagina"] == "dashboard":
         st.plotly_chart(fig, use_container_width=True)
 
     # ======================================================
-    # ⚖️ 3️⃣ COMPARAÇÃO POR MODALIDADE
+    # ⚖️ 3️⃣ COMPARAÇÃO POR MODALIDADE (MÉDIA POR JOGO)
     # ======================================================
     elif modo_scout == "⚖️ Comparação por modalidade":
 
-        if "Condição do Campo" not in df_jogos_full.columns:
-            st.warning("Modalidade não encontrada.")
-        else:
-            comp = (
-                df_jogos_full.groupby("Condição do Campo")[scout_cols]
-                .mean()
-                .reset_index()
+        df_jogos_comp = df_scout_media.copy()
+
+        # 📅 FILTRO DE ANO (UI)
+        anos_disponiveis = (
+            df_scout_media["Data_DT"]
+            .dropna()
+            .dt.year
+            .sort_values()
+            .unique()
+        )
+
+        ano_selecionado = st.selectbox(
+            "📅 Selecionar ano",
+            ["Todos"] + anos_disponiveis.tolist()
+        )
+
+        # 🔒 APLICA FILTRO DE ANO
+        if ano_selecionado != "Todos":
+            df_jogos_comp = df_jogos_comp[
+                df_jogos_comp["Data_DT"].dt.year == ano_selecionado
+                ]
+
+        # 🧹 NORMALIZA CONDIÇÃO DO CAMPO
+        df_jogos_comp["Condição do Campo"] = (
+            df_jogos_comp["Condição do Campo"]
+            .astype(str)
+            .str.strip()
+            .str.lower()
+            .replace({
+                "fut sal": "futsal",
+                "futsal ": "futsal",
+                "campo ": "campo",
+                "society ": "society"
+            })
+            .str.title()
+        )
+
+        # 🔒 APENAS CAMPO E FUTSAL
+        df_jogos_comp = df_jogos_comp[
+            df_jogos_comp["Condição do Campo"].isin(["Campo", "Futsal"])
+        ]
+
+        if df_jogos_comp.empty:
+            st.info("Não há jogos suficientes para comparação.")
+            st.stop()
+
+        # 📊 CONTAGEM REAL DE JOGOS (POR DATA)
+        qtd_campo = (
+            df_jogos_comp[df_jogos_comp["Condição do Campo"] == "Campo"]["Data_DT"]
+            .dt.date
+            .nunique()
+        )
+
+        qtd_futsal = (
+            df_jogos_comp[df_jogos_comp["Condição do Campo"] == "Futsal"]["Data_DT"]
+            .dt.date
+            .nunique()
+        )
+
+        # ✅ AGREGA SCOUT POR JOGO (PRIMEIRO)
+        scout_por_jogo = (
+            df_jogos_comp
+            .groupby(["Data_DT", "Condição do Campo"])[SCOUT_ORDER_UI]
+            .sum()
+            .reset_index()
+        )
+
+        # ✅ MÉDIA POR MODALIDADE (DEPOIS)
+        comp = (
+            scout_por_jogo
+            .groupby("Condição do Campo")[SCOUT_ORDER_UI]
+            .mean()
+            .reset_index()
+        )
+
+        # 🔢 SEM ESCALA (VALOR REAL = MÉDIA)
+        ESCALA_VISUAL = 1
+        comp[SCOUT_ORDER_UI] = comp[SCOUT_ORDER_UI] * ESCALA_VISUAL
+
+        # 📈 GRÁFICO
+        fig = px.bar(
+            comp,
+            x="Condição do Campo",
+            y=SCOUT_ORDER_UI,
+            barmode="group",
+            color_discrete_map=SCOUT_COLORS,
+            title="Comparação de Scouts por Modalidade (média por jogo)"
+        )
+
+        # 🔢 NÚMERO COM 1 CASA DECIMAL (CORRETO PRA MÉDIA)
+        fig.update_traces(
+            texttemplate="%{y:.1f}",
+            textposition="inside",
+            insidetextanchor="middle",
+            textfont=dict(
+                color="white",
+                size=13
             )
+        )
 
-            fig = px.bar(
-                comp,
-                x="Condição do Campo",
-                y=scout_cols,
-                barmode="group",
-                color_discrete_map=SCOUT_COLORS,
-                title="Comparação de Scouts por Modalidade"
+        fig.update_layout(
+            plot_bgcolor="#0E1117",
+            paper_bgcolor="#0E1117",
+            font=dict(color="white"),
+            xaxis_title=None,
+            yaxis_title=None,
+            uniformtext_minsize=10,
+            uniformtext_mode="hide"
+        )
+
+        # 🏷️ TEXTO EXPLICATIVO EMBAIXO DO GRÁFICO
+        fig.add_annotation(
+            text=f"Média por jogo • Base: {qtd_futsal} jogos Futsal • {qtd_campo} jogos Campo",
+            xref="paper",
+            yref="paper",
+            x=0.5,
+            y=-0.18,
+            showarrow=False,
+            font=dict(
+                size=12,
+                color="rgba(255,255,255,0.75)"
             )
+        )
 
-            fig.update_layout(
-                plot_bgcolor="#0E1117",
-                paper_bgcolor="#0E1117",
-                font=dict(color="white")
-            )
-
-            st.plotly_chart(fig, use_container_width=True)
-
-    # 🔹 SEPARADOR PREMIUM — FIM DO RELATÓRIO DO JOGO
-    st.markdown(
-        """
-        <div style="
-            height: 2px;
-            margin: 40px 0 40px 0;
-            background: linear-gradient(
-                to right,
-                rgba(0,229,255,0.05),
-                rgba(0,229,255,0.9),
-                rgba(0,229,255,0.05)
-            );
-            box-shadow: 0 0 14px rgba(0,229,255,0.6);
-            border-radius: 10px;
-        "></div>
-        """,
-        unsafe_allow_html=True
-    )
+        st.plotly_chart(fig, use_container_width=True)
 
     # =============================
     # 🌙 SONO DIÁRIO (COM FILTRO PRÓPRIO)
@@ -4986,6 +5619,5 @@ st.markdown(
     "<p style='text-align:center; color:#6B7280; font-size:13px;'>ScoutMind • Desenvolvido para evolução contínua do atleta.</p>",
     unsafe_allow_html=True
 )
-
 
 

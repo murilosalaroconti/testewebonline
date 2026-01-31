@@ -10,7 +10,16 @@ def carregar_jogos_normalizados(fonte="sheets"):
         "Resultado",
         "Gols Marcados",
         "Assistências",
-        "Minutos Jogados"
+        "Minutos Jogados",
+
+        # 🔥 SCOUTS
+        "Chutes",
+        "Chutes Errados",
+        "Passes-chave",
+        "Passes Errados",
+        "Desarmes",
+        "Faltas Sofridas",
+        "Participações Indiretas"
     ]
 
     if fonte == "firestore":

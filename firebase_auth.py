@@ -1,6 +1,7 @@
 from firebase_admin import auth, firestore
 from datetime import datetime, timedelta, timezone
 import requests
+from firebase_db import db
 
 FIREBASE_API_KEY = "AIzaSyCo7u6bzRTkJQ8VUwtJ_aASMEt8d4VPTs0"
 
@@ -73,7 +74,7 @@ def criar_usuario_firebase(email: str, password: str):
 # ===============================
 # 🆓 TRIAL
 # ===============================
-db = firestore.client()
+
 DIAS_TESTE_GRATUITO = 2  # 7 / 15 / 30
 
 def verificar_trial_ativo(user_uid: str) -> bool:
