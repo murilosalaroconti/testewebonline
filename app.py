@@ -1,22 +1,35 @@
-# app.py - Versão Streamlit do sistema do Murilo
+# ==========================================
+# 📦 IMPORTS PADRÃO
+# ==========================================
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
-import matplotlib.pyplot as plt
-from PIL import Image
+import os
 import io
-import numpy as np
-import matplotlib.patches as mpatches
-import altair as alt
+import json
+import uuid
+import tempfile
+import unicodedata
 from pathlib import Path
+
+# ==========================================
+# 📊 VISUALIZAÇÃO
+# ==========================================
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import numpy as np
+import altair as alt
 import plotly.express as px
 import plotly.graph_objects as go
+from PIL import Image
+
+# ==========================================
+# 📄 PDF / RELATÓRIOS
+# ==========================================
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.colors import HexColor, white
 from reportlab.lib.units import cm
-import tempfile
-import os
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -25,32 +38,52 @@ from reportlab.platypus import (
     Table,
     TableStyle
 )
-import json
-from firebase_admin import firestore
-from data_treinos import load_treinos_df_firestore
-from firebase_db import salvar_treino_firestore
-from data_sono import load_sono_df_firestore
-from firebase_db import salvar_sono_firestore
-from data_saude import load_saude_df_firestore
-from firebase_db import salvar_saude_firestore
-from firebase_db import salvar_jogo_firestore
 
-from data_jogos import load_jogos_df_firestore
-import unicodedata
+# ==========================================
+# 🔥 FIREBASE — INIT OBRIGATÓRIO (CLOUD)
+# ==========================================
+import firebase_admin
+from firebase_admin import credentials
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate(dict(st.secrets["firebase"]))
+    firebase_admin.initialize_app(cred)
+
+# ==========================================
+# 🔐 FIREBASE — AUTENTICAÇÃO / USUÁRIOS
+# ==========================================
 from firebase_auth import (
     login_firebase,
     criar_usuario_firebase,
-    verificar_trial_ativo,enviar_email_reset_senha
+    verificar_trial_ativo,
+    enviar_email_reset_senha
 )
+
 from firebase_atletas import listar_atletas, criar_atleta
-from firebase_trial import get_info_trial
-from data_jogos import carregar_jogos_firestore
-
-
-import uuid
-from firebase_admin import get_app
-from firebase_db import db
 from firebase_trial import get_info_trial, get_plano_usuario
+
+# ==========================================
+# 📊 DADOS — FIRESTORE (SERVIÇOS)
+# ==========================================
+from data_jogos import (
+    load_jogos_df_firestore,
+    carregar_jogos_firestore
+)
+
+from data_treinos import load_treinos_df_firestore
+from data_sono import load_sono_df_firestore
+from data_saude import load_saude_df_firestore
+
+from firebase_db import (
+    salvar_treino_firestore,
+    salvar_sono_firestore,
+    salvar_saude_firestore,
+    salvar_jogo_firestore
+)
+
+# ==========================================
+# 🧠 SCORE
+# ==========================================
 from score_v12 import calcular_score_v12
 
 # -*- coding: utf-8 -*-
